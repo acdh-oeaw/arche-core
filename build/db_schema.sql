@@ -1,5 +1,6 @@
 BEGIN;
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS postgis_raster;
 CREATE OR REPLACE FUNCTION setgdal() RETURNS int LANGUAGE plpgsql AS $$
@@ -74,6 +75,7 @@ CREATE TABLE metadata (
 CREATE INDEX metadata_id_index ON metadata USING btree (id);
 CREATE INDEX metadata_property_index ON metadata USING btree (property);
 CREATE INDEX metadata_value_index ON metadata USING btree (substring(value, 1, 1000));
+CREATE INDEX metadata_value_gindex ON metadata USING gin (value, gin_trgm_ops);
 CREATE INDEX metadata_value_n_index ON metadata USING btree (value_n);
 CREATE INDEX metadata_value_t_index ON metadata USING btree (value_t);
 
@@ -148,7 +150,7 @@ DECLARE
   cnt int;
 BEGIN
   DROP TABLE IF EXISTS __resToDel;
-  CREATE TEMPORARY TABLE __resToDel AS SELECT * FROM get_relatives(resource_id, rel_prop);
+  CREATE TEMPORARY TABLE __resToDel AS SELECT * FROM get_relatives(resource_id, rel_prop, 999999, 0);
 
   DROP TABLE IF EXISTS __resConflict;
   CREATE TEMPORARY TABLE __resConflict AS
