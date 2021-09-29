@@ -613,6 +613,65 @@ class RestTest extends TestBase {
         $this->assertGreaterThan(0, count($g->resource($m[2]->getUri())->propertyUris()));
     }
 
+    public function testMerge(): void {
+        $idProp                                                  = self::$config->schema->id;
+        $txId                                                    = $this->beginTransaction();
+        $headers                                                 = $this->getHeaders($txId);
+        $headers[self::$config->rest->headers->metadataReadMode] = 'resource';
+
+        $meta1 = (new Graph())->resource(self::$baseUrl);
+        $meta1->addResource($idProp, 'http://res1');
+        $meta1->addLiteral('http://foo', '1');
+        $meta1->addLiteral('http://bar', '2');
+        $meta2 = (new Graph())->resource(self::$baseUrl);
+        $meta2->addResource($idProp, 'http://res2');
+        $meta2->addLiteral('http://bar', 'A');
+        $meta2->addLiteral('http://baz', 'B');
+
+        $loc1 = $this->createMetadataResource($meta1, $txId);
+        $loc2 = $this->createMetadataResource($meta2, $txId);
+        $id1  = substr($loc1, strlen(self::$baseUrl));
+        $id2  = substr($loc2, strlen(self::$baseUrl));
+
+        $req     = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
+        $resp    = self::$client->send($req);
+
+        $g       = new Graph();
+        $g->parse((string) $resp->getBody());
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta    = new Graph();
+        $meta->parse($resp->getBody());
+        $metaRes = $meta->resource($loc1);
+        // all ids are preserved
+        $ids     = [];
+        foreach ($metaRes->allResources($idProp) as $i) {
+            $ids[] = (string) $i;
+        }
+        $this->assertContains($loc1, $ids);
+        $this->assertContains($loc2, $ids);
+        $this->assertContains('http://res1', $ids);
+        $this->assertContains('http://res2', $ids);
+        // unique properties are preserved, common are kept from target
+        $this->assertCount(1, $metaRes->all('http://foo'));
+        $this->assertCount(1, $metaRes->all('http://bar'));
+        $this->assertCount(1, $metaRes->all('http://baz'));
+        $this->assertEquals('1', (string)$metaRes->get('http://foo'));
+        $this->assertEquals('2', (string)$metaRes->get('http://bar'));
+        $this->assertEquals('B', (string)$metaRes->get('http://baz'));
+
+        $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $resp = self::$client->send(new Request('get', $loc2));
+        $this->assertEquals(404, $resp->getStatusCode());
+
+        $this->commitTransaction($txId);
+
+        $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $resp = self::$client->send(new Request('get', $loc2));
+        $this->assertEquals(404, $resp->getStatusCode());
+    }
+
     public function testBadMetaMethod(): void {
         $location = $this->createBinaryResource();
         $headers  = [

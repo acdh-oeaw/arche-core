@@ -192,6 +192,9 @@ class RestController {
                     $methodOptions = 'options' . $collection . $suffix;
                     self::$resource->$methodOptions(405);
                 }
+            } else if ($method === 'Put' && preg_match('>^merge/([0-9]+)/([0-9]+)/?$>', $path, $matches)) {
+                self::$resource = new Resource($matches[2]);
+                self::$resource->merge($matches[1]);
             } else {
                 throw new RepoException('Not Found', 404);
             }

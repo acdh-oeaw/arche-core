@@ -83,34 +83,38 @@ class Resource {
         $this->getMetadata();
     }
 
-    public function move(): void {
+    /**
+     * Merges the $srcId resource into the current resource.
+     * 
+     * Preserves identifiers and unique properties from both. Non-unique properties
+     * are kept from the current resource only.
+     * 
+     * @param int $srcId
+     * @return void
+     */
+    public function merge(int $srcId): void {
         $this->checkCanWrite();
-        $srcUri = $this->getUri();
+        $srcRes = new Resource($srcId);
+        $srcRes->checkCanWrite();
 
-        // check writes on destination resource and lock it
-        $dst = filter_input(\INPUT_SERVER, 'HTTP_DESTINATION');
-        $p   = strlen(RC::getBaseUrl());
-        if (substr($dst, 0, $p) !== RC::getBaseUrl()) {
-            throw new RepoException('Destination resource outside the repository', 400);
+        $srcMeta    = new Metadata($srcId);
+        $srcMeta->loadFromDb(RRI::META_RESOURCE);
+        $srcMeta    = $srcMeta->getResource();
+        $targetMeta = new Metadata($this->id);
+        $targetMeta->loadFromDb(RRI::META_RESOURCE);
+
+        $meta = $targetMeta->getResource();
+        foreach (array_diff($meta->propertyUris(), [RC::$config->schema->id]) as $p) {
+            $srcMeta->delete($p);
         }
-        $dstId    = substr($dst, $p);
-        $srcId    = $this->id;
-        $this->id = (int) $dstId;
-        $this->checkCanWrite();
+        $meta->merge($srcMeta, [RC::$config->schema->id]);
+        RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
+        $meta = RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta, null);
+        $targetMeta->loadFromResource($meta);
 
-        // move identifiers and references
-        $query = RC::$pdo->prepare("UPDATE identifiers SET id = ? WHERE id = ? AND ids <> ?");
-        $query->execute([$dstId, $srcId, $srcUri]);
-        $query = RC::$pdo->prepare("UPDATE relations SET target_id = ? WHERE target_id = ?");
-        $query->execute([$dstId, $srcId]);
-        // mark resource as deleted
-        $query = RC::$pdo->prepare("UPDATE resources SET state = ? WHERE id = ?");
-        $query->execute([self::STATE_DELETED, $srcId]);
-        $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
+        $query = RC::$pdo->prepare("DELETE FROM resources WHERE id = ?");
         $query->execute([$srcId]);
-        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
-        $query->execute([$srcId]);
-
+        $targetMeta->save();
         $this->headMetadata(true);
     }
 
