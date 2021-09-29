@@ -126,6 +126,10 @@ class HandlersController {
         }
     }
 
+    public function hasHandlers(string $method): bool {
+        return isset($this->handlers[$method]);
+    }
+
     public function handleResource(string $method, int $id, Resource $res,
                                    ?string $path): Resource {
         if (!isset($this->handlers[$method])) {

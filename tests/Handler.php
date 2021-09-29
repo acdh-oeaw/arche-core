@@ -29,9 +29,11 @@ namespace acdhOeaw\arche\core\tests;
 use PDO;
 use RuntimeException;
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use zozlak\logging\Log;
+use acdhOeaw\arche\core\RepoException;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Config;
 
@@ -52,6 +54,9 @@ function txCommit(string $method, int $txId, array $resourceIds): void {
  * @author zozlak
  */
 class Handler {
+
+    const CHECKTRIGGER_PROP = 'http://bar';
+    const CHECK_PROP        = 'http://foo';
 
     static public function brokenHandler(): void {
         throw new \Exception('', 123);
@@ -80,6 +85,14 @@ class Handler {
             $query->execute([$i, $method . $txId]);
         }
         $pdo->commit();
+    }
+
+    static public function deleteReference(int $id, Resource $meta,
+                                           ?string $path): Resource {
+        if (count($meta->all(self::CHECKTRIGGER_PROP)) > 0 && count($meta->all(self::CHECK_PROP)) === 0) {
+            throw new RepoException(self::CHECK_PROP . " is missing");
+        }
+        return $meta;
     }
 
     /**

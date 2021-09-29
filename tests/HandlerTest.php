@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
+use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
 
 /**
@@ -338,6 +339,35 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
         $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
         $this->assertEmpty((string) $resp->getBody());
+    }
+
+    /**
+     * Tests if a on-metadata-edit handler can prevent deletion with references removal
+     * @group handler
+     */
+    public function testDeleteWithReferencesHandler(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'     => 'function',
+                'function' => '\acdhOeaw\arche\core\tests\Handler::deleteReference',
+            ],
+        ]);
+
+        $txId                                                  = $this->beginTransaction();
+        $headers                                               = $this->getHeaders($txId);
+        $headers[self::$config->rest->headers->withReferences] = 1;
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral(Handler::CHECKTRIGGER_PROP, "baz");
+        $meta->addResource(Handler::CHECK_PROP, $loc1);
+        $loc2 = $this->createMetadataResource($meta, $txId);
+
+        $req  = new Request('delete', $loc1, $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals(204, $this->commitTransaction($txId));
+        $this->assertStringContainsString(Handler::CHECK_PROP . ' is missing', (string) $resp->getBody());
     }
 
     /**

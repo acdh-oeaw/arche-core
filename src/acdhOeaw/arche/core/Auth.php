@@ -127,6 +127,34 @@ class Auth implements AuthInterface {
         }
     }
 
+    public function batchCheckAccessRights(string $table, string $privilege,
+                                           bool $metadataRead): void {
+        $c       = RC::$config->accessControl;
+        $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
+        if ($metadataRead && !$c->enforceOnMetadata || $this->isAdmin || $default === self::DEFAULT_ALLOW) {
+            return;
+        }
+        $query     = "
+            SELECT string_agg(id::text, ', ') AS forbidden
+            FROM $table r
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM metadata
+                WHERE
+                    id = r.id
+                    AND property = ?
+                    AND substring(value, 1, 1000) IN (" . substr(str_repeat(', ?', count($this->userRoles)), 2) . ")
+            )
+        ";
+        $query     = RC::$pdo->prepare($query);
+        $query->execute(array_merge([$c->schema->$privilege], $this->userRoles));
+        $forbidden = $query->fetchColumn();
+        if (!empty($forbidden)) {
+            RC::$log->debug("Forbidden resources: $forbidden");
+            throw new RepoException('Forbidden', 403);
+        }
+    }
+
     public function getCreateRights(): Resource {
         $c     = RC::$config->accessControl;
         $graph = new Graph();

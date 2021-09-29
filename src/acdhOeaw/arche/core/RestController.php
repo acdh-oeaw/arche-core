@@ -56,6 +56,7 @@ class RestController {
         'metadataParentProperty' => 'parentProperty',
         'metadataWriteMode'      => 'writeMode',
         'transactionId'          => 'transactionId',
+        'withReferences'         => 'withReferences',
     ];
 
     /**

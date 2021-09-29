@@ -132,7 +132,10 @@ class RestTest extends TestBase {
 
         $req  = new Request('delete', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta = new Graph();
+        $meta->parse($resp->getBody());
+        $this->assertEquals($location, (string) $meta->resource($location)->getResource(self::$config->schema->id));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -189,6 +192,112 @@ class RestTest extends TestBase {
         $this->assertEquals(405, $resp->getStatusCode());
 
         $this->rollbackTransaction($txId);
+    }
+
+    /**
+     * 
+     * @group rest
+     */
+    public function testDeleteRecursively(): void {
+        $relProp = 'http://relation';
+        $idProp  = self::$config->schema->id;
+        $txId    = $this->beginTransaction();
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource($relProp, $loc1);
+        $loc2 = $this->createMetadataResource($meta, $txId);
+
+        $headers                                                       = $this->getHeaders($txId);
+        $headers[self::$config->rest->headers->metadataParentProperty] = $relProp;
+
+        $req     = new Request('delete', $loc1, $headers);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta    = new Graph();
+        $meta->parse($resp->getBody());
+        $deleted = [];
+        foreach ($meta->resourcesMatching($idProp) as $delres) {
+            $resp      = self::$client->send(new Request('get', $delres->getUri()));
+            $this->assertEquals(410, $resp->getStatusCode());
+            $deleted[] = $delres->getUri();
+        }
+        $this->assertContains($loc1, $deleted);
+        $this->assertContains($loc2, $deleted);
+
+        $this->commitTransaction($txId);
+
+        foreach ($deleted as $delres) {
+            $resp = self::$client->send(new Request('get', $delres));
+            $this->assertEquals(410, $resp->getStatusCode());
+        }
+    }
+
+    /**
+     * @group rest
+     */
+    public function testDeleteWithReferences(): void {
+        $txId    = $this->beginTransaction();
+        $headers = $this->getHeaders($txId);
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource('http://relation', $loc1);
+        $loc2 = $this->createMetadataResource($meta, $txId);
+
+        $req  = new Request('delete', $loc1, $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(409, $resp->getStatusCode());
+
+        $headers[self::$config->rest->headers->withReferences] = 1;
+        $req                                                   = new Request('delete', $loc1, $headers);
+        $resp                                                  = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(204, $this->commitTransaction($txId));
+
+        $req  = new Request('get', $loc1, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(410, $resp->getStatusCode());
+
+        $req  = new Request('get', $loc2 . '/metadata', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta = new Graph();
+        $meta->parse($resp->getBody());
+        $this->assertNull($meta->resource($loc1)->getResource('http://relation'));
+    }
+
+    /**
+     * @group rest
+     */
+    public function testForeignCheckSeparateTx(): void {
+        $txId = $this->beginTransaction();
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource('http://relation', $loc1);
+        $this->createMetadataResource($meta, $txId);
+        $this->commitTransaction($txId);
+
+        $txId = $this->beginTransaction();
+        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(409, $resp->getStatusCode());
+    }
+
+    /**
+     * @group rest
+     */
+    public function testForeignCheckSameTx(): void {
+        $txId = $this->beginTransaction();
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource('http://relation', $loc1);
+        $this->createMetadataResource($meta, $txId);
+
+        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(409, $resp->getStatusCode());
     }
 
     /**

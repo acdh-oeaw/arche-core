@@ -47,7 +47,7 @@ class Transaction {
     private ?int $id          = null;
     private string $startedAt;
     private string $lastRequest = '';
-    private string $state;
+    private ?string $state       = null;
     private string $snapshot;
 
     /**
@@ -153,7 +153,7 @@ class Transaction {
         } catch (PDOException $e) {
             RC::$log->error($e->getMessage());
             if ((int) $e->getCode() === self::PG_FOREIGN_KEY_VIOLATION) {
-                throw new RepoException('Foreign constraing conflict', 409);
+                throw new RepoException('Foreign constraint conflict', 409);
             } else {
                 throw $e;
             }

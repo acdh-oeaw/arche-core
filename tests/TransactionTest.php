@@ -180,7 +180,10 @@ class TransactionTest extends TestBase {
         // delete the resource and make sure it's not there
         $req  = new Request('delete', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta = new Graph();
+        $meta->parse($resp->getBody());
+        $this->assertEquals($location, (string) $meta->resource($location)->getResource(self::$config->schema->id));
 
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -234,49 +237,6 @@ class TransactionTest extends TestBase {
         $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
         $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
-    }
-
-    /**
-     * @group transactions
-     */
-    public function testForeignCheckSeparateTx(): void {
-        $txId = $this->beginTransaction();
-        $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource('http://relation', $loc1);
-        $this->createMetadataResource($meta, $txId);
-        $this->commitTransaction($txId);
-
-        $txId = $this->beginTransaction();
-        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-        $req  = new Request('delete', $loc1 . '/tombstone', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $this->assertEquals(409, $this->commitTransaction($txId));
-    }
-
-    /**
-     * @group transactions
-     */
-    public function testForeignCheckSameTx(): void {
-        $txId = $this->beginTransaction();
-
-        $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource('http://relation', $loc1);
-        $this->createMetadataResource($meta, $txId);
-
-        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-        $req  = new Request('delete', $loc1 . '/tombstone', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $this->assertEquals(409, $this->commitTransaction($txId));
     }
 
     /**
@@ -386,7 +346,7 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
         $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
-    
+
     /**
      * @group transactions
      */

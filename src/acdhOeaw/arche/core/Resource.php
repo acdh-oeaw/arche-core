@@ -26,9 +26,11 @@
 
 namespace acdhOeaw\arche\core;
 
+use EasyRdf\Graph;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
+use acdhOeaw\arche\lib\exception\RepoLibException;
 
 /**
  * Description of Resource
@@ -159,29 +161,37 @@ class Resource {
     public function delete(): void {
         $this->checkCanWrite();
 
-        $query = RC::$pdo->prepare("
-            UPDATE resources SET state = ? WHERE id = ?
-            RETURNING state, transaction_id
-        ");
-        $query->execute([self::STATE_TOMBSTONE, $this->id]);
-        RC::$log->debug(json_encode($query->fetchObject()));
+        $txId       = RC::$transaction->getId();
+        $parentProp = RC::getRequestParameter('metadataParentProperty');
+        $delRefs    = RC::getRequestParameter('withReferences');
 
-        $binary = new BinaryPayload((int) $this->id);
-        $binary->backup((string) RC::$transaction->getId());
+        if (empty($parentProp)) {
+            $resQuery = "SELECT ?::bigint AS id";
+            $resParam = [$this->id];
+        } else {
+            $resQuery = "SELECT * FROM get_relatives(?, ?, 999999, 0)";
+            $resParam = [$this->id, $parentProp];
+        }
+        $query = RC::$pdo->prepare("CREATE TEMPORARY TABLE delres AS $resQuery");
+        $query->execute($resParam);
 
-        // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
-        // keep metadata because they can still store important information, e.g. access rights
-        $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
-        $query->execute([$this->id]);
-        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
-        $query->execute([$this->id]);
+        $format = Metadata::negotiateFormat();
+        $this->deleteLockAll($txId);
+        $this->deleteCheckReferences($txId, (bool) ((int) $delRefs));
+        RC::$auth->batchCheckAccessRights('delres', 'write', false);
+        $this->deleteReferences();
+        $this->deleteResources($txId);
 
-        $meta = new Metadata($this->id);
-        $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', (int) $this->id, $meta->getResource(), $binary->getPath()));
-        $meta->save();
+        $graph = new Graph();
 
-        http_response_code(204);
+        $idProp = RC::$config->schema->id;
+        $base   = RC::getBaseUrl();
+        $query  = RC::$pdo->query("SELECT id, i.ids FROM identifiers i JOIN delres USING (id)");
+        while ($res    = $query->fetchObject()) {
+            $graph->resource($base . $res->id)->addResource($idProp, $res->ids);
+        }
+        Metadata::outputHeaders($format);
+        echo $graph->serialise($format);
     }
 
     public function optionsTombstone(int $code = 204): void {
@@ -327,5 +337,124 @@ class Resource {
         $query->execute([RC::$transaction->getId()]);
         $this->id = (int) $query->fetchColumn();
         RC::$log->info("\t" . $this->getUri());
+    }
+
+    private function deleteLockAll(int $txId): void {
+        // try to lock all resources to be deleted
+        $query = "
+            WITH t AS (
+                UPDATE resources r
+                SET transaction_id = ?
+                WHERE
+                    EXISTS (SELECT 1 FROM delres WHERE id = r.id)
+                    AND (transaction_id = ? OR transaction_id IS NULL)
+                RETURNING *
+            )
+            SELECT count(*)
+            FROM
+                delres
+                LEFT JOIN t USING (id)
+            WHERE transaction_id IS NULL
+        ";
+        $query = RC::$pdo->prepare($query);
+        $query->execute([$txId, $txId]);
+        if ($query->fetchColumn() !== 0) {
+            throw new RepoException('Owned by other transaction', 409);
+        }
+    }
+
+    private function deleteCheckReferences(int $txId, bool $delRefs): void {
+        // check references
+        RC::$pdo->query("
+            CREATE TEMPORARY TABLE delrel AS (
+                SELECT *
+                FROM relations r
+                WHERE
+                    EXISTS (SELECT 1 FROM delres WHERE id = r.target_id)
+                    AND NOT EXISTS (SELECT 1 FROM delres WHERE id = r.id)
+            )
+        ");
+        $query = "
+            WITH t AS (
+                UPDATE resources r
+                SET transaction_id = ?
+                WHERE
+                    EXISTS (SELECT 1 FROM delrel WHERE id = r.id)
+                    AND (transaction_id = ? OR transaction_id IS NULL)
+                RETURNING *
+            )
+            SELECT count(*) AS count, coalesce(sum((transaction_id IS NOT NULL)::int), 0) AS locked
+            FROM
+                delrel
+                LEFT JOIN t USING (id)
+        ";
+        $query = RC::$pdo->prepare($query);
+        $query->execute([$txId, $txId]);
+        $res   = $query->fetchObject();
+        if ($res->count > 0 && $delRefs === false) {
+            throw new RepoException('Referenced by other resource(s)', 409);
+        }
+        if ($res->locked !== $res->count) {
+            throw new RepoException("Referencing resource owned by other transaction", 409);
+        }
+    }
+
+    private function deleteReferences(): void {
+        $query  = RC::$pdo->query("
+            WITH d AS (
+                DELETE FROM relations 
+                WHERE (id, target_id, property) IN (SELECT id, target_id, property FROM delrel)
+                RETURNING *
+            )
+            SELECT DISTINCT id FROM d
+        ");
+        $errors = '';
+        if (RC::$handlersCtl->hasHandlers('updateMetadata')) {
+            while ($id = $query->fetchColumn()) {
+                $meta = new Metadata($id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                try {
+                    $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $id, $meta->getResource(), null));
+                    $meta->save();
+                } catch (RepoLibException $e) {
+                    $errors .= "Referencing resource $id: " . $e->getMessage() . "\n";
+                }
+            }
+        }
+        if (!empty($errors)) {
+            throw new RepoException($errors, 400);
+        }
+    }
+
+    private function deleteResources(int $txId): void {
+        $query = RC::$pdo->prepare("
+            WITH d AS (
+                UPDATE resources 
+                SET state = ? 
+                WHERE id IN (SELECT id FROM delres)
+                RETURNING id
+            )
+            SELECT string_agg(id::text, ', ') AS removed FROM d
+        ");
+        $query->execute([self::STATE_TOMBSTONE]);
+        RC::$log->debug($query->fetchColumn());
+
+        // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
+        // keep metadata because they can still store important information, e.g. access rights
+        RC::$pdo->query("DELETE FROM relations WHERE id IN (SELECT id FROM delres)");
+        RC::$pdo->prepare("DELETE FROM identifiers WHERE id IN (SELECT id FROM delres)");
+
+        $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
+        while ($id    = $query->fetchColumn()) {
+            $binary = new BinaryPayload($id);
+            //$binary->backup((string) $txId);
+
+            if (RC::$handlersCtl->hasHandlers('delete')) {
+                $meta = new Metadata($id);
+                $meta->merge(Metadata::SAVE_MERGE);
+                $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', $id, $meta->getResource(), $binary->getPath()));
+                $meta->save();
+            }
+        }
     }
 }

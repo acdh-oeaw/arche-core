@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
@@ -62,7 +63,7 @@ class AuthTest extends TestBase {
 
         $req  = new Request('delete', $location, array_merge($headers, ['foo' => 'admin']));
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
 
         $this->rollbackTransaction($txId);
     }
@@ -90,8 +91,8 @@ class AuthTest extends TestBase {
         $this->assertEquals(403, $resp->getStatusCode());
 
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:$pswd");
-        $req     = new Request('post', self::$baseUrl, $headers, $body);
-        $resp    = self::$client->send($req);
+        $req                      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp                     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
     }
 
@@ -101,39 +102,75 @@ class AuthTest extends TestBase {
      */
     public function testEnforceOnMeta(): void {
         $location = $this->createBinaryResource();
-        $req     = new Request('get', $location . '/metadata');
+        $req      = new Request('get', $location . '/metadata');
 
-        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['create']['assignRoles']['read'] = [];
-        $cfg['accessControl']['enforceOnMetadata'] = false;
-        $cfg['accessControl']['defaultAction']['read'] = 'deny';
+        $cfg['accessControl']['enforceOnMetadata']             = false;
+        $cfg['accessControl']['defaultAction']['read']         = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        $resp = self::$client->send($req);
+        $resp                                                  = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        
-        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+
+        $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['create']['assignRoles']['read'] = [];
-        $cfg['accessControl']['enforceOnMetadata'] = true;
-        $cfg['accessControl']['defaultAction']['read'] = 'deny';
+        $cfg['accessControl']['enforceOnMetadata']             = true;
+        $cfg['accessControl']['defaultAction']['read']         = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        $resp = self::$client->send($req);
+        $resp                                                  = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
     }
-    
+
     /**
      * 
      * @group auth
      */
     public function testAssignOnCreate(): void {
-        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['create']['assignRoles']['read'] = ['public'];
-        $cfg['accessControl']['enforceOnMetadata'] = true;
-        $cfg['accessControl']['defaultAction']['read'] = 'deny';
+        $cfg['accessControl']['enforceOnMetadata']             = true;
+        $cfg['accessControl']['defaultAction']['read']         = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        
+
         $location = $this->createBinaryResource();
-        $req     = new Request('get', $location . '/metadata');
-        $resp = self::$client->send($req);
+        $req      = new Request('get', $location . '/metadata');
+        $resp     = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+    }
+
+    /**
+     * 
+     * @group auth
+     */
+    public function testAuthDeleteRecursively(): void {
+        $cfg     = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $relProp = 'http://relation';
+        $txId    = $this->beginTransaction();
+
+        $cfg['accessControl']['create']['assignRoles']['write'] = ['public'];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        $loc1                                                   = $this->createMetadataResource(null, $txId);
+
+        $cfg['accessControl']['create']['assignRoles']['write'] = [];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        $meta                                                   = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource($relProp, $loc1);
+        $loc2                                                   = $this->createMetadataResource($meta, $txId);
+
+        $headers = [
+            self::$config->rest->headers->transactionId          => $txId,
+            self::$config->rest->headers->metadataParentProperty => $relProp,
+        ];
+        $req     = new Request('delete', $loc1, $headers);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
+
+        $headers = [
+            self::$config->rest->headers->transactionId  => $txId,
+            self::$config->rest->headers->withReferences => 1,
+        ];
+        $req     = new Request('delete', $loc1, $headers);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
     }
 }
