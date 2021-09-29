@@ -324,24 +324,6 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * Tests if server-side initialization error are captured correctly and no
-     * information about the error is leaked.
-     * 
-     * @group handler
-     */
-    public function testWrongSetup(): void {
-        $cfg                                         = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $cfg['rest']['handlers']['rabbitMq']['host'] = 'foo';
-        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-
-        $req  = new Request('post', self::$baseUrl . 'transaction');
-        $resp = self::$client->send($req);
-        $this->assertEquals(500, $resp->getStatusCode());
-        $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
-        $this->assertEmpty((string) $resp->getBody());
-    }
-
-    /**
      * Tests if a on-metadata-edit handler can prevent deletion with references removal
      * @group handler
      */
@@ -368,6 +350,26 @@ class HandlerTest extends TestBase {
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
         $this->assertStringContainsString(Handler::CHECK_PROP . ' is missing', (string) $resp->getBody());
+    }    
+    
+    /**
+     * Tests if server-side initialization error are captured correctly and no
+     * information about the error is leaked.
+     * 
+     * REMARK - HAS TO BE THE LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
+     * 
+     * @group handler
+     */
+    public function testWrongSetup(): void {
+        $cfg                                         = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['rest']['handlers']['rabbitMq']['host'] = 'foo';
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
+        $this->assertEquals(500, $resp->getStatusCode());
+        $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
+        $this->assertEmpty((string) $resp->getBody());
     }
 
     /**
