@@ -294,7 +294,38 @@ class HandlerTest extends TestBase {
     }
 
     /**
+     * Tests if a on-metadata-edit handler can prevent deletion with references removal
      * @group handler
+     */
+    public function testDeleteWithReferencesHandler(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'     => 'function',
+                'function' => '\acdhOeaw\arche\core\tests\Handler::deleteReference',
+            ],
+        ]);
+
+        $txId                                                  = $this->beginTransaction();
+        $headers                                               = $this->getHeaders($txId);
+        $headers[self::$config->rest->headers->withReferences] = 1;
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral(Handler::CHECKTRIGGER_PROP, "baz");
+        $meta->addResource(Handler::CHECK_PROP, $loc1);
+        $this->createMetadataResource($meta, $txId);
+
+        $req  = new Request('delete', $loc1, $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals(204, $this->commitTransaction($txId));
+        $this->assertStringContainsString(Handler::CHECK_PROP . ' is missing', (string) $resp->getBody());
+    }        
+    
+    /**
+     * @group handler
+     * 
+     * REMARK - HAS TO BE THE SECOND LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
      */
     public function testBrokenHandler(): void {
         $this->setHandlers([
@@ -323,35 +354,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('Unknown transaction', (string) $resp->getBody());
     }
 
-    /**
-     * Tests if a on-metadata-edit handler can prevent deletion with references removal
-     * @group handler
-     */
-    public function testDeleteWithReferencesHandler(): void {
-        $this->setHandlers([
-            'updateMetadata' => [
-                'type'     => 'function',
-                'function' => '\acdhOeaw\arche\core\tests\Handler::deleteReference',
-            ],
-        ]);
-
-        $txId                                                  = $this->beginTransaction();
-        $headers                                               = $this->getHeaders($txId);
-        $headers[self::$config->rest->headers->withReferences] = 1;
-
-        $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral(Handler::CHECKTRIGGER_PROP, "baz");
-        $meta->addResource(Handler::CHECK_PROP, $loc1);
-        $loc2 = $this->createMetadataResource($meta, $txId);
-
-        $req  = new Request('delete', $loc1, $headers);
-        $resp = self::$client->send($req);
-        $this->assertEquals(400, $resp->getStatusCode());
-        $this->assertEquals(204, $this->commitTransaction($txId));
-        $this->assertStringContainsString(Handler::CHECK_PROP . ' is missing', (string) $resp->getBody());
-    }    
-    
     /**
      * Tests if server-side initialization error are captured correctly and no
      * information about the error is leaked.
