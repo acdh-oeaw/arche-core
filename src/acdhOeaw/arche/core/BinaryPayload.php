@@ -120,7 +120,7 @@ class BinaryPayload {
             RC::$log->debug("\tupdating spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
             $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
-            RC::$log->debug("\skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+            RC::$log->debug("skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
     }
 
