@@ -19,8 +19,8 @@ RUN locale-gen en_US.UTF-8 && \
     rm /var/www/html/* && \
     chown -R www-data:www-data /var/www && \
     su -l www-data -c 'mkdir /var/www/tika' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/tika-server-1.26.jar > /var/www/tika/tika-server.jar' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/tika-app-1.26.jar > /var/www/tika/tika-app.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.1.0/tika-server-standard-2.1.0.jar > /var/www/tika/tika-server.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.1.0/tika-app-2.1.0.jar > /var/www/tika/tika-app.jar' && \
     chown -R www-data:www-data /var/run/postgresql && \
     su -l www-data -c '/usr/lib/postgresql/12/bin/initdb -D /var/www/postgresql --auth=ident -U www-data --locale en_US.UTF-8' 
 RUN su -l www-data -c 'git clone https://github.com/acdh-oeaw/arche-core.git /var/www/html' && \

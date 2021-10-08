@@ -536,7 +536,7 @@ class SearchTest extends TestBase {
         $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
-        $this->testFullTextSearch1('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
+        $this->testFullTextSearch1('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@Kettenbrücken ) miteinander <b>verbunden</b> . Zoll für@Donautal <b>verbunden</b> . Das Klima entspricht');
     }
 
     public function testFullTextSearch3(): void {
