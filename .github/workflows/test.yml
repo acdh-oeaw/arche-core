@@ -48,14 +48,14 @@ jobs:
       uses: actions/cache@v2
       with:
         path: tika
-        key: tika-1.26
-        restore-keys: tika-1.26
+        key: tika-2.1.0
+        restore-keys: tika-2.1.0
     - name: tika
       run: |
         mkdir -p tika
         if [ ! -f tika/tika-server.jar ] ; then
-          wget -nv https://archive.apache.org/dist/tika/tika-server-1.26.jar -O tika/tika-server.jar
-          wget -nv https://archive.apache.org/dist/tika/tika-app-1.26.jar -O tika/tika-app.jar
+          wget -nv https://archive.apache.org/dist/tika/2.1.0/tika-server-standard-2.1.0.jar -O tika/tika-server.jar
+          wget -nv https://archive.apache.org/dist/tika/2.1.0/tika-app-2.1.0.jar -O tika/tika-app.jar
         fi
         nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
         sleep 1
