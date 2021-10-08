@@ -345,7 +345,7 @@ class Resource {
 
     private function deleteLockAll(int $txId): void {
         // try to lock all resources to be deleted
-        $query = "
+        $query     = "
             WITH t AS (
                 UPDATE resources r
                 SET transaction_id = ?
@@ -354,16 +354,18 @@ class Resource {
                     AND (transaction_id = ? OR transaction_id IS NULL)
                 RETURNING *
             )
-            SELECT count(*)
+            SELECT 
+                coalesce(string_agg(CASE transaction_id IS NULL WHEN true THEN id::text ELSE null::text END, ', ' ORDER BY id), '') AS notlocked
             FROM
                 delres
                 LEFT JOIN t USING (id)
             WHERE transaction_id IS NULL
         ";
-        $query = RC::$pdo->prepare($query);
+        $query     = RC::$pdo->prepare($query);
         $query->execute([$txId, $txId]);
-        if ($query->fetchColumn() !== 0) {
-            throw new RepoException('Owned by other transaction', 409);
+        $notlocked = $query->fetchColumn();
+        if (!empty($notlocked)) {
+            throw new RepoException("Deleted resource(s) owned by other transaction: $notlocked", 409);
         }
     }
 
@@ -387,7 +389,9 @@ class Resource {
                     AND (transaction_id = ? OR transaction_id IS NULL)
                 RETURNING *
             )
-            SELECT count(*) AS count, coalesce(sum((transaction_id IS NOT NULL)::int), 0) AS locked
+            SELECT
+                count(*) AS count,
+                coalesce(string_agg(CASE transaction_id IS NULL WHEN true THEN id::text ELSE null::text END, ', ' ORDER BY id), '') AS notlocked
             FROM
                 delrel
                 LEFT JOIN t USING (id)
@@ -398,8 +402,8 @@ class Resource {
         if ($res->count > 0 && $delRefs === false) {
             throw new RepoException('Referenced by other resource(s)', 409);
         }
-        if ($res->locked !== $res->count) {
-            throw new RepoException("Referencing resource owned by other transaction", 409);
+        if (!empty($res->notlocked)) {
+            throw new RepoException("Referencing resource(s) owned by other transaction: $res->notlocked", 409);
         }
     }
 
@@ -421,7 +425,7 @@ class Resource {
                     $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $id, $meta->getResource(), null));
                     $meta->save();
                 } catch (RepoLibException $e) {
-                    $errors .= "Referencing resource $id: " . $e->getMessage() . "\n";
+                    $errors .= "Error while removing reference from resource $id: " . $e->getMessage() . "\n";
                 }
             }
         }
