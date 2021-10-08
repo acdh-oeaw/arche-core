@@ -450,17 +450,18 @@ class Resource {
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
         // keep metadata because they can still store important information, e.g. access rights
         RC::$pdo->query("DELETE FROM relations WHERE id IN (SELECT id FROM delres)");
-        RC::$pdo->prepare("DELETE FROM identifiers WHERE id IN (SELECT id FROM delres)");
+        RC::$pdo->query("DELETE FROM identifiers WHERE id IN (SELECT id FROM delres)");
 
         $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
         while ($id    = $query->fetchColumn()) {
             $binary = new BinaryPayload($id);
-            //$binary->backup((string) $txId);
+            $binary->backup((string) $txId);
 
             if (RC::$handlersCtl->hasHandlers('delete')) {
                 $meta = new Metadata($id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                RC::$handlersCtl->handleResource('delete', $id, $meta->getResource(), $binary->getPath());
                 $meta->merge(Metadata::SAVE_MERGE);
-                $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', $id, $meta->getResource(), $binary->getPath()));
                 $meta->save();
             }
         }
