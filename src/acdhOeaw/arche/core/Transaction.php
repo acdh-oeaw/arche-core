@@ -97,6 +97,7 @@ class Transaction {
         if (!isset($this->id)) {
             throw new RepoException('Unknown transaction', 400);
         }
+        header(RC::getHttpHeaderName('transactionId') . ': ' . $this->id);
         header('Content-Type: application/json');
     }
 
