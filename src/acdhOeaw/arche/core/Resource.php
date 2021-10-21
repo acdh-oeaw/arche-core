@@ -179,23 +179,23 @@ class Resource {
         $query = RC::$pdo->prepare("CREATE TEMPORARY TABLE delres AS $resQuery");
         $query->execute($resParam);
 
-        $format = Metadata::negotiateFormat();
         $this->deleteLockAll($txId);
         $this->deleteCheckReferences($txId, (bool) ((int) $delRefs));
         RC::$auth->batchCheckAccessRights('delres', 'write', false);
-        $this->deleteReferences();
-        $this->deleteResources($txId);
 
         $graph = new Graph();
-
         $idProp = RC::$config->schema->id;
         $base   = RC::getBaseUrl();
         $query  = RC::$pdo->query("SELECT id, i.ids FROM identifiers i JOIN delres USING (id)");
         while ($res    = $query->fetchObject()) {
             $graph->resource($base . $res->id)->addResource($idProp, $res->ids);
         }
+        $format = Metadata::negotiateFormat();
         Metadata::outputHeaders($format);
         echo $graph->serialise($format);
+        
+        $this->deleteReferences();
+        $this->deleteResources($txId);
     }
 
     public function optionsTombstone(int $code = 204): void {
