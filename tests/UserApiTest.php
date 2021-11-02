@@ -220,7 +220,10 @@ class UserApiTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
-        $this->assertEquals([self::$publicGroup], $data->groups);
+        // user can't change his/her own groups list as it would allow priviledges escalation
+        $this->assertEquals(3, count($data->groups));
+        $expectedGroups = [self::$createGroup, self::$publicGroup, 'foobar'];
+        $this->assertEquals(3, count(array_intersect($expectedGroups, $data->groups)));
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
         $this->assertFalse(isset($data->other));

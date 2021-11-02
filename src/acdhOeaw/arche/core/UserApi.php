@@ -88,7 +88,8 @@ class UserApi {
     }
 
     public function patch(string $user): void {
-        if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
+        $admin = RC::$auth->isAdmin();
+        if (!$admin && RC::$auth->getUserName() !== $user) {
             throw new RepoException('Forbidden', 403);
         }
         $this->checkUserExists($user);
@@ -96,7 +97,7 @@ class UserApi {
         parse_str((string) file_get_contents('php://input'), $post);
         $json    = json_decode((string) file_get_contents('php://input'));
         $newData = new stdClass();
-        $fields  = ['password', 'groups'];
+        $fields  = $admin ? ['password', 'groups'] : ['password'];
         foreach ($fields as $i) {
             if (isset($_GET[$i])) {
                 $newData->$i = $_GET[$i];
