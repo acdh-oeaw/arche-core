@@ -633,8 +633,8 @@ class RestTest extends TestBase {
         $id1  = substr($loc1, strlen(self::$baseUrl));
         $id2  = substr($loc2, strlen(self::$baseUrl));
 
-        $req     = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
-        $resp    = self::$client->send($req);
+        $req  = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
+        $resp = self::$client->send($req);
 
         $g       = new Graph();
         $g->parse((string) $resp->getBody());
@@ -655,9 +655,9 @@ class RestTest extends TestBase {
         $this->assertCount(1, $metaRes->all('http://foo'));
         $this->assertCount(1, $metaRes->all('http://bar'));
         $this->assertCount(1, $metaRes->all('http://baz'));
-        $this->assertEquals('1', (string)$metaRes->get('http://foo'));
-        $this->assertEquals('2', (string)$metaRes->get('http://bar'));
-        $this->assertEquals('B', (string)$metaRes->get('http://baz'));
+        $this->assertEquals('1', (string) $metaRes->get('http://foo'));
+        $this->assertEquals('2', (string) $metaRes->get('http://bar'));
+        $this->assertEquals('B', (string) $metaRes->get('http://baz'));
 
         $resp = self::$client->send(new Request('get', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
@@ -903,5 +903,32 @@ class RestTest extends TestBase {
         $this->assertEquals(1, $query->fetchColumn());
 
         $this->rollbackTransaction($txId);
+    }
+
+    /**
+     * In the current implementation only a single request can use a given transaction.
+     * Another request trying to use the same transaction in parallel should gracefully
+     * return HTTP 409.
+     * 
+     * @group rest
+     */
+    public function testParallelRequests(): void {
+        $location = $this->createMetadataResource();
+        $prop     = 'http://foo';
+        $txId     = $this->beginTransaction();
+        $headers  = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
+        ];
+        $req1     = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $req2     = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
+        $prom1    = self::$client->sendAsync($req1);
+        $prom2    = self::$client->sendAsync($req2);
+        $resp1    = $prom1->wait();
+        $resp2    = $prom2->wait();
+        $codes    = [$resp1->getStatusCode(), $resp2->getStatusCode()];
+        $this->assertContains(200, $codes);
+        $this->assertContains(409, $codes);
     }
 }

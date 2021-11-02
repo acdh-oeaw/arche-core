@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core;
 
 use ErrorException;
 use PDO;
+use PDOException;
 use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
@@ -102,9 +103,13 @@ class RestController {
             self::$log->info("------------------------------");
             self::$log->info(filter_input(INPUT_SERVER, 'REQUEST_METHOD') . " " . filter_input(INPUT_SERVER, 'REQUEST_URI'));
 
-            self::$pdo = new PDO(self::$config->dbConn->admin);
+            self::$pdo   = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$pdo->query("SET application_name TO rest");
+            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? 1000);
+            self::$pdo->query("SET lock_timeout TO $lockTimeout");
+            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? 60000);
+            self::$pdo->query("SET statement_timeout TO $stmtTimeout");
 
             self::$transaction = new Transaction();
 
@@ -210,12 +215,18 @@ class RestController {
             http_response_code($e->getCode() >= 100 ? $e->getCode() : 500);
             echo $e->getMessage();
         } catch (Throwable $e) {
-            self::$log->error($e);
+            $code = 500;
+            if ($e instanceof PDOException && $e->getCode() === '55P03') {
+                $code = 409;
+                self::$log->warning("Failed to obtain a database lock");
+            } else {
+                self::$log->error($e);
+            }
             if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
                 self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
                 self::$transaction->delete();
             }
-            http_response_code(500);
+            http_response_code($code);
         } finally {
             self::$log->info("Return code " . http_response_code());
             self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
