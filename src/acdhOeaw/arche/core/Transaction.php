@@ -45,7 +45,7 @@ class Transaction {
     const PG_FOREIGN_KEY_VIOLATION = 23503;
 
     private ?int $id          = null;
-    private string $startedAt;
+    private string $startedAt   = '';
     private string $lastRequest = '';
     private ?string $state       = null;
     private string $snapshot;
@@ -62,7 +62,8 @@ class Transaction {
         $this->pdo->query("SET application_name TO rest_tx");
 
         header('Cache-Control: no-cache');
-        $this->id = RC::getRequestParameter('transactionId');
+        $id       = (int) RC::getRequestParameter('transactionId');
+        $this->id = $id > 0 ? $id : null;
         if ($this->id !== null) {
             $this->fetchData();
         }
@@ -97,7 +98,7 @@ class Transaction {
         if (!isset($this->id)) {
             throw new RepoException('Unknown transaction', 400);
         }
-        header(substr(RC::getHttpHeaderName('transactionId'), 5) . ': ' . $this->id);
+        header(RC::$config->rest->headers->transactionId . ': ' . $this->id);
         header('Content-Type: application/json');
     }
 
