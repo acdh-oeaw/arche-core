@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core;
 
 use ErrorException;
 use PDO;
+use PDOException;
 use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
@@ -102,22 +103,36 @@ class RestController {
             self::$log->info("------------------------------");
             self::$log->info(filter_input(INPUT_SERVER, 'REQUEST_METHOD') . " " . filter_input(INPUT_SERVER, 'REQUEST_URI'));
 
-            self::$pdo = new PDO(self::$config->dbConn->admin);
+            self::$pdo   = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$pdo->query("SET application_name TO rest");
+            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? 1000);
+            self::$pdo->query("SET lock_timeout TO $lockTimeout");
+            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? 60000);
+            self::$pdo->query("SET statement_timeout TO $stmtTimeout");
 
             self::$transaction = new Transaction();
 
             self::$auth = new Auth();
 
             self::$handlersCtl = new HandlersController(new Config(self::$config->rest->handlers), $loader);
-        } catch (Throwable $e) {
-            http_response_code(500);
+        } catch (BadRequestException $e) {
             self::$log->error($e);
+            http_response_code($e->getCode());
+            echo $e->getMessage();
+        } catch (Throwable $e) {
+            self::$log->error($e);
+            http_response_code(500);
         }
     }
 
     static public function handleRequest(): void {
+        if (http_response_code() !== 200) {
+            // if the response code has been set already, don't do anything else
+            return;
+        }
+        $exception  = null;
+        $statusCode = null;
         try {
             if (!empty(self::$config->rest->cors ?? '')) {
                 $origin = self::$config->rest->cors;
@@ -201,22 +216,32 @@ class RestController {
 
             self::$transaction->prolongAndRelease(); // to avoid deadlocks in the next line
             self::$pdo->commit();
+        } catch (PDOException $e) {
+            $exception  = $e;
+            $statusCode = $e->getCode() === '55P03' ? 409 : 500;
         } catch (RepoLibException $e) {
-            self::$log->error($e);
-            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
-                self::$transaction->delete();
-            }
-            http_response_code($e->getCode() >= 100 ? $e->getCode() : 500);
+            $exception  = $e;
+            $statusCode = $e->getCode() >= 100 ? $e->getCode() : 500;
+            echo $e->getMessage();
+        } catch (BadRequestException $e) {
+            $exception  = $e;
+            $statusCode = $e->getCode();
             echo $e->getMessage();
         } catch (Throwable $e) {
-            self::$log->error($e);
-            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
-                self::$transaction->delete();
-            }
-            http_response_code(500);
+            self::$log->critical($e);
+            $exception  = $e;
+            $statusCode = 500;
         } finally {
+            if ($exception !== null) {
+                self::$log->error($exception);
+                if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
+                    self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
+                    self::$transaction->delete();
+                }
+            }
+            if ($statusCode !== null) {
+                http_response_code($statusCode);
+            }
             self::$log->info("Return code " . http_response_code());
             self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
         }

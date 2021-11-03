@@ -33,6 +33,7 @@ use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use acdhOeaw\arche\core\Metadata;
@@ -264,5 +265,62 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $g    = new Graph();
         $g->parse((string) $body, 'text/turtle');
         return $g;
+    }
+
+    /**
+     * Runs given requests in parallel, keeping a given delay between sending them.
+     * 
+     * @param array<Request> $requests
+     * @param int $delayUs
+     * @return array<Response>
+     */
+    protected function runConcurrently(array $requests, int $delayUs = 0): array {
+        $handle       = curl_multi_init();
+        $reqHandles   = [];
+        $outputs      = [];
+        $startTimes   = [];
+        $runningCount = null;
+        foreach ($requests as $i) {
+            /* @var $i Request */
+            $req          = curl_init();
+            $reqHandles[] = $req;
+            curl_setopt($req, \CURLOPT_URL, $i->getUri());
+            curl_setopt($req, \CURLOPT_CUSTOMREQUEST, $i->getMethod());
+            $headers      = [];
+            foreach ($i->getHeaders() as $header => $values) {
+                $headers[] = $header . ": " . implode(', ', $values);
+            }
+            curl_setopt($req, \CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($req, \CURLOPT_POSTFIELDS, $i->getBody()->getContents());
+            $output       = fopen("php://memory", "rw");
+            $outputs[]    = $output;
+            curl_setopt($req, \CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($req, \CURLOPT_FILE, $output);
+            curl_multi_add_handle($handle, $req);
+            $startTimes[] = microtime(true);
+            curl_multi_exec($handle, $runningCount);
+            if ($delayUs > 0) {
+                usleep($delayUs);
+            }
+        }
+        do {
+            $status = curl_multi_exec($handle, $runningCount);
+            if ($runningCount > 0) {
+                curl_multi_select($handle);
+            }
+        } while ($runningCount > 0 && $status === \CURLM_OK);
+        $responses = [];
+        foreach ($reqHandles as $n => $i) {
+            curl_multi_remove_handle($handle, $i);
+            $code        = curl_getinfo($i, \CURLINFO_RESPONSE_CODE);
+            fseek($outputs[$n], 0);
+            $headers     = [
+                'Start-Time' => $startTimes[$n],
+                'Time'       => curl_getinfo($i, \CURLINFO_TOTAL_TIME_T),
+            ];
+            $responses[] = new Response($code, $headers, $outputs[$n]);
+        }
+        curl_multi_close($handle);
+        return $responses;
     }
 }

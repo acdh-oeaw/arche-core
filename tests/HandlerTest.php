@@ -351,7 +351,7 @@ class HandlerTest extends TestBase {
         $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
-        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+        $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
     }
 
     /**

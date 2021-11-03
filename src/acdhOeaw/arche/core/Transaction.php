@@ -42,7 +42,8 @@ class Transaction {
     const STATE_ACTIVE             = 'active';
     const STATE_COMMIT             = 'commit';
     const STATE_ROLLBACK           = 'rollback';
-    const PG_FOREIGN_KEY_VIOLATION = 23503;
+    const PG_FOREIGN_KEY_VIOLATION = '23503';
+    const PG_LOCK_FAILURE          = '55P03';
 
     private ?int $id          = null;
     private string $startedAt   = '';
@@ -61,23 +62,29 @@ class Transaction {
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_tx");
 
-        header('Cache-Control: no-cache');
         $id       = (int) RC::getRequestParameter('transactionId');
         $this->id = $id > 0 ? $id : null;
         if ($this->id !== null) {
+            header('Cache-Control: no-cache');
             $this->fetchData();
         }
     }
 
     public function prolongAndRelease(): void {
-        if (!empty($this->id)) {
-            $query = $this->pdo->prepare("UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ? RETURNING last_request");
+        if ($this->id !== null) {
+            $query = $this->pdo->prepare("
+                UPDATE transactions 
+                SET last_request = clock_timestamp() 
+                WHERE transaction_id = ? 
+                RETURNING last_request
+            ");
             $query->execute([$this->id]);
-            RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $query->fetchColumn());
+            RC::$log->debug("Updating $this->id transaction timestamp with " . $query->fetchColumn());
         }
 
         if ($this->pdo->inTransaction()) {
             $this->pdo->commit();
+            RC::$log->debug("Transaction $this->id released");
         }
     }
 
@@ -95,7 +102,7 @@ class Transaction {
     }
 
     public function head(): void {
-        if (!isset($this->id)) {
+        if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
         header(RC::$config->rest->headers->transactionId . ': ' . $this->id);
@@ -113,26 +120,29 @@ class Transaction {
     }
 
     public function delete(): void {
-        if (!isset($this->id)) {
+        if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
+        $this->lock();
 
-        $this->prolongAndRelease();
         RC::$handlersCtl->handleTransaction('rollback', (int) $this->id, $this->getResourceList());
 
         $query = $this->pdo->prepare("
-            UPDATE transactions SET state = 'rollback' WHERE transaction_id = ?
+            UPDATE transactions 
+            SET state = 'rollback', last_request = clock_timestamp() 
+            WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
-
         $this->wait();
+
         http_response_code(204);
     }
 
     public function put(): void {
-        if (!isset($this->id)) {
+        if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
+        $this->lock();
 
         RC::$handlersCtl->handleTransaction('commit', (int) $this->id, $this->getResourceList());
 
@@ -145,28 +155,31 @@ class Transaction {
             $query->execute([$this->id, Resource::STATE_DELETED]);
 
             $query = $this->pdo->prepare("
-                UPDATE transactions SET state = ? WHERE transaction_id = ?
+                UPDATE transactions 
+                SET state = ?, last_request = clock_timestamp()
+                WHERE transaction_id = ?
             ");
             $query->execute([self::STATE_COMMIT, $this->id]);
             http_response_code(204);
         } catch (PDOException $e) {
             RC::$log->error($e->getMessage());
-            if ((int) $e->getCode() === self::PG_FOREIGN_KEY_VIOLATION) {
-                throw new RepoException('Foreign constraint conflict', 409);
+            if ((string) $e->getCode() === self::PG_FOREIGN_KEY_VIOLATION) {
+                throw new ConflictException("Foreign constraint conflict");
             } else {
                 throw $e;
             }
         }
-
         $this->wait();
     }
 
     public function post(): void {
+        header('Cache-Control: no-cache');
         try {
             $this->id = TransactionController::registerTransaction(RC::$config);
         } catch (RepoLibException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
+        $this->lock();
 
         RC::$handlersCtl->handleTransaction('begin', $this->id, []);
 
@@ -185,11 +198,30 @@ class Transaction {
     }
 
     private function lock(): void {
-        $this->pdo->beginTransaction();
+        if (!$this->pdo->inTransaction()) {
+            $this->pdo->beginTransaction();
+        }
         $query = $this->pdo->prepare("
-                SELECT * FROM transactions WHERE transaction_id = ? FOR UPDATE
-            ");
-        $query->execute([$this->id]);
+            SELECT state
+            FROM transactions 
+            WHERE transaction_id = ? 
+            FOR UPDATE 
+        ");
+        try {
+            $query->execute([$this->id]);
+            $state = $query->fetchColumn();
+            if ($state !== self::STATE_ACTIVE) {
+                $this->pdo->commit();
+                throw new ConflictException("Transaction $this->id is in $state state and can't be locked");
+            }
+            RC::$log->debug("Transaction $this->id locked");
+        } catch (PDOException $e) {
+            if ((string) $e->getCode() === self::PG_LOCK_FAILURE) {
+                throw new ConflictException("Transaction $this->id already locked");
+            } else {
+                throw $e;
+            }
+        }
     }
 
     private function fetchData(): void {
@@ -199,13 +231,14 @@ class Transaction {
         ");
         $query->execute([$this->id]);
         $data  = $query->fetchObject();
-        if ($data !== false) {
-            $this->startedAt   = $data->started;
-            $this->lastRequest = $data->last;
-            $this->state       = $data->state;
-            $this->snapshot    = $data->snapshot;
-            RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
+        if ($data === false) {
+            throw new BadRequestException("Transaction $this->id doesn't exist");
         }
+        $this->startedAt   = $data->started;
+        $this->lastRequest = $data->last;
+        $this->state       = $data->state;
+        $this->snapshot    = $data->snapshot;
+        RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
     }
 
     /**
@@ -214,11 +247,12 @@ class Transaction {
     private function wait(): void {
         if ($this->pdo->inTransaction()) {
             $this->pdo->commit();
+            RC::$log->debug("Transaction $this->id released");
         }
         $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);
-            RC::$log->debug('Waiting for the transaction ' . $this->id . ' to end');
+            RC::$log->debug("Waiting for the transaction $this->id to end");
             $query->execute([$this->id]);
             $exists = $query->fetchObject() !== false;
         } while ($exists);

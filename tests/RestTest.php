@@ -255,11 +255,11 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $loc1, $this->getHeaders($txId));
+        $req  = new Request('get', $loc1);
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
-        $req  = new Request('get', $loc2 . '/metadata', $this->getHeaders($txId));
+        $req  = new Request('get', $loc2 . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta = new Graph();
@@ -519,6 +519,19 @@ class RestTest extends TestBase {
         $this->assertEquals('Wrong metadata merge mode foo', (string) $resp->getBody());
     }
 
+    public function testPatchWrongTransactionId(): void {
+        $location = $this->createBinaryResource();
+        $headers  = [
+            self::$config->rest->headers->transactionId => -123,
+            'Content-Type'                              => 'application/n-triples',
+            'Eppn'                                      => 'admin',
+        ];
+        $req      = new Request('patch', $location . '/metadata', $headers);
+        $resp     = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Begin transaction first', (string) $resp->getBody());
+    }
+
     /**
      * @group rest
      */
@@ -542,6 +555,7 @@ class RestTest extends TestBase {
      */
     public function testUnbinaryResource(): void {
         $location = $this->createBinaryResource();
+        $txHeader = self::$config->rest->headers->transactionId;
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -560,11 +574,11 @@ class RestTest extends TestBase {
 
         $this->commitTransaction($txId);
 
-        $resp = self::$client->send($req);
+        $resp = self::$client->send($req->withoutHeader($txHeader));
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertEquals($location . '/metadata', $resp->getHeader('Location')[0]);
 
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $req  = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
@@ -633,8 +647,8 @@ class RestTest extends TestBase {
         $id1  = substr($loc1, strlen(self::$baseUrl));
         $id2  = substr($loc2, strlen(self::$baseUrl));
 
-        $req     = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
-        $resp    = self::$client->send($req);
+        $req  = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
+        $resp = self::$client->send($req);
 
         $g       = new Graph();
         $g->parse((string) $resp->getBody());
@@ -655,9 +669,9 @@ class RestTest extends TestBase {
         $this->assertCount(1, $metaRes->all('http://foo'));
         $this->assertCount(1, $metaRes->all('http://bar'));
         $this->assertCount(1, $metaRes->all('http://baz'));
-        $this->assertEquals('1', (string)$metaRes->get('http://foo'));
-        $this->assertEquals('2', (string)$metaRes->get('http://bar'));
-        $this->assertEquals('B', (string)$metaRes->get('http://baz'));
+        $this->assertEquals('1', (string) $metaRes->get('http://foo'));
+        $this->assertEquals('2', (string) $metaRes->get('http://bar'));
+        $this->assertEquals('B', (string) $metaRes->get('http://baz'));
 
         $resp = self::$client->send(new Request('get', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
