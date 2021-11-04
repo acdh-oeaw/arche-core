@@ -39,16 +39,19 @@ use acdhOeaw\arche\lib\exception\RepoLibException;
  */
 class Transaction {
 
+    const STATE_NOTX               = 'notx';
     const STATE_ACTIVE             = 'active';
     const STATE_COMMIT             = 'commit';
     const STATE_ROLLBACK           = 'rollback';
     const PG_FOREIGN_KEY_VIOLATION = '23503';
     const PG_LOCK_FAILURE          = '55P03';
+    const LOCK_TIMEOUT_DEFAULT     = 1000;
+    const STMT_TIMEOUT_DEFAULT     = 60000;
 
     private ?int $id          = null;
     private string $startedAt   = '';
     private string $lastRequest = '';
-    private ?string $state       = null;
+    private string $state       = self::STATE_NOTX;
     private string $snapshot;
 
     /**
@@ -58,9 +61,11 @@ class Transaction {
     private PDO $pdo;
 
     public function __construct() {
-        $this->pdo = new PDO(RC::$config->dbConn->admin);
+        $this->pdo   = new PDO(RC::$config->dbConn->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_tx");
+        $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
+        $this->pdo->query("SET lock_timeout TO $lockTimeout");
 
         $id       = (int) RC::getRequestParameter('transactionId');
         $this->id = $id > 0 ? $id : null;
@@ -201,11 +206,15 @@ class Transaction {
         if (!$this->pdo->inTransaction()) {
             $this->pdo->beginTransaction();
         }
+        // Can't use NOWAIT becuase even GET on transaction modifies it (updates 
+        // the last_request db field) and NOWAIT would cause one of two parallel
+        // transaction GET to fail. Instead rely on the lock_timeout being set
+        // on the connecitn in the Transaction class constructor.
         $query = $this->pdo->prepare("
             SELECT state
             FROM transactions 
             WHERE transaction_id = ? 
-            FOR UPDATE 
+            FOR UPDATE
         ");
         try {
             $query->execute([$this->id]);

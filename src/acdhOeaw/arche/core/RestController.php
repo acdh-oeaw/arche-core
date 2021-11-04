@@ -106,9 +106,9 @@ class RestController {
             self::$pdo   = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$pdo->query("SET application_name TO rest");
-            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? 1000);
+            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? Transaction::LOCK_TIMEOUT_DEFAULT);
             self::$pdo->query("SET lock_timeout TO $lockTimeout");
-            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? 60000);
+            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? Transaction::STMT_TIMEOUT_DEFAULT);
             self::$pdo->query("SET statement_timeout TO $stmtTimeout");
 
             self::$transaction = new Transaction();

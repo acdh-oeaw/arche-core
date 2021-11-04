@@ -183,7 +183,7 @@ class Resource {
         $this->deleteCheckReferences($txId, (bool) ((int) $delRefs));
         RC::$auth->batchCheckAccessRights('delres', 'write', false);
 
-        $graph = new Graph();
+        $graph  = new Graph();
         $idProp = RC::$config->schema->id;
         $base   = RC::getBaseUrl();
         $query  = RC::$pdo->query("SELECT id, i.ids FROM identifiers i JOIN delres USING (id)");
@@ -193,7 +193,7 @@ class Resource {
         $format = Metadata::negotiateFormat();
         Metadata::outputHeaders($format);
         echo $graph->serialise($format);
-        
+
         $this->deleteReferences();
         $this->deleteResources($txId);
     }
@@ -328,11 +328,13 @@ class Resource {
 
     private function checkTransactionState(): void {
         $txState = RC::$transaction->getState();
-        if (empty($txState)) {
-            throw new RepoException('Begin transaction first', 400);
-        }
-        if ($txState !== Transaction::STATE_ACTIVE) {
-            throw new RepoException('Wrong transaction state: ' . $txState, 400);
+        switch ($txState) {
+            case Transaction::STATE_ACTIVE:
+                break;
+            case Transaction::STATE_NOTX:
+                throw new RepoException('Begin transaction first', 400);
+            default:
+                throw new RepoException("Wrong transaction state: $txState", 400);
         }
     }
 
