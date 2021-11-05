@@ -59,7 +59,7 @@ transactionController:
     logging:
         file: /tmp/arche-core/log/txlog
         level: debug
-    checkInterval: 1
+    checkInterval: 400
     timeout: 2
     enforceCompleteness: false
     simplifyMetaHistory: true

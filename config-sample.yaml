@@ -78,16 +78,17 @@ transactionController:
         # debug/info/notice/warning/error/critical/alert/emergency
         level: info
     # transaction state check interval in ms
-    checkInterval: 200
+    checkInterval: 400
     # transaction timeout in s
     timeout: 5
     # do transactions have to be complete in ACID terms?
     enforceCompleteness: false
     # should metadata history table contain only one set of entries per transaction?
     simplifyMetaHistory: true
-    # the timeout assures parallel requests to the same trasnsaction don't cause a deadlock
+    # the maximum time parallel request can wait for the lock on a transaction before
+    # reporting HTTP 409 Conflict (in ms)
     lockTimeout: 1000
-    # REST API single SQL statement timeout (in miliseconds)
+    # REST API single SQL statement timeout (in ms)
     statementTimeout: 600000
 spatialSearch:
     # list of properties containing geometries in the WKT format

@@ -228,7 +228,7 @@ class Resource {
     public function postCollection(): void {
         $this->checkCanCreate();
 
-        $this->createResource();
+        $this->id = $state    = RC::$transaction->createResource(RC::$logId);
 
         $binary = new BinaryPayload((int) $this->id);
         $binary->upload();
@@ -254,7 +254,7 @@ class Resource {
     public function postCollectionMetadata(): void {
         $this->checkCanCreate();
 
-        $this->createResource();
+        $this->id = $state    = RC::$transaction->createResource(RC::$logId);
 
         $meta  = new Metadata($this->id);
         $count = $meta->loadFromRequest(RC::getBaseUrl());
@@ -325,13 +325,6 @@ class Resource {
             default:
                 throw new RepoException("Wrong transaction state: $txState", 400);
         }
-    }
-
-    private function createResource(): void {
-        $query    = RC::$pdo->prepare("INSERT INTO resources (transaction_id) VALUES (?) RETURNING id");
-        $query->execute([RC::$transaction->getId()]);
-        $this->id = (int) $query->fetchColumn();
-        RC::$log->info("\t" . $this->getUri());
     }
 
     private function deleteLockAll(int $txId): void {

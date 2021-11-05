@@ -33,6 +33,7 @@ use Socket;
 use zozlak\logging\Log;
 use acdhOeaw\arche\core\RepoException;
 use acdhOeaw\arche\lib\Config;
+use acdhOeaw\arche\core\Transaction as T;
 
 /**
  * Description of TransactionController
@@ -41,9 +42,8 @@ use acdhOeaw\arche\lib\Config;
  */
 class TransactionController {
 
-    const TYPE_UNIX                  = 'unix';
-    const TYPE_INET                  = 'inet';
-    const DBERROR_LOCK_NOT_AVAILABLE = '55P03';
+    const TYPE_UNIX = 'unix';
+    const TYPE_INET = 'inet';
 
     /**
      * 
@@ -220,7 +220,7 @@ class TransactionController {
             $txId  = (int) $query->fetchColumn();
             $this->log->info("Transaction $txId created");
 
-            $checkQuery = $pdo->prepare("
+            $checkQuery        = $pdo->prepare("
                 SELECT 
                     state, 
                     extract(epoch from now() - last_request) AS delay 
@@ -229,6 +229,13 @@ class TransactionController {
                 FOR UPDATE NOWAIT
             ");
             $checkQuery->execute([$txId]); // only to make sure it's runs fine before we confirm readiness to the client
+            $checkResLockQuery = $pdo->prepare("
+                SELECT count(*)
+                FROM resources
+                WHERE
+                    transaction_id = ?
+                    AND lock IS NOT NULL
+            ");
 
             $ret = @socket_write($connSocket, $txId . "\n");
             if ($ret === false) {
@@ -236,34 +243,47 @@ class TransactionController {
             } else {
                 $this->log->info("Transaction $txId - client notified");
             }
-            $state = (object) ['state' => Transaction::STATE_ACTIVE, 'delay' => 0];
-            do {
+            $state = $this->makeState(T::STATE_ACTIVE, 0);
+            while (true) {
+                $this->logState($txId, $state); // out of the transaction to minimize critical section
                 usleep($checkInterval);
+
+                $pdo->beginTransaction();
                 try {
                     $checkQuery->execute([$txId]);
                     $state = $checkQuery->fetchObject();
+                    $state = $state ?: $this->makeState(T::STATE_NOTX);
+
+                    $checkResLockQuery->execute([$txId]);
+                    $state->lockedResCount = $checkResLockQuery->fetchColumn();
                 } catch (PDOException $e) {
-                    if ($e->getCode() !== self::DBERROR_LOCK_NOT_AVAILABLE) {
-                        $state = false;
-                    }
+                    $state = $e->getCode() === T::PG_LOCK_FAILURE ? T::STATE_LOCKED : T::STATE_NOTX;
+                    $state = $this->makeState($state);
                 }
-
-                if ($state !== false) {
-                    $this->log->debug("Transaction $txId state: " . $state->state . ", " . $state->delay . " s");
-                } else {
-                    $this->log->info("Transaction $txId state: not exists");
+                $timeoutCond = $state->state === T::STATE_ACTIVE && ($state->delay ?? 0) >= $timeout && ($state->lockedResCount ?? 0) === 0;
+                $stateCond   = $state->state !== T::STATE_ACTIVE && $state->state !== T::STATE_LOCKED;
+                if ($timeoutCond || $stateCond) {
+                    break;
                 }
-            } while ($state !== false && $state->state === Transaction::STATE_ACTIVE && $state->delay < $timeout);
+                $pdo->commit();
+            };
+            $this->logState($txId, $state);
 
-            if ($state === false || $state->state !== Transaction::STATE_COMMIT) {
-                $this->rollbackTransaction($txId, $pdo, $preTxState);
-            } else {
+            if ($state->state !== T::STATE_COMMIT) {
+                $query = $pdo->prepare("UPDATE transactions SET state = ? WHERE transaction_id = ?");
+                $query->execute([T::STATE_ROLLBACK, $txId]);
+            }
+            $pdo->commit();
+
+            if ($state->state === T::STATE_COMMIT) {
                 $this->commitTransaction($txId, $pdo, $preTxState);
+            } else {
+                $this->rollbackTransaction($txId, $pdo, $preTxState);
             }
             $preTxState->query('COMMIT');
 
             $pdo->beginTransaction();
-            $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+            $query = $pdo->prepare("UPDATE resources SET transaction_id = null, lock = null WHERE transaction_id = ?");
             $query->execute([$txId]);
             $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
             $query->execute([$txId]);
@@ -276,7 +296,7 @@ class TransactionController {
                     $pdo->rollBack();
                 }
                 $pdo->beginTransaction();
-                $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+                $query = $pdo->prepare("UPDATE resources SET transaction_id = null, lock = null WHERE transaction_id = ?");
                 $query->execute([$txId]);
                 $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
                 $query->execute([$txId]);
@@ -404,5 +424,30 @@ class TransactionController {
             $query->execute([$txId]);
             $this->log->info("Transaction $txId - " . $query->rowCount() . " metadata history rows removed");
         }
+    }
+
+    /**
+     * 
+     * @param string $state
+     * @param int|null $delay
+     * @param int|null $lockedResCount
+     * @return object
+     */
+    private function makeState(string $state, ?int $delay = null,
+                               ?int $lockedResCount = null): object {
+        return (object) [
+                'state'          => $state,
+                'delay'          => $delay,
+                'lockedResCount' => $lockedResCount,
+        ];
+    }
+
+    /**
+     * 
+     * @param object $state
+     * @return void
+     */
+    private function logState(int $txId, object $state): void {
+        $this->log->debug("Transaction $txId state: $state->state, " . ($state->delay ?? '?') . " s " . ($state->lockedResCount ?? '?') . " locked resources");
     }
 }

@@ -27,8 +27,10 @@
 namespace acdhOeaw\arche\core\tests;
 
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use function \GuzzleHttp\json_encode;
+use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Description of TransactionTest
@@ -36,6 +38,17 @@ use function \GuzzleHttp\json_encode;
  * @author zozlak
  */
 class TransactionTest extends TestBase {
+
+    static public function sleepResource(int $id, Resource $meta, ?string $path): Resource {
+        $c = RC::$config->transactionController;
+        usleep(($c->timeout << 20) + ($c->checkInterval << 10));
+        return $meta;
+    }
+
+    static public function sleepTx(string $method, int $txId, array $resourceIds): void {
+        $c = RC::$config->transactionController;
+        usleep(($c->timeout << 20) + ($c->checkInterval << 10));
+    }
 
     /**
      * @group transactions
@@ -353,5 +366,39 @@ class TransactionTest extends TestBase {
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('patch', self::$baseUrl . 'transaction'));
         $this->assertEquals(405, $resp->getStatusCode());
+    }
+
+    /**
+     * Tests scenarios when request processing takes more then TransactionController
+     * timeout. If the transaction is rolled back by the TransactionController,
+     * the transaction/resource locking system doesn't work well.
+     * 
+     * @group transactions
+     */
+    public function testLongProcessing(): void {
+        TestBase::setHandler([
+            'txCommit'       => self::class . '::sleepTx',
+            'updateMetadata' => self::class . '::sleepResource',
+        ]);
+
+        $location = $this->createMetadataResource();
+        $prop     = 'http://foo';
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
+        ];
+
+        $req  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $res  = $this->extractResource($resp->getBody(), $location);
+        $this->assertEquals('value1', $res->getLiteral($prop));
+
+        $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
     }
 }

@@ -92,6 +92,19 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         usleep(100000);
     }
 
+    static protected function setHandler(array $handlers): void {
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        foreach ($handlers as $method => $function) {
+            $cfg['rest']['handlers']['methods'][$method] = [
+                [
+                    'type'     => 'function',
+                    'function' => $function,
+                ]
+            ];
+        }
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+    }
+
     public function setUp(): void {
         self::$pdo->query("TRUNCATE transactions CASCADE");
     }

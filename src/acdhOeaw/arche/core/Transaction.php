@@ -45,6 +45,7 @@ class Transaction {
     const STATE_ACTIVE             = 'active';
     const STATE_COMMIT             = 'commit';
     const STATE_ROLLBACK           = 'rollback';
+    const STATE_LOCKED             = 'locked';
     const PG_FOREIGN_KEY_VIOLATION = '23503';
     const PG_LOCK_FAILURE          = '55P03';
     const LOCK_TIMEOUT_DEFAULT     = 1000;
@@ -90,6 +91,29 @@ class Transaction {
         ");
         $query->execute([$this->id]);
         RC::$log->debug("Updating $this->id transaction timestamp with " . $query->fetchColumn());
+    }
+
+    public function createResource(int $lockId): int {
+        if ($this->pdo->inTransaction()) {
+            throw new RuntimeException("Can't lock a resource while inside a database transaction");
+        }
+        $this->pdo->beginTransaction();
+
+        $this->lock(false);
+
+        $query = $this->pdo->prepare("
+            INSERT INTO resources (transaction_id, lock)
+            VALUES (?, ?)
+            RETURNING id
+        ");
+        $query->execute([$this->id, $lockId]);
+        $resId = $query->fetchColumn();
+
+        $this->pdo->commit();
+
+        $this->lockedResources = true;
+        RC::$log->debug("Resource $resId created with transaction $this->id and lock $lockId");
+        return $resId;
     }
 
     /**

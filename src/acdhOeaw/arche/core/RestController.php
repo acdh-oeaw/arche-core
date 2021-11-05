@@ -219,13 +219,11 @@ class RestController {
 
             self::$transaction->prolong();
             self::$pdo->commit();
-        } catch (PDOException $ex) {
-            $statusCode = $ex->getCode() === '55P03' ? 409 : 500;
-        } catch (RepoLibException $ex) {
-            $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
-            echo $ex->getMessage();
         } catch (BadRequestException $ex) {
             $statusCode = $ex->getCode();
+            echo $ex->getMessage();
+        } catch (RepoLibException $ex) {
+            $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
             echo $ex->getMessage();
         } catch (Throwable $ex) {
             self::$log->error($ex);
@@ -238,7 +236,8 @@ class RestController {
 
                 self::$log->error($ex);
                 if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                    self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
+                    self::$log->info('aborting transaction ' . self::$transaction->getId() . ' due to enforce completeness');
+                    self::$transaction->unlockResources(self::$logId);
                     self::$transaction->delete();
                 }
             }

@@ -264,9 +264,9 @@ class Metadata {
             }
         } catch (PDOException $e) {
             switch ($e->getCode()) {
-                case 23505:
+                case '23505':
                     throw new RepoException('Duplicated resource identifier', 400, $e);
-                case 22007:
+                case '22007':
                     throw new RepoException('Wrong property value', 400, $e);
                 default:
                     throw $e;

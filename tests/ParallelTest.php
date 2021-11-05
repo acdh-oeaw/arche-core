@@ -56,20 +56,10 @@ class ParallelTest extends TestBase {
         // add some latency to request handling to make tests timing more
         // predictable
         $handlers = [
-            'txCommit'       => [
-                'type'     => 'function',
-                'function' => self::class . '::sleepTx',
-            ],
-            'updateMetadata' => [
-                'type'     => 'function',
-                'function' => self::class . '::sleepResource',
-            ],
+            'txCommit'       => self::class . '::sleepTx',
+            'updateMetadata' => self::class . '::sleepResource',
         ];
-        $cfg      = yaml_parse_file(__DIR__ . '/../config.yaml');
-        foreach ($handlers as $method => $data) {
-            $cfg['rest']['handlers']['methods'][$method][] = $data;
-        }
-        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        self::setHandler($handlers);
     }
 
     /**
@@ -107,7 +97,7 @@ class ParallelTest extends TestBase {
         while (count($requests) < 10) {
             $requests[] = new Request('get', self::$baseUrl . 'transaction', $headers);
         }
-        $resp = $this->runConcurrently($requests, [50000, 25000]);
+        $resp = $this->runConcurrently($requests, 75000);
         $this->assertEquals(204, $resp[0]->getStatusCode());
         $i    = 1;
         while ($i < count($resp) && $resp[$i]->getStatusCode() === 200) {
@@ -172,6 +162,7 @@ class ParallelTest extends TestBase {
         $this->assertEquals(204, $txResp->getStatusCode());
         $this->assertEquals(409, $resResp->getStatusCode());
     }
+
     /**
      * patch + patch on separate resources
      * Both should pass
