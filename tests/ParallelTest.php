@@ -76,7 +76,7 @@ class ParallelTest extends TestBase {
         ];
         $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
         $req2    = new Request('delete', self::$baseUrl . 'transaction', $headers);
-        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 10000);
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 50000);
         $this->assertEquals(204, $resp1->getStatusCode());
         $this->assertEquals(409, $resp2->getStatusCode());
     }
