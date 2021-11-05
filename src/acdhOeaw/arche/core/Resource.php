@@ -294,36 +294,25 @@ class Resource {
     public function checkCanWrite(bool $tombstone = false): void {
         $this->checkTransactionState();
 
-        $txId   = RC::$transaction->getId();
-        $query  = RC::$pdo->prepare("
-            UPDATE resources 
-            SET transaction_id = ?
-            WHERE id = ? AND (transaction_id IS NULL OR transaction_id = ?)
-            RETURNING state
-        ");
-        $query->execute([$txId, $this->id, $txId]);
-        $result = $query->fetchObject();
-        if ($result === false) {
-            $query = RC::$pdo->prepare("SELECT state FROM resources WHERE id = ?");
-            $query->execute([$this->id]);
-            $state = $query->fetchColumn();
-            if ($state === false || $state === self::STATE_DELETED) {
-                throw new RepoException('Not found', 404);
-            } else {
-                throw new RepoException('Owned by other transaction', 403);
-            }
-        }
-        if ($result->state === self::STATE_DELETED) {
+        // Lock by marking lock and transaction_id columns in the resources table
+        // It makes it possible for other requests to determine the resource is
+        // locked in a non-blocking way.
+        $state = RC::$transaction->lockResource($this->id, RC::$logId);
+        if ($state === self::STATE_DELETED) {
             throw new RepoException('Not Found', 404);
         }
-        if (!$tombstone && $result->state === self::STATE_TOMBSTONE) {
+        if (!$tombstone && $state === self::STATE_TOMBSTONE) {
             throw new RepoException('Gone', 410);
         }
-        if ($tombstone && $result->state !== self::STATE_TOMBSTONE) {
+        if ($tombstone && $state !== self::STATE_TOMBSTONE) {
             throw new RepoException('Not a tombstone', 405);
         }
 
         RC::$auth->checkAccessRights((int) $this->id, 'write', false);
+
+        // Lock by obtaining a row lock on the database
+        $query = RC::$pdo->prepare("SELECT id FROM resources WHERE id = ? FOR UPDATE");
+        $query->execute([$this->id]);
     }
 
     private function checkTransactionState(): void {

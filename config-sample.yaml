@@ -85,6 +85,10 @@ transactionController:
     enforceCompleteness: false
     # should metadata history table contain only one set of entries per transaction?
     simplifyMetaHistory: true
+    # the timeout assures parallel requests to the same trasnsaction don't cause a deadlock
+    lockTimeout: 1000
+    # REST API single SQL statement timeout (in miliseconds)
+    statementTimeout: 600000
 spatialSearch:
     # list of properties containing geometries in the WKT format
     properties:

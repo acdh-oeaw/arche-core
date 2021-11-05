@@ -29,6 +29,7 @@ namespace acdhOeaw\arche\core\tests;
 use RuntimeException;
 use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
+use acdhOeaw\arche\core\HandlersController as HC;
 
 /**
  * Description of HandlerTest
@@ -102,7 +103,7 @@ class HandlerTest extends TestBase {
     public function testMetadataManagerBasic(): void {
         $this->setHandlers([
             'create' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
@@ -123,7 +124,7 @@ class HandlerTest extends TestBase {
     public function testMetadataManagerDefault(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
@@ -149,7 +150,7 @@ class HandlerTest extends TestBase {
     public function testMetadataManagerForbidden(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
@@ -170,7 +171,7 @@ class HandlerTest extends TestBase {
     public function testMetadataManagerCopying(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
@@ -192,7 +193,7 @@ class HandlerTest extends TestBase {
     public function testRpcBasic(): void {
         $this->setHandlers([
             'create' => [
-                'type'  => 'rpc',
+                'type'  => HC::TYPE_RPC,
                 'queue' => 'onCreateRpc',
             ],
         ]);
@@ -208,7 +209,7 @@ class HandlerTest extends TestBase {
     public function testRpcTimeoutExceptio(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'  => 'rpc',
+                'type'  => HC::TYPE_RPC,
                 'queue' => 'onUpdateRpc',
             ],
             ], true);
@@ -224,7 +225,7 @@ class HandlerTest extends TestBase {
     public function testRpcTimeoutNoException(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'  => 'rpc',
+                'type'  => HC::TYPE_RPC,
                 'queue' => 'onUpdateRpc',
             ],
             ], false);
@@ -243,7 +244,7 @@ class HandlerTest extends TestBase {
     public function testTxCommitFunction(): void {
         $this->setHandlers([
             'txCommit' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\tests\Handler::onTxCommit',
             ],
         ]);
@@ -264,7 +265,7 @@ class HandlerTest extends TestBase {
     public function testTxCommitRpc(): void {
         $this->setHandlers([
             'txCommit' => [
-                'type'  => 'rpc',
+                'type'  => HC::TYPE_RPC,
                 'queue' => 'onCommitRpc',
             ],
         ]);
@@ -285,7 +286,7 @@ class HandlerTest extends TestBase {
     public function testFunctionHandler(): void {
         $this->setHandlers([
             'txCommit' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => 'max',
             ]
         ]);
@@ -300,7 +301,7 @@ class HandlerTest extends TestBase {
     public function testDeleteWithReferencesHandler(): void {
         $this->setHandlers([
             'updateMetadata' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\tests\Handler::deleteReference',
             ],
         ]);
@@ -320,8 +321,8 @@ class HandlerTest extends TestBase {
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
         $this->assertStringContainsString(Handler::CHECK_PROP . ' is missing', (string) $resp->getBody());
-    }        
-    
+    }
+
     /**
      * @group handler
      * 
@@ -330,7 +331,7 @@ class HandlerTest extends TestBase {
     public function testBrokenHandler(): void {
         $this->setHandlers([
             'create' => [
-                'type'     => 'function',
+                'type'     => HC::TYPE_FUNC,
                 'function' => '\acdhOeaw\arche\core\tests\Handler::brokenHandler',
             ]
         ]);
@@ -390,8 +391,9 @@ class HandlerTest extends TestBase {
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
         $cmd           = 'php -f ' . __DIR__ . '/handlerRun.php ' . __DIR__ . '/../config.yaml';
+        $desc          = [2 => ['pipe', 'w']]; // catch stdout to avoid the "Terminated" output
         $pipes         = [];
-        $this->rmqSrvr = proc_open($cmd, [], $pipes, __DIR__);
+        $this->rmqSrvr = proc_open($cmd, $desc, $pipes, __DIR__);
         if ($this->rmqSrvr === false) {
             throw new RuntimeException('failed to start handlerRun.php');
         }

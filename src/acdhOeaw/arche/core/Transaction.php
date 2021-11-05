@@ -28,7 +28,9 @@ namespace acdhOeaw\arche\core;
 
 use PDO;
 use PDOException;
+use PDOStatement;
 use RuntimeException;
+use Throwable;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\exception\RepoLibException;
 
@@ -48,11 +50,12 @@ class Transaction {
     const LOCK_TIMEOUT_DEFAULT     = 1000;
     const STMT_TIMEOUT_DEFAULT     = 60000;
 
-    private ?int $id          = null;
-    private string $startedAt   = '';
-    private string $lastRequest = '';
-    private string $state       = self::STATE_NOTX;
+    private ?int $id              = null;
+    private string $startedAt       = '';
+    private string $lastRequest     = '';
+    private string $state           = self::STATE_NOTX;
     private string $snapshot;
+    private bool $lockedResources = false;
 
     /**
      * Database connection.
@@ -75,22 +78,92 @@ class Transaction {
         }
     }
 
-    public function prolongAndRelease(): void {
-        if ($this->id !== null) {
-            $query = $this->pdo->prepare("
-                UPDATE transactions 
-                SET last_request = clock_timestamp() 
-                WHERE transaction_id = ? 
-                RETURNING last_request
-            ");
-            $query->execute([$this->id]);
-            RC::$log->debug("Updating $this->id transaction timestamp with " . $query->fetchColumn());
+    public function prolong(): void {
+        if ($this->id === null) {
+            return;
+        }
+        $query = $this->pdo->prepare("
+            UPDATE transactions 
+            SET last_request = clock_timestamp() 
+            WHERE transaction_id = ?
+            RETURNING last_request
+        ");
+        $query->execute([$this->id]);
+        RC::$log->debug("Updating $this->id transaction timestamp with " . $query->fetchColumn());
+    }
+
+    /**
+     * Locks a given resource with a given lock id and the current transaction id.
+     * 
+     * - First a database lock on the transaction is obtained with `$this->lock(false)`.
+     * - Then a database lock on the resource is obtained and the resource is
+     *   marked as arche-locked by setting up `transaction_id` and `lock`
+     *   column values
+     * - Finally the database transaction is commited.
+     * 
+     * @param int $resId
+     * @param int $lockId
+     * @return string|null
+     * @throws RuntimeException
+     * @throws BadRequestException
+     * @throws ConflictException
+     */
+    public function lockResource(int $resId, int $lockId): ?string {
+        if ($this->pdo->inTransaction()) {
+            throw new RuntimeException("Can't lock a resource while inside a database transaction");
+        }
+        $this->pdo->beginTransaction();
+
+        $this->lock(false);
+        $query = $this->pdo->prepare("
+            SELECT state, lock, transaction_id AS txid
+            FROM resources r
+            WHERE id = ? 
+            FOR UPDATE NOWAIT
+        ");
+        $this->executeQuery($query, [$resId], "Resource $resId locked");
+        $data  = $query->fetchObject();
+        if ($data === false) {
+            $this->pdo->rollBack();
+            throw new BadRequestException('Not found', 404);
+        } elseif ($data->txid !== null && $data->txid !== $this->id) {
+            $this->pdo->rollBack();
+            throw new BadRequestException('Owned by other transaction', 403);
+        } elseif ($data->lock !== null && $data->lock !== $lockId) {
+            $this->pdo->rollBack();
+            throw new ConflictException('Owned by other request');
         }
 
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->commit();
-            RC::$log->debug("Transaction $this->id released");
+        $query = $this->pdo->prepare("
+            UPDATE resources r
+            SET lock = ?, transaction_id = ?
+            WHERE id = ?
+        ");
+        $query->execute([$lockId, $this->id, $resId]);
+
+        $this->pdo->commit();
+
+        $this->lockedResources = true;
+        RC::$log->debug("Resource $resId locked with transaction $this->id and lock $lockId");
+
+        return $data->state;
+    }
+
+    public function unlockResources(int $lockId): void {
+        if (!$this->lockedResources) {
+            return;
         }
+        $inTx = (int) $this->pdo->inTransaction();
+        if ($inTx) {
+            RC::$log->warning("Calling Transaction::unlockResources() while it's PDO handler is inside a transaction - it will likely fail");
+        }
+        $query = $this->pdo->prepare("
+            UPDATE resources 
+            SET lock = null
+            WHERE lock = ?
+        ");
+        $this->executeQuery($query, [$lockId], "Failed to release resource locks");
+        RC::$log->debug("Resource locks released");
     }
 
     public function getId(): ?int {
@@ -128,18 +201,19 @@ class Transaction {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
-        $this->lock();
 
-        RC::$handlersCtl->handleTransaction('rollback', (int) $this->id, $this->getResourceList());
+        try {
+            $this->pdo->beginTransaction();
+            $this->lock(true);
 
-        $query = $this->pdo->prepare("
-            UPDATE transactions 
-            SET state = 'rollback', last_request = clock_timestamp() 
-            WHERE transaction_id = ?
-        ");
-        $query->execute([$this->id]);
-        $this->wait();
+            RC::$handlersCtl->handleTransaction('rollback', (int) $this->id, $this->getResourceList());
 
+            $this->setState(self::STATE_ROLLBACK);
+        } catch (Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
+        $this->releaseAndWait();
         http_response_code(204);
     }
 
@@ -147,34 +221,28 @@ class Transaction {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
-        $this->lock();
 
-        RC::$handlersCtl->handleTransaction('commit', (int) $this->id, $this->getResourceList());
-
-        RC::$log->debug('Cleaning up transaction ' . $this->id);
         try {
+            $this->pdo->beginTransaction();
+            $this->lock(true);
+
+            RC::$handlersCtl->handleTransaction('commit', (int) $this->id, $this->getResourceList());
+
+            RC::$log->debug('Cleaning up transaction ' . $this->id);
             $query = $this->pdo->prepare("
                 DELETE FROM resources
                 WHERE transaction_id = ? AND state = ?
             ");
-            $query->execute([$this->id, Resource::STATE_DELETED]);
+            $param = [$this->id, Resource::STATE_DELETED];
+            $this->executeQuery($query, $param, "Foreign constraint conflict", true);
 
-            $query = $this->pdo->prepare("
-                UPDATE transactions 
-                SET state = ?, last_request = clock_timestamp()
-                WHERE transaction_id = ?
-            ");
-            $query->execute([self::STATE_COMMIT, $this->id]);
-            http_response_code(204);
-        } catch (PDOException $e) {
-            RC::$log->error($e->getMessage());
-            if ((string) $e->getCode() === self::PG_FOREIGN_KEY_VIOLATION) {
-                throw new ConflictException("Foreign constraint conflict");
-            } else {
-                throw $e;
-            }
+            $this->setState(self::STATE_COMMIT);
+        } catch (Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
         }
-        $this->wait();
+        $this->releaseAndWait();
+        http_response_code(204);
     }
 
     public function post(): void {
@@ -184,10 +252,18 @@ class Transaction {
         } catch (RepoLibException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
-        $this->lock();
 
-        RC::$handlersCtl->handleTransaction('begin', $this->id, []);
+        try {
+            $this->pdo->beginTransaction();
+            $this->lock(true);
 
+            RC::$handlersCtl->handleTransaction('begin', $this->id, []);
+
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            $this->pdo->rollBack();
+            throw $e;
+        }
         http_response_code(201);
         $this->fetchData();
         $this->get();
@@ -202,9 +278,32 @@ class Transaction {
         return $pdo;
     }
 
-    private function lock(): void {
+    /**
+     * Tries to lock the current transaction.
+     * Assures no other transaction PUT(commit)/DELETE(rollback) is executed 
+     * in parallel. Will succeed only if there's no this transaction related
+     * resource operation being executed.
+     * 
+     * @param bool $checkResourceLocks
+     * @return void
+     * @throws ConflictException
+     * @throws PDOException
+     */
+    private function lock(bool $checkResourceLocks = true): void {
         if (!$this->pdo->inTransaction()) {
-            $this->pdo->beginTransaction();
+            throw new RuntimeException("Must be in a database transaction");
+        }
+        $resLocksClasue = '';
+        if ($checkResourceLocks) {
+            $resLocksClasue = "
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM resources
+                    WHERE
+                        transaction_id = t.transaction_id
+                        AND lock IS NOT NULL
+                )
+            ";
         }
         // Can't use NOWAIT becuase even GET on transaction modifies it (updates 
         // the last_request db field) and NOWAIT would cause one of two parallel
@@ -212,31 +311,32 @@ class Transaction {
         // on the connecitn in the Transaction class constructor.
         $query = $this->pdo->prepare("
             SELECT state
-            FROM transactions 
-            WHERE transaction_id = ? 
+            FROM transactions t
+            WHERE
+                transaction_id = ?
+                $resLocksClasue
             FOR UPDATE
         ");
-        try {
-            $query->execute([$this->id]);
-            $state = $query->fetchColumn();
-            if ($state !== self::STATE_ACTIVE) {
-                $this->pdo->commit();
-                throw new ConflictException("Transaction $this->id is in $state state and can't be locked");
-            }
-            RC::$log->debug("Transaction $this->id locked");
-        } catch (PDOException $e) {
-            if ((string) $e->getCode() === self::PG_LOCK_FAILURE) {
-                throw new ConflictException("Transaction $this->id already locked");
-            } else {
-                throw $e;
-            }
+        $this->executeQuery($query, [$this->id], "Transaction $this->id locked");
+        $state = $query->fetchColumn();
+        if ($state === false) {
+            throw new ConflictException("Transaction $this->id can't be locked - there's at least one request belonging to the transaction which is still being processed");
         }
+        if ($state !== self::STATE_ACTIVE) {
+            throw new ConflictException("Transaction $this->id is in $state state and can't be locked");
+        }
+        RC::$log->debug("Transaction $this->id locked");
     }
 
     private function fetchData(): void {
+//        $query = $this->pdo->prepare("
+//            UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ?
+//            RETURNING started, last_request AS last, state, snapshot
+//        ");
         $query = $this->pdo->prepare("
-            UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ?
-            RETURNING started, last_request AS last, state, snapshot
+            SELECT started, clock_timestamp() AS last, state, snapshot
+            FROM transactions
+            WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
         $data  = $query->fetchObject();
@@ -253,11 +353,12 @@ class Transaction {
     /**
      * Actively waits until the transaction controller daemon rollbacks/commits the transaction
      */
-    private function wait(): void {
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->commit();
-            RC::$log->debug("Transaction $this->id released");
+    private function releaseAndWait(): void {
+        if (!$this->pdo->inTransaction()) {
+            throw new RuntimeException("Waiting for unlocked transaction doesn't guarantee atomicity");
         }
+        $this->pdo->commit();
+        RC::$log->debug("Transaction $this->id released");
         $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);
@@ -268,6 +369,16 @@ class Transaction {
         RC::$log->info('Transaction ' . $this->id . ' ended');
     }
 
+    private function setState(string $state): void {
+        $query = $this->pdo->prepare("
+            UPDATE transactions 
+            SET state = ?, last_request = clock_timestamp() 
+            WHERE transaction_id = ?
+        ");
+        $query->execute([$state, $this->id]);
+        RC::$log->debug("Transaction $this->id state changed to $state");
+    }
+
     /**
      * 
      * @return array<int>
@@ -276,5 +387,40 @@ class Transaction {
         $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $query->execute([$this->id]);
         return $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    /**
+     * Executes a given PDO statement trapping the lock timeout and foreign key
+     * database exceptions and turning them it into the `ConflictException`.
+     * 
+     * @param PDOStatement $query
+     * @param array $param
+     * @param string $errorMsg
+     * @param bool $logException
+     * @return void
+     * @throws ConflictException
+     * @throws PDOException
+     */
+    private function executeQuery(PDOStatement $query, array $param,
+                                  string $errorMsg = "Database lock timeout",
+                                  bool $logException = false): void {
+        try {
+            $query->execute($param);
+        } catch (PDOException $e) {
+            if ($logException) {
+                RC::$log->error($e);
+            }
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            switch ((string) $e->getCode()) {
+                case self::PG_LOCK_FAILURE:
+                    throw new ConflictException($errorMsg);
+                case self::PG_FOREIGN_KEY_VIOLATION:
+                    throw new ConflictException($errorMsg);
+                default:
+                    throw $e;
+            }
+        }
     }
 }

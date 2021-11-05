@@ -41,28 +41,88 @@ use acdhOeaw\arche\core\Transaction;
  */
 class ParallelTest extends TestBase {
 
+    static public function sleepResource(int $id, Resource $meta, ?string $path): Resource {
+        usleep(100000); // sleep 100 ms
+        return $meta;
+    }
+
+    static public function sleepTx(string $method, int $txId, array $resourceIds): void {
+        usleep(100000); // sleep 100 ms
+    }
+
+    static public function setUpBeforeClass(): void {
+        parent::setUpBeforeClass();
+
+        // add some latency to request handling to make tests timing more
+        // predictable
+        $handlers = [
+            'txCommit'       => [
+                'type'     => 'function',
+                'function' => self::class . '::sleepTx',
+            ],
+            'updateMetadata' => [
+                'type'     => 'function',
+                'function' => self::class . '::sleepResource',
+            ],
+        ];
+        $cfg      = yaml_parse_file(__DIR__ . '/../config.yaml');
+        foreach ($handlers as $method => $data) {
+            $cfg['rest']['handlers']['methods'][$method][] = $data;
+        }
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+    }
+
     /**
-     * patch + patch to the same resource
-     * The first patch should succeed, the second one should fail with 409
+     * tx commit + tx rollback
+     * - The tx commit should succeed
+     * - The tx rollback should fail with HTTP 409
      * 
      * @group parallel
      */
-    public function testParallelPatchPatchSame(): void {
-        $location = $this->createMetadataResource();
-        $prop     = 'http://foo';
-
+    public function testParallelCommitRollback(): void {
         $txId    = $this->beginTransaction();
         $headers = [
             self::$config->rest->headers->transactionId => $txId,
-            'Eppn'                                      => 'admin',
-            'Content-Type'                              => 'application/n-triples',
         ];
-        $req1    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
-        $req2    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
-        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 1000);
-        $codes   = [$resp1->getStatusCode(), $resp2->getStatusCode()];
-        $this->assertContains(200, $codes);
-        $this->assertContains(409, $codes);
+        $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
+        $req2    = new Request('delete', self::$baseUrl . 'transaction', $headers);
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 10000);
+        $this->assertEquals(204, $resp1->getStatusCode());
+        $this->assertEquals(409, $resp2->getStatusCode());
+    }
+
+    /**
+     * tx commit + tx get
+     * - The tx commit should succeed
+     * - The tx get should succeed
+     * 
+     * @group parallel
+     */
+    public function testParallelCommitTxGet(): void {
+        $txId     = $this->beginTransaction();
+        $headers  = [
+            self::$config->rest->headers->transactionId => $txId,
+        ];
+        $requests = [new Request('put', self::$baseUrl . 'transaction', $headers)];
+        while (count($requests) < 10) {
+            $requests[] = new Request('get', self::$baseUrl . 'transaction', $headers);
+        }
+        $resp = $this->runConcurrently($requests, [50000, 25000]);
+        $this->assertEquals(204, $resp[0]->getStatusCode());
+        $i    = 1;
+        while ($i < count($resp) && $resp[$i]->getStatusCode() === 200) {
+            $i++;
+        }
+        $this->assertLessThan(count($resp), $i);
+        $this->assertEquals(400, $resp[$i]->getStatusCode());
+        $lastData = json_decode($resp[$i - 1]->getBody());
+        // We can't check just for the STATE_COMMIT because the TransactionController
+        // runs asynchronously and it's impossible to predict the time between
+        // the release of the transaction done by the `PUT /transaction` and
+        // the transaction removal perfromed by the TransactionController.
+        // Sending many `GET /transaction` requests in a short period of time
+        // doesn't help as it makes all the timings even less predictable.
+        $this->assertContains($lastData->state, [Transaction::STATE_COMMIT, Transaction::STATE_ACTIVE]);
     }
 
     /**
@@ -84,14 +144,34 @@ class ParallelTest extends TestBase {
         ];
         $resReq  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
         $txReq   = new Request('put', self::$baseUrl . 'transaction', $headers);
-        list($resResp, $txResp) = $this->runConcurrently([$resReq, $txReq], 1000);
-        print_r($resResp->getHeaders());
-        print_r($txResp->getHeaders());
-        print_r([$resResp->getStatusCode(), $txResp->getStatusCode()]);
+        list($resResp, $txResp) = $this->runConcurrently([$resReq, $txReq], 50000);
         $this->assertEquals(200, $resResp->getStatusCode());
         $this->assertEquals(409, $txResp->getStatusCode());
     }
 
+    /**
+     * tx commit + patch
+     * - The tx commit should pass
+     * - The patch should fail with 409 because of the commit
+     * 
+     * @group parallel
+     */
+    public function testParallelCommitAndPatch(): void {
+        $location = $this->createMetadataResource();
+        $prop     = 'http://foo';
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
+        ];
+        $txReq   = new Request('put', self::$baseUrl . 'transaction', $headers);
+        $resReq  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        list($txResp, $resResp) = $this->runConcurrently([$txReq, $resReq], 50000);
+        $this->assertEquals(204, $txResp->getStatusCode());
+        $this->assertEquals(409, $resResp->getStatusCode());
+    }
     /**
      * patch + patch on separate resources
      * Both should pass
@@ -124,50 +204,28 @@ class ParallelTest extends TestBase {
     }
 
     /**
-     * tx commit + tx rollback
-     * - The tx commit should succeed
-     * - The tx rollback should fail with HTTP 409
+     * patch + patch to the same resource
+     * The first patch should succeed, the second one should fail with 409
      * 
      * @group parallel
      */
-    public function testParallelCommitRollback(): void {
-        $txId    = $this->beginTransaction();
-        $headers = [
-            self::$config->rest->headers->transactionId => $txId,
-        ];
-        $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
-        $req2    = new Request('delete', self::$baseUrl . 'transaction', $headers);
-        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 10000);
-        $this->assertEquals(204, $resp1->getStatusCode());
-        $this->assertEquals(409, $resp2->getStatusCode());
-    }
+    public function testParallelPatchPatchSame(): void {
+        $location = $this->createMetadataResource();
+        $prop     = 'http://foo';
 
-    /**
-     * tx commit + tx get
-     * - The tx commit should succeed
-     * - The tx get should succeed
-     * 
-     * @group parallel
-     */
-    public function testParallelCommitTxGet(): void {
         $txId    = $this->beginTransaction();
         $headers = [
             self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
         ];
-        $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
-        $req2    = new Request('get', self::$baseUrl . 'transaction', $headers);
-        $resp    = $this->runConcurrently([$req1, $req2, $req2, $req2, $req2], 10000);
-        $this->assertEquals(204, $resp[0]->getStatusCode());
-        $i       = 1;
-        while ($i < count($resp) && $resp[$i]->getStatusCode() === 200) {
-            $i++;
-        }
-        $this->assertLessThan(count($resp), $i);
-        $this->assertEquals(400, $resp[$i]->getStatusCode());
-        $lastData = json_decode($resp[$i - 1]->getBody());
-        $this->assertEquals(Transaction::STATE_COMMIT, $lastData->state);
+        $req1    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $req2    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 50000);
+        $codes   = [$resp1->getStatusCode(), $resp2->getStatusCode()];
+        $this->assertContains(200, $codes);
+        $this->assertContains(409, $codes);
     }
-    
     //TODO - test assuring some kind of locking prevents long processing from transaction remocal
     // SearchTest::testFullTextSearch2 does the job
 }

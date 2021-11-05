@@ -271,16 +271,24 @@ class TestBase extends \PHPUnit\Framework\TestCase {
      * Runs given requests in parallel, keeping a given delay between sending them.
      * 
      * @param array<Request> $requests
-     * @param int $delayUs
+     * @param int|array $delayUs
      * @return array<Response>
      */
-    protected function runConcurrently(array $requests, int $delayUs = 0): array {
+    protected function runConcurrently(array $requests, $delayUs = 0): array {
+        if (!is_array($delayUs)) {
+            $delayUs = [$delayUs];
+        }
+        $lastDelay = $delayUs[count($delayUs) - 1];
+        while (count($delayUs) < count($requests)) {
+            $delayUs[] = $lastDelay;
+        }
+
         $handle       = curl_multi_init();
         $reqHandles   = [];
         $outputs      = [];
         $startTimes   = [];
         $runningCount = null;
-        foreach ($requests as $i) {
+        foreach ($requests as $n => $i) {
             /* @var $i Request */
             $req          = curl_init();
             $reqHandles[] = $req;
@@ -299,8 +307,8 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             curl_multi_add_handle($handle, $req);
             $startTimes[] = microtime(true);
             curl_multi_exec($handle, $runningCount);
-            if ($delayUs > 0) {
-                usleep($delayUs);
+            if ($delayUs[$n] > 0) {
+                usleep($delayUs[$n]);
             }
         }
         do {

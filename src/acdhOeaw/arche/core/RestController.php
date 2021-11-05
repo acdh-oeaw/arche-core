@@ -79,6 +79,7 @@ class RestController {
     static public Transaction $transaction;
     static public Resource $resource;
     static public Auth $auth;
+    static public int $logId;
 
     /**
      *
@@ -96,8 +97,12 @@ class RestController {
 
         self::$config = Config::fromYaml($configFile);
 
-        $logId     = sprintf("%06d", rand(0, 999999)); // short unique request id
-        self::$log = new Log(self::$config->rest->logging->file, self::$config->rest->logging->level, "{TIMESTAMP}\t$logId\t{LEVEL}\t{MESSAGE}");
+        self::$logId = rand(0, 999999); // short unique request id
+        self::$log   = new Log(
+            self::$config->rest->logging->file,
+            self::$config->rest->logging->level,
+            "{TIMESTAMP}\t" . sprintf("%06d", self::$logId) . "\t{LEVEL}\t{MESSAGE}"
+        );
 
         try {
             self::$log->info("------------------------------");
@@ -131,8 +136,6 @@ class RestController {
             // if the response code has been set already, don't do anything else
             return;
         }
-        $exception  = null;
-        $statusCode = null;
         try {
             if (!empty(self::$config->rest->cors ?? '')) {
                 $origin = self::$config->rest->cors;
@@ -214,34 +217,37 @@ class RestController {
                 throw new RepoException('Not Found', 404);
             }
 
-            self::$transaction->prolongAndRelease(); // to avoid deadlocks in the next line
+            self::$transaction->prolong();
             self::$pdo->commit();
-        } catch (PDOException $e) {
-            $exception  = $e;
-            $statusCode = $e->getCode() === '55P03' ? 409 : 500;
-        } catch (RepoLibException $e) {
-            $exception  = $e;
-            $statusCode = $e->getCode() >= 100 ? $e->getCode() : 500;
-            echo $e->getMessage();
-        } catch (BadRequestException $e) {
-            $exception  = $e;
-            $statusCode = $e->getCode();
-            echo $e->getMessage();
-        } catch (Throwable $e) {
-            self::$log->critical($e);
-            $exception  = $e;
+        } catch (PDOException $ex) {
+            $statusCode = $ex->getCode() === '55P03' ? 409 : 500;
+        } catch (RepoLibException $ex) {
+            $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
+            echo $ex->getMessage();
+        } catch (BadRequestException $ex) {
+            $statusCode = $ex->getCode();
+            echo $ex->getMessage();
+        } catch (Throwable $ex) {
+            self::$log->error($ex);
             $statusCode = 500;
         } finally {
-            if ($exception !== null) {
-                self::$log->error($exception);
+            if (isset($ex)) {
+                if (self::$pdo->inTransaction()) {
+                    self::$pdo->rollBack();
+                }
+
+                self::$log->error($ex);
                 if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
                     self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
                     self::$transaction->delete();
                 }
             }
-            if ($statusCode !== null) {
+            if (isset($statusCode)) {
                 http_response_code($statusCode);
             }
+
+            self::$transaction->unlockResources(self::$logId);
+
             self::$log->info("Return code " . http_response_code());
             self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
         }
