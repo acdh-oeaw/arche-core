@@ -48,6 +48,8 @@ class Transaction {
     const STATE_LOCKED             = 'locked';
     const PG_FOREIGN_KEY_VIOLATION = '23503';
     const PG_LOCK_FAILURE          = '55P03';
+    const PG_DUPLICATE_KEY         = '23505';
+    const PG_WRONG_DATE_VALUE      = '22007';
     const LOCK_TIMEOUT_DEFAULT     = 1000;
     const STMT_TIMEOUT_DEFAULT     = 60000;
 

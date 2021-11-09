@@ -264,9 +264,9 @@ class Metadata {
             }
         } catch (PDOException $e) {
             switch ($e->getCode()) {
-                case '23505':
+                case Transaction::PG_DUPLICATE_KEY:
                     throw new RepoException('Duplicated resource identifier', 400, $e);
-                case '22007':
+                case Transaction::PG_WRONG_DATE_VALUE:
                     throw new RepoException('Wrong property value', 400, $e);
                 default:
                     throw $e;
@@ -353,14 +353,32 @@ class Metadata {
                 throw new RepoException('Denied to create a non-existing id', 400);
             case 'add':
                 RC::$log->info("\t\tadding resource $ids <--");
-                $query = RC::$pdo->prepare("INSERT INTO resources (id, transaction_id) VALUES (nextval('id_seq'::regclass), ?) RETURNING id");
-                $query->execute([RC::$transaction->getId()]);
-                $id    = (int) $query->fetchColumn();
-                $meta  = new Metadata($id);
-                $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
-                $meta->update(RC::$auth->getCreateRights());
-                $meta->merge(self::SAVE_OVERWRITE);
-                $meta->save();
+                try {
+                    // Quite some time passes before the decicion to call autoAddId()
+                    // and actual resource addition and there is a risk a parallel
+                    // request created the target resource in the meantime.
+                    // This situation require special handling which is done with
+                    // a savepoint and catching of the "Duplicate key" database
+                    // exception.
+                    RC::$pdo->query("SAVEPOINT autoaddid");
+                    $query = RC::$pdo->prepare("INSERT INTO resources (id, transaction_id) VALUES (nextval('id_seq'::regclass), ?) RETURNING id");
+                    $query->execute([RC::$transaction->getId()]);
+                    $id    = (int) $query->fetchColumn();
+                    $meta  = new Metadata($id);
+                    $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
+                    $meta->update(RC::$auth->getCreateRights());
+                    $meta->merge(self::SAVE_OVERWRITE);
+                    $meta->save();
+                    RC::$pdo->query("RELEASE SAVEPOINT autoaddid");
+                } catch (RepoException $e) {
+                    RC::$pdo->query("ROLLBACK TO SAVEPOINT autoaddid");
+                    // Transaction::PG_DUPLICATE_KEY means "resource has been added in the meantime by other request"
+                    if ($e->getPrevious()?->getCode() !== Transaction::PG_DUPLICATE_KEY) {
+                        RC::$log->critical('c');
+                        throw $e;
+                    }
+                    RC::$log->critical('d');
+                }
                 RC::$log->info("\t\t-->adding resource $ids");
                 return true;
             default:

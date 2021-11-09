@@ -217,6 +217,36 @@ class ParallelTest extends TestBase {
         $this->assertContains(200, $codes);
         $this->assertContains(409, $codes);
     }
-    //TODO - test assuring some kind of locking prevents long processing from transaction remocal
-    // SearchTest::testFullTextSearch2 does the job
+
+    /**
+     * patch + patch on separate resources triggering adding of the same third
+     * resource
+     * Both should pass
+     * 
+     * @group parallel
+     */
+    public function testParallelPatchPatchAddId(): void {
+        $loc1  = $this->createMetadataResource();
+        $loc2  = $this->createMetadataResource();
+        $prop  = 'http://foo';
+        $value = 'http://same/object';
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
+        ];
+        $req1    = new Request('patch', $loc1 . '/metadata', $headers, "<$loc1> <$prop> <$value> .");
+        $req2    = new Request('patch', $loc2 . '/metadata', $headers, "<$loc2> <$prop> <$value> .");
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
+        $h1      = $resp1->getHeaders();
+        $h2      = $resp2->getHeaders();
+        $this->assertEquals(200, $resp1->getStatusCode());
+        $this->assertEquals(200, $resp2->getStatusCode());
+        $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
+        $r1      = $this->extractResource($resp1->getBody(), $loc1);
+        $r2      = $this->extractResource($resp2->getBody(), $loc2);
+        $this->assertEquals((string) $r2->getResource($prop), (string) $r1->getResource($prop));
+    }
 }
