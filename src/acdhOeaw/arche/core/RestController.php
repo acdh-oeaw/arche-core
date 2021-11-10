@@ -110,7 +110,7 @@ class RestController {
 
             self::$pdo   = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            self::$pdo->query("SET application_name TO rest");
+            self::$pdo->query("SET application_name TO rest_" . self::$logId);
             $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? Transaction::LOCK_TIMEOUT_DEFAULT);
             self::$pdo->query("SET lock_timeout TO $lockTimeout");
             $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? Transaction::STMT_TIMEOUT_DEFAULT);
@@ -238,7 +238,13 @@ class RestController {
                 if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
                     self::$log->info('aborting transaction ' . self::$transaction->getId() . ' due to enforce completeness');
                     self::$transaction->unlockResources(self::$logId);
-                    self::$transaction->delete();
+                    while (self::$transaction->getState() === Transaction::STATE_ACTIVE) {
+                        try {
+                            self::$transaction->delete();
+                        } catch (ConflictException) {
+                            
+                        }
+                    }
                 }
             }
             if (isset($statusCode)) {
