@@ -317,11 +317,11 @@ class ParallelTest extends TestBase {
         $req1     = new Request('post', self::$baseUrl . "metadata", $headers, $meta1->getGraph()->serialise('application/n-triples'));
         $req2     = new Request('post', self::$baseUrl . "metadata", $headers, $meta2->getGraph()->serialise('application/n-triples'));
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
-        $h1       = $resp1->getHeaders();
-        $h2       = $resp2->getHeaders();
         $statuses = [$resp1->getStatusCode(), $resp2->getStatusCode()];
         $this->assertContains(201, $statuses);
         $this->assertContains(400, $statuses);
+        $body     = $resp1->getBody() . "\n" . $resp2->getBody();
+        $this->assertStringContainsString('duplicate key value violates unique constraint "identifiers_pkey"', $body);
     }
     /*
      * Missing tests:
