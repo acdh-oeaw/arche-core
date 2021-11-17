@@ -352,6 +352,43 @@ class TransactionTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
+    
+   /**
+    * - tx1 creates res1 and res2
+    * - tx2 creates res3 pointing to res1
+    * - tx1 is rolled back
+    * - tx2 is commited
+    * res 1 should stay because it's referenced by res3 while res2 should be 
+    * deleted by the transaction controller
+    * 
+    * @group transactions
+    */
+    public function testParallelCommonResourceRollbackCommit(): void {
+        $relProp = self::$config->schema->parent;
+
+        $tx1   = $this->beginTransaction();
+        $tx2   = $this->beginTransaction();
+        $loc1  = $this->createMetadataResource(null, $tx1);
+        $loc2  = $this->createMetadataResource(null, $tx1);
+        $meta3 = (new Graph())->resource(self::$baseUrl);
+        $meta3->addResource($relProp, $loc1);
+        $loc3  = $this->createMetadataResource($meta3, $tx2);
+        $this->rollbackTransaction($tx1);
+        $this->commitTransaction($tx2);
+        sleep(2);
+
+        $meta3 = $this->getResourceMeta($loc3);
+        $this->assertEquals($loc1, (string)$meta3->getResource($relProp));
+        
+        $req1 = new Request('get', "$loc1/metadata");
+        $resp1 = self::$client->send($req1);
+        $this->assertEquals(200, $resp1->getStatusCode());
+        $req2 = new Request('get', "$loc2/metadata");
+        $resp2 = self::$client->send($req2);
+        $this->assertEquals(404, $resp2->getStatusCode());
+        
+    }    
+    
     /**
      * @group transactions
      */

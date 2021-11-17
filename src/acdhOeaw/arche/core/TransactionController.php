@@ -320,35 +320,56 @@ class TransactionController {
                                          PDO $prevState): void {
         $this->log->info("Transaction $txId - rollback");
 
-        $queryResDel  = $curState->prepare("DELETE FROM resources WHERE id = ?");
-        $queryIdDel   = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
-        $queryRelDel  = $curState->prepare("DELETE FROM relations WHERE id = ?");
-        $queryMetaDel = $curState->prepare("DELETE FROM metadata WHERE id = ?");
-        $queryFtsDel  = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
-        $queryResUpd  = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
-        $queryIdIns   = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
-        $queryRelIns  = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
-        $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $queryFtsIns  = $curState->prepare("INSERT INTO full_text_search (ftsid, id, segments, raw) VALUES (?, ?, ?, ?)");
-        $queryIdSel   = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
-        $queryRelSel  = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
-        $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
-        $queryFtsSel  = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
-        $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
-        $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        $queryResDelCheck = $curState->prepare("
+            SELECT transaction_id
+            FROM
+                resources
+                JOIN relations USING (id)
+            WHERE
+                target_id = ?
+                AND transaction_id <> ?
+            LIMIT 1
+        ");
+        $queryResDel      = $curState->prepare("DELETE FROM resources r WHERE id = ?");
+        $queryResMigrate  = $curState->prepare("UPDATE resources SET transaction_id = ? WHERE id = ?");
+        $queryIdDel       = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
+        $queryRelDel      = $curState->prepare("DELETE FROM relations WHERE id = ?");
+        $queryMetaDel     = $curState->prepare("DELETE FROM metadata WHERE id = ?");
+        $queryFtsDel      = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
+        $queryResUpd      = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $queryIdIns       = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
+        $queryRelIns      = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
+        $queryMetaIns     = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $queryFtsIns      = $curState->prepare("INSERT INTO full_text_search (ftsid, id, segments, raw) VALUES (?, ?, ?, ?)");
+        $queryIdSel       = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
+        $queryRelSel      = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
+        $queryMetaSel     = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
+        $queryFtsSel      = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
+        $queryPrev        = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
+        $queryCur         = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $queryCur->execute([$txId]);
-        $toRestore    = [];
+        $toRestore        = [];
         // deferred foreign key on relations.target_id won't work without a transaction
         $curState->beginTransaction();
-        while ($rid          = (int) $queryCur->fetchColumn()) {
+        $curState->query("CREATE TEMPORARY TABLE _removed_ids AS SELECT * FROM identifiers LIMIT 0");
+        while ($rid              = (int) $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
             $state  = $queryPrev->fetchColumn();
             $binary = new BinaryPayload($rid);
             if ($state === false) {
-                // resource didn't exist before - delete it
+                // resource didn't exist before - delete it but only if it's not referenced
+                // by a resource from other transaction (or no transaction at all)
+                // if it's referenced, keep it but mark it as belonging to the referer transaction
                 $this->log->debug("  deleting $rid");
-                $queryResDel->execute([$rid]);
-                $binary->delete();
+                $queryResDelCheck->execute([$rid, $txId]);
+                $otherTx = $queryResDelCheck->fetchColumn();
+                if ($otherTx === false) {
+                    $queryResDel->execute([$rid]);
+                    $binary->delete();
+                } else {
+                    $this->log->debug("    keeping $rid and migrating to transaction " . ($otherTx ?? 'null'));
+                    $queryResMigrate->execute([$otherTx, $rid]);
+                }
             } else {
                 // must be processed later as they can cause conflicts with resources still to be deleted
                 $toRestore[$rid] = $state;
