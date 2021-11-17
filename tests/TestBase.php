@@ -190,6 +190,9 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
+        if ($resp->getStatusCode() >= 400) {
+            throw new RuntimeException((string) $resp->getBody(), $resp->getStatusCode());
+        }
         return $resp->getHeader('Location')[0];
     }
 

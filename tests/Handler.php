@@ -95,6 +95,11 @@ class Handler {
         return $meta;
     }
 
+    static public function throwException(int $id, Resource $meta,
+                                           ?string $path): Resource {
+        throw new RepoException("Just throw an exception", 400);
+    }
+    
     /**
      *
      * @var \PhpAmqpLib\Connection\AMQPStreamConnection

@@ -324,6 +324,41 @@ class HandlerTest extends TestBase {
     }
 
     /**
+     * Tests if resource creation refused by the post-creation handler doesn't
+     * leave any trash in the database.
+     * 
+     * @group handler
+     */
+    public function testRefusedCreation(): void {
+        $this->setHandlers([
+            'create' => [
+                'type'     => HC::TYPE_FUNC,
+                'function' => '\acdhOeaw\arche\core\tests\Handler::throwException',
+            ]
+        ]);
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        
+        $txId = $this->beginTransaction();
+        try {
+            $this->createBinaryResource($txId);
+            $this->assertTrue(false);
+        } catch (RuntimeException $ex) {
+            $this->assertEquals(400, $ex->getCode());
+            $this->assertEquals("Just throw an exception", $ex->getMessage());
+        }
+        try {
+            $this->createMetadataResource(null, $txId);
+            $this->assertTrue(false);
+        } catch (RuntimeException $ex) {
+            $this->assertEquals(400, $ex->getCode());
+            $this->assertEquals("Just throw an exception", $ex->getMessage());
+        }
+        $count = self::$pdo->query("SELECT count(*) FROM resources")->fetchColumn();
+        $this->assertEquals(0, $count);
+    }
+
+    /**
      * @group handler
      * 
      * REMARK - HAS TO BE THE SECOND LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
@@ -338,7 +373,6 @@ class HandlerTest extends TestBase {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['transactionController']['enforceCompleteness'] = true;
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        self::reloadTxCtrlConfig();
 
         $txId = $this->beginTransaction();
         try {
