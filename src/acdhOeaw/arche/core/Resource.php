@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core;
 
+use Throwable;
 use EasyRdf\Graph;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
@@ -228,21 +229,25 @@ class Resource {
     public function postCollection(): void {
         $this->checkCanCreate();
 
-        $this->id = $state    = RC::$transaction->createResource(RC::$logId);
+        $this->id = RC::$transaction->createResource(RC::$logId);
+        try {
+            $binary = new BinaryPayload((int) $this->id);
+            $binary->upload();
 
-        $binary = new BinaryPayload((int) $this->id);
-        $binary->upload();
+            $meta = new Metadata($this->id);
+            $meta->update($binary->getRequestMetadata());
+            $meta->update(RC::$auth->getCreateRights());
+            $meta->merge(Metadata::SAVE_OVERWRITE);
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
+            $meta->save(true);
 
-        $meta = new Metadata($this->id);
-        $meta->update($binary->getRequestMetadata());
-        $meta->update(RC::$auth->getCreateRights());
-        $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
-        $meta->save();
-
-        header('Location: ' . $this->getUri());
-        http_response_code(201);
-        $this->getMetadata();
+            header('Location: ' . $this->getUri());
+            http_response_code(201);
+            $this->getMetadata();
+        } catch (Throwable $e) {
+            RC::$transaction->deleteResource($this->id);
+            throw $e;
+        }
     }
 
     public function optionsCollectionMetadata(int $code = 204): void {
@@ -254,19 +259,27 @@ class Resource {
     public function postCollectionMetadata(): void {
         $this->checkCanCreate();
 
-        $this->id = $state    = RC::$transaction->createResource(RC::$logId);
-
-        $meta  = new Metadata($this->id);
-        $count = $meta->loadFromRequest(RC::getBaseUrl());
+        $idProp   = RC::$config->schema->id;
+        $meta     = new Metadata();
+        $count    = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
-        $meta->update(RC::$auth->getCreateRights());
-        $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
-        $meta->save();
+        $metaRes  = $meta->getResource();
+        $ids      = Metadata::propertyAsString($metaRes, $idProp);
+        $this->id = RC::$transaction->createResource(RC::$logId, $ids);
+        try {
+            $meta->setId($this->id);
+            $meta->update(RC::$auth->getCreateRights());
+            $meta->merge(Metadata::SAVE_OVERWRITE);
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
+            $meta->save(true);
 
-        header('Location: ' . $this->getUri());
-        http_response_code(201);
-        $this->getMetadata();
+            header('Location: ' . $this->getUri());
+            http_response_code(201);
+            $this->getMetadata();
+        } catch (Throwable $e) {
+            RC::$transaction->deleteResource($this->id);
+            throw $e;
+        }
     }
 
     public function getUri(): string {

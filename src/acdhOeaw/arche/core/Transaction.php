@@ -50,7 +50,7 @@ class Transaction {
     const PG_LOCK_FAILURE          = '55P03';
     const PG_DUPLICATE_KEY         = '23505';
     const PG_WRONG_DATE_VALUE      = '22007';
-    const LOCK_TIMEOUT_DEFAULT     = 1000;
+    const LOCK_TIMEOUT_DEFAULT     = 10000;
     const STMT_TIMEOUT_DEFAULT     = 60000;
 
     private ?int $id              = null;
@@ -69,7 +69,7 @@ class Transaction {
     public function __construct() {
         $this->pdo   = new PDO(RC::$config->dbConn->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->pdo->query("SET application_name TO rest_tx");
+        $this->pdo->query("SET application_name TO rest_tx_" . RC::$logId);
         $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
         $this->pdo->query("SET lock_timeout TO $lockTimeout");
 
@@ -95,7 +95,15 @@ class Transaction {
         RC::$log->debug("Updating $this->id transaction timestamp with " . $query->fetchColumn());
     }
 
-    public function createResource(int $lockId): int {
+    public function deleteResource(int $resId): void {
+        if ($this->pdo->inTransaction()) {
+            throw new RuntimeException("Can't delete a resource while inside a database transaction");
+        }
+        $query = $this->pdo->prepare("DELETE FROM resources WHERE id = ?");
+        $query->execute([$resId]);
+    }
+
+    public function createResource(int $lockId, array $ids = []): int {
         if ($this->pdo->inTransaction()) {
             throw new RuntimeException("Can't lock a resource while inside a database transaction");
         }
@@ -110,6 +118,20 @@ class Transaction {
         ");
         $query->execute([$this->id, $lockId]);
         $resId = $query->fetchColumn();
+
+        $ids[] = Metadata::idAsUri($resId);
+        try {
+            $query = $this->pdo->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
+            foreach ($ids as $i) {
+                $query->execute([$i, $resId]);
+            }
+        } catch (PDOException $e) {
+            $this->pdo->rollBack();
+            if ($e->getCode() === self::PG_DUPLICATE_KEY) {
+                throw new DuplicatedKeyException($e->getMessage());
+            }
+            throw $e;
+        }
 
         $this->pdo->commit();
 
@@ -310,6 +332,8 @@ class Transaction {
      * in parallel. Will succeed only if there's no this transaction related
      * resource operation being executed.
      * 
+     * Lock persists until $this->pdo->commit()/rollBack();
+     * 
      * @param bool $checkResourceLocks
      * @return void
      * @throws ConflictException
@@ -396,12 +420,13 @@ class Transaction {
     }
 
     private function setState(string $state): void {
-        $query = $this->pdo->prepare("
+        $query       = $this->pdo->prepare("
             UPDATE transactions 
             SET state = ?, last_request = clock_timestamp() 
             WHERE transaction_id = ?
         ");
         $query->execute([$state, $this->id]);
+        $this->state = $state;
         RC::$log->debug("Transaction $this->id state changed to $state");
     }
 

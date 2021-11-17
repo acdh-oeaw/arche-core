@@ -245,10 +245,16 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         ];
     }
 
-    protected function extractResource(ResponseInterface | StreamInterface $body,
-                                       string $location): Resource {
+    protected function extractResource(ResponseInterface | StreamInterface | string $body,
+                                       ?string $location = null): Resource {
+        if ($body instanceof ResponseInterface) {
+            $body = $body->getBody();
+        }
         if ($body instanceof ResponseInterface) {
             $body = (string) $body->getBody();
+        }
+        if ($location === null) {
+            $location = substr($body, 1, strpos($body, '>') - 1); // lucky n-triples guess 
         }
         $graph = new Graph();
         try {

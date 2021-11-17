@@ -63,7 +63,7 @@ transactionController:
     timeout: 2
     enforceCompleteness: false
     simplifyMetaHistory: true
-    lockTimeout: 1000
+    lockTimeout: 10000
     statementTimeout: 60000
 spatialSearch:
     # list of properties containing geometries in the WKT format

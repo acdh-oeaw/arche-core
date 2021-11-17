@@ -249,4 +249,97 @@ class ParallelTest extends TestBase {
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
         $this->assertEquals((string) $r2->getResource($prop), (string) $r1->getResource($prop));
     }
+
+    /**
+     * post + post with one resource pointing the other and vice versa
+     * Both should pass (if lockTimeout is long enought)
+     * or one should throw 409 (if lockTimeout is too short)
+     * 
+     * @group parallel
+     */
+    public function testParallelPostPostCycle(): void {
+        $titleProp = self::$config->schema->label;
+        $relProp   = self::$config->schema->parent;
+        $idProp    = self::$config->schema->id;
+        $txId      = $this->beginTransaction();
+        $headers   = [
+            self::$config->rest->headers->transactionId    => $txId,
+            'Eppn'                                         => 'admin',
+            'Content-Type'                                 => 'application/n-triples',
+            'Accept'                                       => 'application/n-triples',
+            self::$config->rest->headers->metadataReadMode => 'resource',
+        ];
+        $meta1     = (new Graph())->resource(self::$baseUrl);
+        $meta1->addLiteral($titleProp, 'res1');
+        $meta1->addResource($idProp, 'http://res1');
+        $meta1->addResource($relProp, 'http://res2');
+        $meta2     = (new Graph())->resource(self::$baseUrl);
+        $meta2->addLiteral($titleProp, 'res2');
+        $meta2->addResource($idProp, 'http://res2');
+        $meta2->addResource($relProp, 'http://res1');
+
+        $req1  = new Request('post', self::$baseUrl . "metadata", $headers, $meta1->getGraph()->serialise('application/n-triples'));
+        $req2  = new Request('post', self::$baseUrl . "metadata", $headers, $meta2->getGraph()->serialise('application/n-triples'));
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
+        $h1    = $resp1->getHeaders();
+        $h2    = $resp2->getHeaders();
+        $this->assertEquals(201, $resp1->getStatusCode());
+        $this->assertEquals(201, $resp2->getStatusCode());
+        $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
+        $meta1 = $this->extractResource($resp1);
+        $meta2 = $this->extractResource($resp2);
+        $this->assertEquals($meta2->getUri(), (string) $meta1->getResource($relProp));
+        $this->assertEquals($meta1->getUri(), (string) $meta2->getResource($relProp));
+    }
+
+    /**
+     * post + post with same id
+     * One should pass, second one should throw 400
+     * 
+     * @group parallel
+     */
+    public function testParallelPostPostSameId(): void {
+        $titleProp = self::$config->schema->label;
+        $idProp    = self::$config->schema->id;
+        $txId      = $this->beginTransaction();
+        $headers   = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Type'                              => 'application/n-triples',
+        ];
+        $meta1     = (new Graph())->resource(self::$baseUrl);
+        $meta1->addLiteral($titleProp, 'res1');
+        $meta1->addResource($idProp, 'http://res1');
+        $meta2     = (new Graph())->resource(self::$baseUrl);
+        $meta2->addLiteral($titleProp, 'res1');
+        $meta2->addResource($idProp, 'http://res1');
+
+        $req1     = new Request('post', self::$baseUrl . "metadata", $headers, $meta1->getGraph()->serialise('application/n-triples'));
+        $req2     = new Request('post', self::$baseUrl . "metadata", $headers, $meta2->getGraph()->serialise('application/n-triples'));
+        list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
+        $h1       = $resp1->getHeaders();
+        $h2       = $resp2->getHeaders();
+        $statuses = [$resp1->getStatusCode(), $resp2->getStatusCode()];
+        $this->assertContains(201, $statuses);
+        $this->assertContains(400, $statuses);
+    }
+    /*
+     * Missing tests:
+
+      Scenario 1.
+      - tx1 creates res1
+      - tx2 creates res2 pointing to res1
+      - tx1 is rolled back
+      - what happens?
+      - is res1 removed?
+      - if so, what happens to res2 metadata and tx2
+      - if not, hot its metadata should look like?
+
+      Scenario 2.
+      - tx in the atomic mode
+      - req1 is ok
+      - req2 (overlapping req1) causes an error and causes transaction to be deleted
+      - req3... (overlapping req2) succeeds to some point, then may throw 409, then fail with no such transaction
+
+     */
 }
