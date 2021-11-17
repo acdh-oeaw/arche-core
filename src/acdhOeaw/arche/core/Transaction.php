@@ -373,6 +373,7 @@ class Transaction {
             throw new ConflictException("Transaction $this->id can't be locked - there's at least one request belonging to the transaction which is still being processed");
         }
         if ($state !== self::STATE_ACTIVE) {
+            $this->state = $state;
             throw new ConflictException("Transaction $this->id is in $state state and can't be locked");
         }
         RC::$log->debug("Transaction $this->id locked");

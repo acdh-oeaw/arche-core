@@ -323,23 +323,70 @@ class ParallelTest extends TestBase {
         $body     = $resp1->getBody() . "\n" . $resp2->getBody();
         $this->assertStringContainsString('duplicate key value violates unique constraint "identifiers_pkey"', $body);
     }
-    /*
-     * Missing tests:
 
-      Scenario 1.
-      - tx1 creates res1
-      - tx2 creates res2 pointing to res1
-      - tx1 is rolled back
-      - what happens?
-      - is res1 removed?
-      - if so, what happens to res2 metadata and tx2
-      - if not, hot its metadata should look like?
-
-      Scenario 2.
-      - tx in the atomic mode
-      - req1 is ok
-      - req2 (overlapping req1) causes an error and causes transaction to be deleted
-      - req3... (overlapping req2) succeeds to some point, then may throw 409, then fail with no such transaction
-
+    /**
+     * transactions in atomic mode
+     * resource create + wrong resource (causing transaction rollback) + resource create (repeated)
+     * Last sequence of resource creation requests may succeed for some time,
+     * then it may throw 409 (once the transaction is locked),
+     * and finally they should start throwing 400 - no such transaction. At that
+     * point the first resource should not exist any more.
+     * 
+     * @group parallel
      */
+    public function testParallelAtomicTransaction(): void {
+        $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['transactionController']['enforceCompleteness'] = true;
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $tx      = $this->beginTransaction();
+        $loc1    = $this->createMetadataResource(null, $tx);
+        $req1    = new Request('get', "$loc1/metadata");
+        $headers = [
+            self::$config->rest->headers->transactionId => $tx,
+            'Content-Type'                              => 'application/n-triples',
+            'Eppn'                                      => 'admin',
+        ];
+        $resp1   = self::$client->send($req1);
+        $this->assertEquals(200, $resp1->getStatusCode());
+
+        $meta2 = (new Graph())->resource(self::$baseUrl);
+        $meta2->addResource(self::$config->schema->id, $loc1);
+        $body2 = $meta2->getGraph()->serialise('application/n-triples');
+        $req2  = new Request('post', self::$baseUrl . 'metadata', $headers, $body2);
+
+        $meta3 = (new Graph())->resource(self::$baseUrl);
+        $body3 = $meta3->getGraph()->serialise('application/n-triples');
+        $req3  = new Request('post', self::$baseUrl . 'metadata', $headers, $body3);
+
+        $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3];
+        $delays    = [100, 10000, 10000, 50000, 100000, 100000, 100000];
+        $responses = $this->runConcurrently($requests, $delays);
+
+        $resp1 = self::$client->send($req1);
+        $this->assertEquals(404, $resp1->getStatusCode());
+
+        $this->assertEquals(400, $responses[0]->getStatusCode());
+        $allowed    = [201, 409, 400];
+        $allowed400 = [
+            "Transaction $tx doesn't exist",
+            "Wrong transaction state: rollback",
+        ];
+        for ($i = 1; $i < count($responses); $i++) {
+            $sc = $responses[$i]->getStatusCode();
+            if ($sc !== 201) {
+                $allowed = [409, 400];
+                if ($sc !== 409) {
+                    $allowed = [400];
+                }
+            }
+            $this->assertContains($sc, $allowed);
+            if ($sc === 409) {
+                $this->assertEquals("Transaction $tx is in rollback state and can't be locked", (string) $responses[$i]->getBody());
+            } else if ($sc === 400) {
+                $this->assertContains((string) $responses[$i]->getBody(), $allowed400);
+            }
+        }
+        $this->assertEquals("Transaction $tx doesn't exist", (string) $responses[$i - 1]->getBody());
+    }
 }
