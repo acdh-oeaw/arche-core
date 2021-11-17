@@ -330,7 +330,6 @@ class TransactionTest extends TestBase {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['transactionController']['enforceCompleteness'] = true;
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        self::reloadTxCtrlConfig();
 
         $txId     = $this->beginTransaction();
         $location = $this->createBinaryResource($txId);
