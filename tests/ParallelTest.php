@@ -388,5 +388,6 @@ class ParallelTest extends TestBase {
             }
         }
         $this->assertEquals("Transaction $tx doesn't exist", (string) $responses[$i - 1]->getBody());
+        sleep(1);
     }
 }
