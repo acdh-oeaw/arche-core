@@ -359,8 +359,8 @@ class ParallelTest extends TestBase {
         $body3 = $meta3->getGraph()->serialise('application/n-triples');
         $req3  = new Request('post', self::$baseUrl . 'metadata', $headers, $body3);
 
-        $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3];
-        $delays    = [100, 10000, 10000, 50000, 100000, 100000, 100000];
+        $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3];
+        $delays    = [100, 10000, 10000, 50000, 100000, 100000, 100000, 200000, 200000];
         $responses = $this->runConcurrently($requests, $delays);
 
         $resp1 = self::$client->send($req1);
