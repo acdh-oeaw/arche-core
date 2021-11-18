@@ -70,7 +70,7 @@ class Transaction {
         $this->pdo   = new PDO(RC::$config->dbConn->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_tx_" . RC::$logId);
-        $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
+        $lockTimeout = (int) (RC::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
         $this->pdo->query("SET lock_timeout TO $lockTimeout");
 
         $id       = (int) RC::getRequestParameter('transactionId');
