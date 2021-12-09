@@ -546,7 +546,7 @@ class RestTest extends TestBase {
         $meta2 = $this->getResourceMeta($res2);
         $meta2->addResource(self::$config->schema->id, 'https://my.id');
         $resp  = $this->updateResource($meta2);
-        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals(409, $resp->getStatusCode());
         $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
     }
 
