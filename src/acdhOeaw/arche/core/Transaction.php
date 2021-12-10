@@ -50,6 +50,8 @@ class Transaction {
     const PG_LOCK_FAILURE          = '55P03';
     const PG_DUPLICATE_KEY         = '23505';
     const PG_WRONG_DATE_VALUE      = '22007';
+    const PG_WRONG_TEXT_VALUE      = '22P02';
+    const PG_WRONG_BINARY_VALUE    = '22P03';
     const LOCK_TIMEOUT_DEFAULT     = 10000;
     const STMT_TIMEOUT_DEFAULT     = 60000;
 

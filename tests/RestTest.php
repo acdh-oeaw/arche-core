@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use RuntimeException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
@@ -825,6 +826,20 @@ class RestTest extends TestBase {
         $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
     }
 
+    /**
+     * @group rest
+     */
+    function testWrongValue(): void {
+        $meta     = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral('https://wrong/date', new Literal('foo', null, RDF::XSD_DATE));
+        try {
+            $this->createMetadataResource($meta);
+            $this->assertTrue(false);
+        } catch (RuntimeException $ex) {
+            $this->assertStringContainsString('Wrong property value', $e->getMessage());
+        }
+    }
+    
     /**
      * @group rest
      */
