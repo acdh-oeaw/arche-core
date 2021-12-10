@@ -304,7 +304,7 @@ class Metadata {
         } catch (PDOException $e) {
             switch ($e->getCode()) {
                 case Transaction::PG_DUPLICATE_KEY:
-                    throw new RepoException('Duplicated resource identifier', 400, $e);
+                    throw new DuplicatedKeyException('Duplicated resource identifier', 409, $e);
                 case Transaction::PG_WRONG_DATE_VALUE:
                     throw new RepoException('Wrong property value', 400, $e);
                 default:

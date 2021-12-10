@@ -319,7 +319,7 @@ class ParallelTest extends TestBase {
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $statuses = [$resp1->getStatusCode(), $resp2->getStatusCode()];
         $this->assertContains(201, $statuses);
-        $this->assertContains(400, $statuses);
+        $this->assertContains(409, $statuses);
         $body     = $resp1->getBody() . "\n" . $resp2->getBody();
         $this->assertStringContainsString('duplicate key value violates unique constraint "identifiers_pkey"', $body);
     }
@@ -366,7 +366,7 @@ class ParallelTest extends TestBase {
         $resp1 = self::$client->send($req1);
         $this->assertEquals(404, $resp1->getStatusCode());
 
-        $this->assertEquals(400, $responses[0]->getStatusCode());
+        $this->assertEquals(409, $responses[0]->getStatusCode());
         $allowed    = [201, 409, 400];
         $allowed400 = [
             "Transaction $tx doesn't exist",
