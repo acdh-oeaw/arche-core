@@ -835,7 +835,7 @@ class RestTest extends TestBase {
         try {
             $this->createMetadataResource($meta);
             $this->assertTrue(false);
-        } catch (RuntimeException $ex) {
+        } catch (RuntimeException $e) {
             $this->assertStringContainsString('Wrong property value', $e->getMessage());
         }
     }
