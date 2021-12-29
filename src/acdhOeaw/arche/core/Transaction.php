@@ -105,6 +105,15 @@ class Transaction {
         $query->execute([$resId]);
     }
 
+    /**
+     * 
+     * @param int $lockId
+     * @param array<string> $ids
+     * @return int
+     * @throws RuntimeException
+     * @throws DuplicatedKeyException
+     * @throws PDOException
+     */
     public function createResource(int $lockId, array $ids = []): int {
         if ($this->pdo->inTransaction()) {
             throw new RuntimeException("Can't lock a resource while inside a database transaction");
@@ -119,7 +128,7 @@ class Transaction {
             RETURNING id
         ");
         $query->execute([$this->id, $lockId]);
-        $resId = $query->fetchColumn();
+        $resId = (int) $query->fetchColumn();
 
         $ids[] = Metadata::idAsUri($resId);
         try {
@@ -307,7 +316,7 @@ class Transaction {
             $this->pdo->beginTransaction();
             $this->lock(true);
 
-            RC::$handlersCtl->handleTransaction('begin', $this->id, []);
+            RC::$handlersCtl->handleTransaction('begin', (int) $this->id, []);
 
             $this->pdo->commit();
         } catch (Throwable $e) {
@@ -375,7 +384,7 @@ class Transaction {
             throw new ConflictException("Transaction $this->id can't be locked - there's at least one request belonging to the transaction which is still being processed");
         }
         if ($state !== self::STATE_ACTIVE) {
-            $this->state = $state;
+            $this->state = (string) $state;
             throw new ConflictException("Transaction $this->id is in $state state and can't be locked");
         }
         RC::$log->debug("Transaction $this->id locked");
@@ -448,7 +457,7 @@ class Transaction {
      * database exceptions and turning them it into the `ConflictException`.
      * 
      * @param PDOStatement $query
-     * @param array $param
+     * @param array<mixed> $param
      * @param string $errorMsg
      * @param bool $logException
      * @return void

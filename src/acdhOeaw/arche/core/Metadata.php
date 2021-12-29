@@ -63,6 +63,12 @@ class Metadata {
     ];
     const DATE_TYPES     = [RDF::XSD_DATE, RDF::XSD_DATE_TIME];
 
+    /**
+     * 
+     * @param Resource $resource
+     * @param string $property
+     * @return array<string>
+     */
     static public function propertyAsString(Resource $resource, string $property): array {
         $values = [];
         foreach ($resource->all($property) as $i) {

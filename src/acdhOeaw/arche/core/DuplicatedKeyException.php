@@ -34,6 +34,6 @@ class DuplicatedKeyException extends RepoException {
 
     public function __construct(string $message = "Duplicate key value violates unique constraint", int $code = 409,
                                 \Throwable $previous = null) {
-        return parent::__construct($message, $code, $previous);
+        parent::__construct($message, $code, $previous);
     }
 }

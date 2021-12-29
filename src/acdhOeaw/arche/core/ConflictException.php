@@ -34,6 +34,6 @@ class ConflictException extends BadRequestException {
 
     public function __construct(string $message = "", int $code = 409,
                                 \Throwable $previous = null) {
-        return parent::__construct($message, $code, $previous);
+        parent::__construct($message, $code, $previous);
     }
 }

@@ -168,7 +168,7 @@ class Resource {
     public function delete(): void {
         $this->checkCanWrite();
 
-        $txId       = RC::$transaction->getId();
+        $txId       = (int) RC::$transaction->getId();
         $parentProp = RC::getRequestParameter('metadataParentProperty');
         $delRefs    = RC::getRequestParameter('withReferences');
 
@@ -219,7 +219,7 @@ class Resource {
         $meta->loadFromDb(RRI::META_RESOURCE);
         RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getResource(), null);
 
-        RC::$log->debug(json_encode($query->fetchObject()));
+        RC::$log->debug((string) json_encode($query->fetchObject()));
         http_response_code(204);
     }
 
@@ -312,7 +312,7 @@ class Resource {
         // Lock by marking lock and transaction_id columns in the resources table
         // It makes it possible for other requests to determine the resource is
         // locked in a non-blocking way.
-        $state = RC::$transaction->lockResource($this->id, RC::$logId);
+        $state = RC::$transaction->lockResource((int) $this->id, RC::$logId);
         if ($state === self::STATE_DELETED) {
             throw new RepoException('Not Found', 404);
         }
@@ -418,6 +418,7 @@ class Resource {
         $errors = '';
         if (RC::$handlersCtl->hasHandlers('updateMetadata')) {
             while ($id = $query->fetchColumn()) {
+                $id   = (int) $id;
                 $meta = new Metadata($id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
                 try {
@@ -444,7 +445,7 @@ class Resource {
             SELECT string_agg(id::text, ', ') AS removed FROM d
         ");
         $query->execute([self::STATE_TOMBSTONE]);
-        RC::$log->debug($query->fetchColumn());
+        RC::$log->debug((string) $query->fetchColumn());
 
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
         // keep metadata because they can still store important information, e.g. access rights
@@ -453,6 +454,7 @@ class Resource {
 
         $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
         while ($id    = $query->fetchColumn()) {
+            $id     = (int) $id;
             $binary = new BinaryPayload($id);
             $binary->backup((string) $txId);
 
