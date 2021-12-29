@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core;
 
 use RuntimeException;
 use zozlak\HttpAccept;
+use Composer\InstalledVersions;
 use acdhOeaw\arche\core\RestController as RC;
 use function \GuzzleHttp\json_encode;
 
@@ -40,6 +41,7 @@ class Describe {
 
     public function head(): string {
         $cfg = [
+            'version' => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
             'rest'   => [
                 'headers'  => RC::$config->rest->headers,
                 'urlBase'  => RC::$config->rest->urlBase,
