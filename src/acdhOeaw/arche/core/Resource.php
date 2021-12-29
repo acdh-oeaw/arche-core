@@ -126,6 +126,7 @@ class Resource {
 
     public function head(): void {
         $this->checkCanRead();
+        $metaUrl = $this->getUri() . '/metadata';
         try {
             $binary  = new BinaryPayload((int) $this->id);
             $headers = $binary->getHeaders();
@@ -133,9 +134,10 @@ class Resource {
             foreach ($headers as $h => $v) {
                 header("$h: $v");
             }
+            header('Link: <' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
         } catch (NoBinaryException $e) {
             http_response_code(302);
-            header('Location: ' . $this->getUri() . '/metadata');
+            header("Location: $metaUrl");
         }
     }
 
