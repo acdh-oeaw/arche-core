@@ -61,8 +61,12 @@ class Resource {
         RC::$auth->checkAccessRights((int) $this->id, 'read', true);
         $format = Metadata::outputHeaders();
         if ($get) {
-            $meta       = new MetadataReadOnly((int) $this->id);
             $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+            if ($mode === RRI::META_NONE) {
+                http_response_code(204);
+                return;
+            }
+            $meta       = new MetadataReadOnly((int) $this->id);
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $meta->loadFromDb(strtolower($mode), $parentProp);
             $meta->outputRdf($format);
@@ -162,7 +166,17 @@ class Resource {
         $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', (int) $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
-        http_response_code(204);
+        $mode = RC::getRequestParameter('metadataReadMode') ?? RRI::META_NONE;
+        if ($mode === RRI::META_NONE) {
+            http_response_code(204);
+            return;
+        }
+        if ($mode !== RRI::META_RESOURCE) {
+            $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
+            $meta->loadFromDb(strtolower($mode), $parentProp);
+        }
+        $format = Metadata::outputHeaders();
+        $meta->outputRdf($format);
     }
 
     public function delete(): void {

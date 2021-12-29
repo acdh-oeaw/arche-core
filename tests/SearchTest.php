@@ -32,6 +32,7 @@ use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
  * Description of TestSearch
@@ -89,7 +90,7 @@ class SearchTest extends TestBase {
                 'value[1]'    => '20',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -109,7 +110,7 @@ class SearchTest extends TestBase {
                 'type[0]'     => RDF::RDFS_RESOURCE,
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -124,7 +125,7 @@ class SearchTest extends TestBase {
                 'type[0]'     => SearchTerm::TYPE_RELATION,
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -143,7 +144,7 @@ class SearchTest extends TestBase {
                 'value[0]'    => $this->m[2]->getUri(),
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -158,7 +159,7 @@ class SearchTest extends TestBase {
     public function testLiteralUri(): void {
         $opts = [
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
 
@@ -203,7 +204,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '<=',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -224,7 +225,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '>=',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -244,7 +245,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '~',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -263,7 +264,7 @@ class SearchTest extends TestBase {
                 'value[0]'    => 'abc',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'neighbors',
+                self::$config->rest->headers->metadataReadMode => RRI::META_NEIGHBORS,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -307,7 +308,7 @@ class SearchTest extends TestBase {
                 'language[0]' => 'en',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -322,7 +323,7 @@ class SearchTest extends TestBase {
                 'language[0]' => 'pl',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -336,7 +337,7 @@ class SearchTest extends TestBase {
                 'language[0]' => 'pl',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -353,7 +354,7 @@ class SearchTest extends TestBase {
                 'value[0][1]' => 'bcd',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -371,7 +372,7 @@ class SearchTest extends TestBase {
                 'property[0][1]' => 'https://title2',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -444,7 +445,7 @@ class SearchTest extends TestBase {
                 'sql' => "SELECT id FROM metadata WHERE value_n = 20",
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -464,7 +465,7 @@ class SearchTest extends TestBase {
                 'limit'     => 1,
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -517,7 +518,7 @@ class SearchTest extends TestBase {
                 'ftsMaxWords'          => 5,
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -550,7 +551,7 @@ class SearchTest extends TestBase {
                 'ftsProperty' => 'https://title',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -571,7 +572,7 @@ class SearchTest extends TestBase {
                 'ftsProperty' => 'https://title',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -591,7 +592,7 @@ class SearchTest extends TestBase {
                 'ftsProperty' => 'https://title',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -625,7 +626,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '<=',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -642,7 +643,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '>=',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -658,7 +659,7 @@ class SearchTest extends TestBase {
                 'operator[0]' => '>=',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -675,7 +676,7 @@ class SearchTest extends TestBase {
         // m[0]: POLYGON((0 0,10 0,10 10,0 10,0 0))
         // m[1]: POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))
         $opts = ['headers' => [
-                self::$config->rest->headers->metadataReadMode => 'resource',
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
         ]];
 
         // intersects
@@ -687,7 +688,7 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        
+
         // intersects with distance
         $opts['query'] = [
             'operator[0]' => '&&1000',
@@ -697,7 +698,7 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        
+
         // db value contains search value
         $opts['query'] = [
             'operator[0]' => '&>',
@@ -707,7 +708,7 @@ class SearchTest extends TestBase {
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        
+
         // search value contains db value
         $opts['query'] = [
             'operator[0]' => '&<',
@@ -718,7 +719,27 @@ class SearchTest extends TestBase {
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
     }
-    
+
+    /**
+     * @group search
+     */
+    public function testReadNone(): void {
+        $opts = [
+            'query'   => [
+                'property[0]' => 'https://title',
+                'value[0]'    => 'bcd',
+                'property[1]' => 'https://number',
+                'value[1]'    => '20',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
+            ],
+        ];
+        $resp = self::$client->request('get', self::$baseUrl . 'search', $opts);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEmpty((string) $resp->getBody());
+    }
+
     /**
      * @group search
      */
