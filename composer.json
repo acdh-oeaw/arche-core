@@ -11,9 +11,10 @@
         }
     ],
     "require": {
+        "php": ">=8.0 <=8.1",
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7 | ^6",
-        "acdh-oeaw/easyrdf": ">=0.15.2",
+        "acdh-oeaw/easyrdf": ">=0.15.3",
         "acdh-oeaw/arche-lib": "^4.0.0-beta",
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": ">=0.1.1 <1",
