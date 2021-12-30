@@ -234,8 +234,8 @@ class BinaryPayload {
      * @return array<string | null>
      */
     private function getRequestMetadataRaw(): array {
-        $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
-        $contentType        = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+        $contentDisposition = trim((string) filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
+        $contentType        = (string) filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         RC::$log->debug("\trequest file data - content-type: $contentType, content-disposition: $contentDisposition");
 
         $fileName = null;
