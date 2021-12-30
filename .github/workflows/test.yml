@@ -41,9 +41,9 @@ jobs:
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
         sudo sed -i -e "s@</VirtualHost>@<Directory `pwd`>Options All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n<FilesMatch \\.php$>\\nSetHandler 'proxy:unix:/var/run/php/php-fpm.sock|fcgi://localhost'\\n</FilesMatch>\\n</VirtualHost>@" /etc/apache2/sites-available/000-default.conf
         echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/*/fpm/conf.d/20-xdebug.ini /etc/php/*/cli/conf.d/20-xdebug.ini
-        sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/8.0/fpm/pool.d/www.conf
+        sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/*/fpm/pool.d/www.conf
         sudo service apache2 restart
-        sudo /etc/init.d/php8.0-fpm restart
+        sudo /etc/init.d/php8.1-fpm restart
     - name: tika-cache
       uses: actions/cache@v2
       with:

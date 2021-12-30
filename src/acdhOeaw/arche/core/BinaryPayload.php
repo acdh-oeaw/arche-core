@@ -48,7 +48,7 @@ class BinaryPayload {
                                          int $levelMax): string {
         if ($level < $levelMax) {
             $path = sprintf('%s/%02d', $path, $id % 100);
-            $path = self::getStorageDir((int) $id / 100, $path, $level + 1, $levelMax);
+            $path = self::getStorageDir((int) ($id / 100), $path, $level + 1, $levelMax);
         }
         return $path;
     }
