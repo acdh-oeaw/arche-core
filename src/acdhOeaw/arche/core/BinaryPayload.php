@@ -261,7 +261,7 @@ class BinaryPayload {
                 RC::$log->debug("\t\tdefault mime: $contentType");
             }
         }
-        $contentType = trim(preg_replace('/;.*$/', '', $contentType)); // skip additional information, e.g. encoding, version, etc.
+        $contentType = trim((string) preg_replace('/;.*$/', '', $contentType)); // skip additional information, e.g. encoding, version, etc.
 
         return [$contentType, $fileName];
     }

@@ -95,7 +95,7 @@ class HandlersController {
             $this->rmqTimeout            = (float) $cfg->rabbitMq->timeout;
             $this->rmqExceptionOnTimeout = (bool) $cfg->rabbitMq->exceptionOnTimeout;
 
-            $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, (string) $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
+            $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, (int) $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
             $this->rmqChannel = $this->rmqConn->channel();
             list($this->rmqQueue,, ) = $this->rmqChannel->queue_declare('', false, false, true, false);
             $clbck            = [$this, 'callback'];
