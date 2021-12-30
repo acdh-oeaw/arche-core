@@ -18,7 +18,7 @@
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": ">=0.1.1 <1",
         "zozlak/rdf-constants": "^1",
-        "php-amqplib/php-amqplib": "^2.10",
+        "php-amqplib/php-amqplib": "^3.1",
         "pietercolpaert/hardf": "^0.2.0",
         "ml/json-ld": "^1.2"
     },
