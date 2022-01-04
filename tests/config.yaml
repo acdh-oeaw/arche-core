@@ -59,12 +59,12 @@ transactionController:
     logging:
         file: /tmp/arche-core/log/txlog
         level: debug
-    checkInterval: 1
+    checkInterval: 400
     timeout: 2
     enforceCompleteness: false
     simplifyMetaHistory: true
-    lockTimeout: 1000
-    statementTimeout: 600000
+    lockTimeout: 10000
+    statementTimeout: 60000
 spatialSearch:
     # list of properties containing geometries in the WKT format
     properties:

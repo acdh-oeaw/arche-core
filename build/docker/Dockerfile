@@ -21,14 +21,8 @@ RUN locale-gen en_US.UTF-8 && \
     su -l www-data -c 'mkdir /var/www/tika' && \
     su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.1.0/tika-server-standard-2.1.0.jar > /var/www/tika/tika-server.jar' && \
     su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.1.0/tika-app-2.1.0.jar > /var/www/tika/tika-app.jar' && \
-    chown -R www-data:www-data /var/run/postgresql && \
-    su -l www-data -c '/usr/lib/postgresql/12/bin/initdb -D /var/www/postgresql --auth=ident -U www-data --locale en_US.UTF-8' 
-RUN su -l www-data -c 'git clone https://github.com/acdh-oeaw/arche-core.git /var/www/html' && \
-    su -l www-data -c 'cd /var/www/html && composer update' && \
-    su -l www-data -c '/usr/lib/postgresql/12/bin/pg_ctl start -D /var/www/postgresql' && \
-    su -l www-data -c 'createdb -O www-data www-data' && \
-    su -l www-data -c 'psql -f /var/www/html/build/db_schema.sql' && \
-    su -l www-data -c '/usr/lib/postgresql/12/bin/pg_ctl stop -D /var/www/postgresql'
+    chown -R www-data:www-data /var/run/postgresql
 COPY /root /
+WORKDIR /var/www/html
 CMD ["/root/run.sh"]
 

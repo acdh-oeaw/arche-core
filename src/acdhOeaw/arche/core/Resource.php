@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core;
 
+use Throwable;
 use EasyRdf\Graph;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
@@ -60,8 +61,12 @@ class Resource {
         RC::$auth->checkAccessRights((int) $this->id, 'read', true);
         $format = Metadata::outputHeaders();
         if ($get) {
-            $meta       = new MetadataReadOnly((int) $this->id);
             $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+            if ($mode === RRI::META_NONE) {
+                http_response_code(204);
+                return;
+            }
+            $meta       = new MetadataReadOnly((int) $this->id);
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $meta->loadFromDb(strtolower($mode), $parentProp);
             $meta->outputRdf($format);
@@ -125,6 +130,7 @@ class Resource {
 
     public function head(): void {
         $this->checkCanRead();
+        $metaUrl = $this->getUri() . '/metadata';
         try {
             $binary  = new BinaryPayload((int) $this->id);
             $headers = $binary->getHeaders();
@@ -132,9 +138,10 @@ class Resource {
             foreach ($headers as $h => $v) {
                 header("$h: $v");
             }
+            header('Link: <' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
         } catch (NoBinaryException $e) {
             http_response_code(302);
-            header('Location: ' . $this->getUri() . '/metadata');
+            header("Location: $metaUrl");
         }
     }
 
@@ -159,13 +166,23 @@ class Resource {
         $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', (int) $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
-        http_response_code(204);
+        $mode = RC::getRequestParameter('metadataReadMode') ?? RRI::META_NONE;
+        if ($mode === RRI::META_NONE) {
+            http_response_code(204);
+            return;
+        }
+        if ($mode !== RRI::META_RESOURCE) {
+            $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
+            $meta->loadFromDb(strtolower($mode), $parentProp);
+        }
+        $format = Metadata::outputHeaders();
+        $meta->outputRdf($format);
     }
 
     public function delete(): void {
         $this->checkCanWrite();
 
-        $txId       = RC::$transaction->getId();
+        $txId       = (int) RC::$transaction->getId();
         $parentProp = RC::getRequestParameter('metadataParentProperty');
         $delRefs    = RC::getRequestParameter('withReferences');
 
@@ -183,7 +200,7 @@ class Resource {
         $this->deleteCheckReferences($txId, (bool) ((int) $delRefs));
         RC::$auth->batchCheckAccessRights('delres', 'write', false);
 
-        $graph = new Graph();
+        $graph  = new Graph();
         $idProp = RC::$config->schema->id;
         $base   = RC::getBaseUrl();
         $query  = RC::$pdo->query("SELECT id, i.ids FROM identifiers i JOIN delres USING (id)");
@@ -193,7 +210,7 @@ class Resource {
         $format = Metadata::negotiateFormat();
         Metadata::outputHeaders($format);
         echo $graph->serialise($format);
-        
+
         $this->deleteReferences();
         $this->deleteResources($txId);
     }
@@ -216,7 +233,7 @@ class Resource {
         $meta->loadFromDb(RRI::META_RESOURCE);
         RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getResource(), null);
 
-        RC::$log->debug(json_encode($query->fetchObject()));
+        RC::$log->debug((string) json_encode($query->fetchObject()));
         http_response_code(204);
     }
 
@@ -228,21 +245,25 @@ class Resource {
     public function postCollection(): void {
         $this->checkCanCreate();
 
-        $this->createResource();
+        $this->id = RC::$transaction->createResource(RC::$logId);
+        try {
+            $binary = new BinaryPayload((int) $this->id);
+            $binary->upload();
 
-        $binary = new BinaryPayload((int) $this->id);
-        $binary->upload();
+            $meta = new Metadata($this->id);
+            $meta->update($binary->getRequestMetadata());
+            $meta->update(RC::$auth->getCreateRights());
+            $meta->merge(Metadata::SAVE_OVERWRITE);
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
+            $meta->save(true);
 
-        $meta = new Metadata($this->id);
-        $meta->update($binary->getRequestMetadata());
-        $meta->update(RC::$auth->getCreateRights());
-        $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
-        $meta->save();
-
-        header('Location: ' . $this->getUri());
-        http_response_code(201);
-        $this->getMetadata();
+            header('Location: ' . $this->getUri());
+            http_response_code(201);
+            $this->getMetadata();
+        } catch (Throwable $e) {
+            RC::$transaction->deleteResource($this->id);
+            throw $e;
+        }
     }
 
     public function optionsCollectionMetadata(int $code = 204): void {
@@ -254,19 +275,27 @@ class Resource {
     public function postCollectionMetadata(): void {
         $this->checkCanCreate();
 
-        $this->createResource();
-
-        $meta  = new Metadata($this->id);
-        $count = $meta->loadFromRequest(RC::getBaseUrl());
+        $idProp   = RC::$config->schema->id;
+        $meta     = new Metadata();
+        $count    = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
-        $meta->update(RC::$auth->getCreateRights());
-        $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
-        $meta->save();
+        $metaRes  = $meta->getResource();
+        $ids      = Metadata::propertyAsString($metaRes, $idProp);
+        $this->id = RC::$transaction->createResource(RC::$logId, $ids);
+        try {
+            $meta->setId($this->id);
+            $meta->update(RC::$auth->getCreateRights());
+            $meta->merge(Metadata::SAVE_OVERWRITE);
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
+            $meta->save(true);
 
-        header('Location: ' . $this->getUri());
-        http_response_code(201);
-        $this->getMetadata();
+            header('Location: ' . $this->getUri());
+            http_response_code(201);
+            $this->getMetadata();
+        } catch (Throwable $e) {
+            RC::$transaction->deleteResource($this->id);
+            throw $e;
+        }
     }
 
     public function getUri(): string {
@@ -294,53 +323,37 @@ class Resource {
     public function checkCanWrite(bool $tombstone = false): void {
         $this->checkTransactionState();
 
-        $txId   = RC::$transaction->getId();
-        $query  = RC::$pdo->prepare("
-            UPDATE resources 
-            SET transaction_id = ?
-            WHERE id = ? AND (transaction_id IS NULL OR transaction_id = ?)
-            RETURNING state
-        ");
-        $query->execute([$txId, $this->id, $txId]);
-        $result = $query->fetchObject();
-        if ($result === false) {
-            $query = RC::$pdo->prepare("SELECT state FROM resources WHERE id = ?");
-            $query->execute([$this->id]);
-            $state = $query->fetchColumn();
-            if ($state === false || $state === self::STATE_DELETED) {
-                throw new RepoException('Not found', 404);
-            } else {
-                throw new RepoException('Owned by other transaction', 403);
-            }
-        }
-        if ($result->state === self::STATE_DELETED) {
+        // Lock by marking lock and transaction_id columns in the resources table
+        // It makes it possible for other requests to determine the resource is
+        // locked in a non-blocking way.
+        $state = RC::$transaction->lockResource((int) $this->id, RC::$logId);
+        if ($state === self::STATE_DELETED) {
             throw new RepoException('Not Found', 404);
         }
-        if (!$tombstone && $result->state === self::STATE_TOMBSTONE) {
+        if (!$tombstone && $state === self::STATE_TOMBSTONE) {
             throw new RepoException('Gone', 410);
         }
-        if ($tombstone && $result->state !== self::STATE_TOMBSTONE) {
+        if ($tombstone && $state !== self::STATE_TOMBSTONE) {
             throw new RepoException('Not a tombstone', 405);
         }
 
         RC::$auth->checkAccessRights((int) $this->id, 'write', false);
+
+        // Lock by obtaining a row lock on the database
+        $query = RC::$pdo->prepare("SELECT id FROM resources WHERE id = ? FOR UPDATE");
+        $query->execute([$this->id]);
     }
 
     private function checkTransactionState(): void {
         $txState = RC::$transaction->getState();
-        if (empty($txState)) {
-            throw new RepoException('Begin transaction first', 400);
+        switch ($txState) {
+            case Transaction::STATE_ACTIVE:
+                break;
+            case Transaction::STATE_NOTX:
+                throw new RepoException('Begin transaction first', 400);
+            default:
+                throw new RepoException("Wrong transaction state: $txState", 400);
         }
-        if ($txState !== Transaction::STATE_ACTIVE) {
-            throw new RepoException('Wrong transaction state: ' . $txState, 400);
-        }
-    }
-
-    private function createResource(): void {
-        $query    = RC::$pdo->prepare("INSERT INTO resources (transaction_id) VALUES (?) RETURNING id");
-        $query->execute([RC::$transaction->getId()]);
-        $this->id = (int) $query->fetchColumn();
-        RC::$log->info("\t" . $this->getUri());
     }
 
     private function deleteLockAll(int $txId): void {
@@ -419,6 +432,7 @@ class Resource {
         $errors = '';
         if (RC::$handlersCtl->hasHandlers('updateMetadata')) {
             while ($id = $query->fetchColumn()) {
+                $id   = (int) $id;
                 $meta = new Metadata($id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
                 try {
@@ -445,7 +459,7 @@ class Resource {
             SELECT string_agg(id::text, ', ') AS removed FROM d
         ");
         $query->execute([self::STATE_TOMBSTONE]);
-        RC::$log->debug($query->fetchColumn());
+        RC::$log->debug((string) $query->fetchColumn());
 
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
         // keep metadata because they can still store important information, e.g. access rights
@@ -454,6 +468,7 @@ class Resource {
 
         $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
         while ($id    = $query->fetchColumn()) {
+            $id     = (int) $id;
             $binary = new BinaryPayload($id);
             $binary->backup((string) $txId);
 

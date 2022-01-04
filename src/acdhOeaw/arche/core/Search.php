@@ -32,6 +32,7 @@ use acdhOeaw\arche\lib\RepoDb;
 use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\SearchTerm;
 use acdhOeaw\arche\lib\SearchConfig;
+use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
  * Description of Search
@@ -72,6 +73,10 @@ class Search {
 
         $meta   = new MetadataReadOnly(0);
         $meta->loadFromPdoStatement($repo, $pdoStmnt);
+        if ($config->metadataMode === RRI::META_NONE) {
+            http_response_code(204);
+            return;
+        }
         $format = Metadata::outputHeaders();
         $meta->outputRdf($format);
     }

@@ -44,8 +44,11 @@ CREATE TABLE resources (
     id bigint DEFAULT nextval('id_seq') NOT NULL PRIMARY KEY,
     transaction_id bigint REFERENCES transactions(transaction_id) ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED,
     state text DEFAULT 'active' NOT NULL,
+    lock int,
     CONSTRAINT resources_state_check CHECK ((state = ANY (ARRAY['active', 'tombstone', 'deleted'])))
 );
+CREATE INDEX resources_transaction_id_index ON resources(transaction_id) WHERE transaction_id IS NOT NULL;
+CREATE INDEX resources_lock_index ON resources(lock) WHERE lock IS NOT NULL;
 
 CREATE TABLE identifiers (
     ids text NOT NULL PRIMARY KEY,

@@ -51,7 +51,6 @@ An environment allowing you to edit code in your host system and run all the tes
   ```
   and then inside the container
   ```bash
-  cd /var/www/html
   XDEBUG_MODE=coverage vendor/bin/phpunit
   ```
 

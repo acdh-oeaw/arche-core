@@ -63,6 +63,24 @@ class Metadata {
     ];
     const DATE_TYPES     = [RDF::XSD_DATE, RDF::XSD_DATE_TIME];
 
+    /**
+     * 
+     * @param Resource $resource
+     * @param string $property
+     * @return array<string>
+     */
+    static public function propertyAsString(Resource $resource, string $property): array {
+        $values = [];
+        foreach ($resource->all($property) as $i) {
+            $values[] = (string) $i;
+        }
+        return $values;
+    }
+
+    static public function idAsUri(int $id): string {
+        return RC::getBaseUrl() . $id;
+    }
+
     static public function getAcceptedFormats(): string {
         return Format::getHttpAcceptHeader();
     }
@@ -86,16 +104,27 @@ class Metadata {
         return $format;
     }
 
-    private ?int $id;
+    private int $id;
     private Graph $graph;
 
     public function __construct(?int $id = null) {
-        $this->id    = $id;
+        if ($id !== null) {
+            $this->id = $id;
+        }
         $this->graph = new Graph();
     }
 
+    public function setId(int $id): void {
+        $oldMeta  = $this->getResource();
+        $this->id = $id;
+        if ($oldMeta !== null) {
+            $meta        = $oldMeta->copy([], '/^$/', $this->getUri());
+            $this->graph = $meta->getGraph();
+        }
+    }
+
     public function getUri(): string {
-        return RC::getBaseUrl() . $this->id;
+        return isset($this->id) ? self::idAsUri($this->id) : RC::getBaseUrl();
     }
 
     /**
@@ -181,32 +210,31 @@ class Metadata {
         return $meta;
     }
 
-    public function save(): void {
+    public function save(bool $skipIds = false): void {
         $spatialProps = RC::$config->spatialSearch->properties ?? [];
+        $idProp       = RC::$config->schema->id;
         $query        = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
         $query->execute([$this->id]);
         $query        = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
         $query->execute([$this->id]);
-        $query        = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
-        $query->execute([$this->id]);
 
         $meta = $this->graph->resource($this->getUri());
         try {
-            $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING mid");
-            $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
+            $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING mid");
+            $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
             // deal with the problem of multiple identifiers leading to same rows in the relations table
-            $queryR = RC::$pdo->prepare("
+            $queryR     = RC::$pdo->prepare("
                 INSERT INTO relations (id, target_id, property) 
                 SELECT ?, id, ? FROM identifiers WHERE ids = ? 
                 ON CONFLICT (id, target_id, property) DO UPDATE SET id = excluded.id
             ");
-            // process ids first so self-references can be properly resolved
-            foreach ($meta->all(RC::$config->schema->id) as $v) {
-                $v = (string) $v;
-                RC::$log->debug("\tadding id " . $v);
-                $queryI->execute([$this->id, $v]);
-            }
-            $properties = array_diff($meta->propertyUris(), [RC::$config->schema->id]);
+            $queryRSelf = RC::$pdo->prepare("
+                INSERT INTO relations (id, target_id, property) 
+                VALUES (?, ?, ?) 
+                ON CONFLICT (id, target_id, property) DO NOTHING
+            ");
+            $ids        = $skipIds ? [] : self::propertyAsString($meta, $idProp);
+            $properties = array_diff($meta->propertyUris(), [$idProp]);
             foreach ($properties as $p) {
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
                     $resources = [];
@@ -220,11 +248,16 @@ class Metadata {
                 foreach ($resources as $v) {
                     $v = (string) $v;
                     RC::$log->debug("\tadding relation " . $p . " " . $v);
-                    $queryR->execute([$this->id, $p, $v]);
-                    if ($queryR->rowCount() === 0) {
-                        $added = $this->autoAddId($v);
-                        if ($added) {
-                            $queryR->execute([$this->id, $p, $v]);
+                    // $v may not exist in identifiers table yet, thus special handling
+                    if (!$skipIds && in_array($v, $ids)) {
+                        $queryRSelf->execute([$this->id, $this->id, $p]);
+                    } else {
+                        $queryR->execute([$this->id, $p, $v]);
+                        if ($queryR->rowCount() === 0) {
+                            $added = $this->autoAddId($v);
+                            if ($added) {
+                                $queryR->execute([$this->id, $p, $v]);
+                            }
                         }
                     }
                 }
@@ -262,11 +295,25 @@ class Metadata {
                     $queryV->execute($param);
                 }
             }
+
+            if (!$skipIds) {
+                // Postpone processing ids because it would lock identifiers db table
+                // and as a consequence prevent Transaction::createResource() from working
+                // and Transaction::createResouce() may be called by $this->autoAddIds()
+                $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+                $query->execute([$this->id]);
+                foreach ($ids as $v) {
+                    RC::$log->debug("\tadding id " . $v);
+                    $queryI->execute([$this->id, $v]);
+                }
+            }
         } catch (PDOException $e) {
             switch ($e->getCode()) {
-                case 23505:
-                    throw new RepoException('Duplicated resource identifier', 400, $e);
-                case 22007:
+                case Transaction::PG_DUPLICATE_KEY:
+                    throw new DuplicatedKeyException('Duplicated resource identifier', 409, $e);
+                case Transaction::PG_WRONG_DATE_VALUE:
+                case Transaction::PG_WRONG_TEXT_VALUE:
+                case Transaction::PG_WRONG_BINARY_VALUE:
                     throw new RepoException('Wrong property value', 400, $e);
                 default:
                     throw $e;
@@ -353,14 +400,12 @@ class Metadata {
                 throw new RepoException('Denied to create a non-existing id', 400);
             case 'add':
                 RC::$log->info("\t\tadding resource $ids <--");
-                $query = RC::$pdo->prepare("INSERT INTO resources (id, transaction_id) VALUES (nextval('id_seq'::regclass), ?) RETURNING id");
-                $query->execute([RC::$transaction->getId()]);
-                $id    = (int) $query->fetchColumn();
-                $meta  = new Metadata($id);
-                $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
-                $meta->update(RC::$auth->getCreateRights());
-                $meta->merge(self::SAVE_OVERWRITE);
-                $meta->save();
+                try {
+                    RC::$transaction->createResource(RC::$logId, [$ids]);
+                } catch (DuplicatedKeyException $e) {
+                    RC::$log->info("\t\t-->adding resource $ids (added by someone else)");
+                    return true;
+                }
                 RC::$log->info("\t\t-->adding resource $ids");
                 return true;
             default:

@@ -12,4 +12,6 @@ composer.lock
 /tika
 /.phpunit.result.cache
 /.phpdoc
+/supervisord.log
+/supervisord.pid
 /tests/data/baedeker.xml

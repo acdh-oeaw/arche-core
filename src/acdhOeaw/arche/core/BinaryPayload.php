@@ -44,6 +44,15 @@ use acdhOeaw\arche\lib\BinaryPayload as BP;
  */
 class BinaryPayload {
 
+    static public function getStorageDir(int $id, string $path, int $level,
+                                         int $levelMax): string {
+        if ($level < $levelMax) {
+            $path = sprintf('%s/%02d', $path, $id % 100);
+            $path = self::getStorageDir((int) ($id / 100), $path, $level + 1, $levelMax);
+        }
+        return $path;
+    }
+
     /**
      *
      * @var int
@@ -213,22 +222,11 @@ class BinaryPayload {
     }
 
     public function getPath(bool $create = false, string $suffix = ''): string {
-        return $this->getStorageDir($this->id, $create) . '/' . $this->id . (empty($suffix) ? '' : '.' . $suffix);
-    }
-
-    private function getStorageDir(int $id, bool $create, string $path = null,
-                                   int $level = 0): string {
-        if (empty($path)) {
-            $path = RC::$config->storage->dir;
+        $storageDir = self::getStorageDir($this->id, RC::$config->storage->dir, 0, RC::$config->storage->levels);
+        if ($create && !file_exists($storageDir)) {
+            mkdir($storageDir, (int) base_convert(RC::$config->storage->modeDir, 8, 10), true);
         }
-        if ($level < RC::$config->storage->levels) {
-            $path = sprintf('%s/%02d', $path, $id % 100);
-            if ($create && !file_exists($path)) {
-                mkdir($path, (int) base_convert(RC::$config->storage->modeDir, 8, 10));
-            }
-            $path = $this->getStorageDir((int) $id / 100, $create, $path, $level + 1);
-        }
-        return $path;
+        return "$storageDir/$this->id" . (empty($suffix) ? '' : '.' . $suffix);
     }
 
     /**
@@ -236,8 +234,8 @@ class BinaryPayload {
      * @return array<string | null>
      */
     private function getRequestMetadataRaw(): array {
-        $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
-        $contentType        = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+        $contentDisposition = trim((string) filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
+        $contentType        = (string) filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         RC::$log->debug("\trequest file data - content-type: $contentType, content-disposition: $contentDisposition");
 
         $fileName = null;
@@ -263,7 +261,7 @@ class BinaryPayload {
                 RC::$log->debug("\t\tdefault mime: $contentType");
             }
         }
-        $contentType = trim(preg_replace('/;.*$/', '', $contentType)); // skip additional information, e.g. encoding, version, etc.
+        $contentType = trim((string) preg_replace('/;.*$/', '', $contentType)); // skip additional information, e.g. encoding, version, etc.
 
         return [$contentType, $fileName];
     }

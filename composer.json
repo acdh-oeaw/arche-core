@@ -11,14 +11,15 @@
         }
     ],
     "require": {
-        "zozlak/auth": "^1.0.1",
+        "php": ">=8.0 <=8.1",
+        "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7 | ^6",
-        "acdh-oeaw/easyrdf": ">=0.14.3",
-        "acdh-oeaw/arche-lib": "^3.0.0",
-        "zozlak/http-accept": "*",
-        "zozlak/logging": "*",
-        "zozlak/rdf-constants": "*",
-        "php-amqplib/php-amqplib": "^2.10",
+        "acdh-oeaw/easyrdf": ">=0.15.3",
+        "acdh-oeaw/arche-lib": "^4",
+        "zozlak/http-accept": ">=0.1.0 <1",
+        "zozlak/logging": ">=0.1.1 <1",
+        "zozlak/rdf-constants": "^1",
+        "php-amqplib/php-amqplib": "^3.1",
         "pietercolpaert/hardf": "^0.2.0",
         "ml/json-ld": "^1.2"
     },
@@ -31,6 +32,6 @@
     "require-dev": {
         "phpunit/phpunit": "^9",
         "zozlak/yaml-merge": "^1",
-        "phpstan/phpstan": "^0.12.76"
+        "phpstan/phpstan": "*"
     }
 }

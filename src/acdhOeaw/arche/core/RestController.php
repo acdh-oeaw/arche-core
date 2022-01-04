@@ -79,6 +79,7 @@ class RestController {
     static public Transaction $transaction;
     static public Resource $resource;
     static public Auth $auth;
+    static public int $logId;
 
     /**
      *
@@ -96,8 +97,12 @@ class RestController {
 
         self::$config = Config::fromYaml($configFile);
 
-        $logId     = sprintf("%06d", rand(0, 999999)); // short unique request id
-        self::$log = new Log(self::$config->rest->logging->file, self::$config->rest->logging->level, "{TIMESTAMP}\t$logId\t{LEVEL}\t{MESSAGE}");
+        self::$logId = rand(0, 999999); // short unique request id
+        self::$log   = new Log(
+            self::$config->rest->logging->file,
+            self::$config->rest->logging->level,
+            "{TIMESTAMP}\t" . sprintf("%06d", self::$logId) . "\t{LEVEL}\t{MESSAGE}"
+        );
 
         try {
             self::$log->info("------------------------------");
@@ -105,10 +110,10 @@ class RestController {
 
             self::$pdo   = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            self::$pdo->query("SET application_name TO rest");
-            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? 1000);
+            self::$pdo->query("SET application_name TO rest_" . self::$logId);
+            $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? Transaction::LOCK_TIMEOUT_DEFAULT);
             self::$pdo->query("SET lock_timeout TO $lockTimeout");
-            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? 60000);
+            $stmtTimeout = (int) (self::$config->transactionController->statementTimeout ?? Transaction::STMT_TIMEOUT_DEFAULT);
             self::$pdo->query("SET statement_timeout TO $stmtTimeout");
 
             self::$transaction = new Transaction();
@@ -116,13 +121,21 @@ class RestController {
             self::$auth = new Auth();
 
             self::$handlersCtl = new HandlersController(new Config(self::$config->rest->handlers), $loader);
-        } catch (Throwable $e) {
-            http_response_code(500);
+        } catch (BadRequestException $e) {
             self::$log->error($e);
+            http_response_code($e->getCode());
+            echo $e->getMessage();
+        } catch (Throwable $e) {
+            self::$log->error($e);
+            http_response_code(500);
         }
     }
 
     static public function handleRequest(): void {
+        if (http_response_code() !== 200) {
+            // if the response code has been set already, don't do anything else
+            return;
+        }
         try {
             if (!empty(self::$config->rest->cors ?? '')) {
                 $origin = self::$config->rest->cors;
@@ -204,30 +217,42 @@ class RestController {
                 throw new RepoException('Not Found', 404);
             }
 
-            self::$transaction->prolongAndRelease(); // to avoid deadlocks in the next line
+            self::$transaction->prolong();
             self::$pdo->commit();
-        } catch (RepoLibException $e) {
-            self::$log->error($e);
-            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
-                self::$transaction->delete();
-            }
-            http_response_code($e->getCode() >= 100 ? $e->getCode() : 500);
-            echo $e->getMessage();
-        } catch (Throwable $e) {
-            $code = 500;
-            if ($e instanceof PDOException && $e->getCode() === '55P03') {
-                $code = 409;
-                self::$log->warning("Failed to obtain a database lock");
-            } else {
-                self::$log->error($e);
-            }
-            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
-                self::$transaction->delete();
-            }
-            http_response_code($code);
+        } catch (BadRequestException $ex) {
+            $statusCode = $ex->getCode();
+            echo $ex->getMessage();
+        } catch (RepoLibException $ex) {
+            $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
+            echo $ex->getMessage();
+        } catch (Throwable $ex) {
+            self::$log->error($ex);
+            $statusCode = 500;
         } finally {
+            if (isset($ex)) {
+                if (self::$pdo->inTransaction()) {
+                    self::$pdo->rollBack();
+                }
+
+                self::$log->error($ex);
+                if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
+                    self::$log->info('aborting transaction ' . self::$transaction->getId() . ' due to enforce completeness');
+                    self::$transaction->unlockResources(self::$logId);
+                    while (self::$transaction->getState() === Transaction::STATE_ACTIVE) {
+                        try {
+                            self::$transaction->delete();
+                        } catch (ConflictException) {
+                            
+                        }
+                    }
+                }
+            }
+            if (isset($statusCode)) {
+                http_response_code($statusCode);
+            }
+
+            self::$transaction->unlockResources(self::$logId);
+
             self::$log->info("Return code " . http_response_code());
             self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
         }

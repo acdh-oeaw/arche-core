@@ -26,12 +26,14 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use RuntimeException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\Metadata;
+use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
  * Description of RestTest
@@ -255,11 +257,11 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $loc1, $this->getHeaders($txId));
+        $req  = new Request('get', $loc1);
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
-        $req  = new Request('get', $loc2 . '/metadata', $this->getHeaders($txId));
+        $req  = new Request('get', $loc2 . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta = new Graph();
@@ -358,20 +360,23 @@ class RestTest extends TestBase {
 
         $txId    = $this->beginTransaction();
         $headers = [
-            self::$config->rest->headers->transactionId => $txId,
-            'Content-Disposition'                       => 'attachment; filename="RestTest.php"',
-            'Content-Type'                              => 'application/php',
-            'Eppn'                                      => 'admin',
+            self::$config->rest->headers->transactionId    => $txId,
+            self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
+            'Content-Disposition'                          => 'attachment; filename="RestTest.php"',
+            'Content-Type'                                 => 'application/php',
+            'Eppn'                                         => 'admin',
         ];
         $body    = (string) file_get_contents(__FILE__);
         $req     = new Request('put', $location, $headers, $body);
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEmpty((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
+        $this->assertStringContainsString("<$location/metadata>; rel=\"alternate\"", $resp->getHeader('Link')[0] ?? '');
 
         $this->commitTransaction($txId);
 
@@ -379,6 +384,36 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
+    }
+
+    /**
+     * @group rest
+     */
+    public function testPutReturnMeta(): void {
+        // create a resource and make sure it's there
+        $location = $this->createBinaryResource();
+        $req      = new Request('get', $location, $this->getHeaders());
+        $resp     = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId    => $txId,
+            self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            'Content-Disposition'                          => 'attachment; filename="RestTest.php"',
+            'Content-Type'                                 => 'application/php',
+            'Eppn'                                         => 'admin',
+        ];
+        $body    = (string) file_get_contents(__FILE__);
+        $req     = new Request('put', $location, $headers, $body);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        $meta = $this->extractResource($resp, $location);
+        $this->assertEquals('RestTest.php', (string) $meta->getLiteral(self::$config->schema->fileName));
+        $this->assertEquals('application/php', (string) $meta->getLiteral(self::$config->schema->mime));
+
+        $this->rollbackTransaction($txId);
     }
 
     /**
@@ -519,6 +554,19 @@ class RestTest extends TestBase {
         $this->assertEquals('Wrong metadata merge mode foo', (string) $resp->getBody());
     }
 
+    public function testPatchWrongTransactionId(): void {
+        $location = $this->createBinaryResource();
+        $headers  = [
+            self::$config->rest->headers->transactionId => -123,
+            'Content-Type'                              => 'application/n-triples',
+            'Eppn'                                      => 'admin',
+        ];
+        $req      = new Request('patch', $location . '/metadata', $headers);
+        $resp     = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Begin transaction first', (string) $resp->getBody());
+    }
+
     /**
      * @group rest
      */
@@ -533,7 +581,7 @@ class RestTest extends TestBase {
         $meta2 = $this->getResourceMeta($res2);
         $meta2->addResource(self::$config->schema->id, 'https://my.id');
         $resp  = $this->updateResource($meta2);
-        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals(409, $resp->getStatusCode());
         $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
     }
 
@@ -542,6 +590,7 @@ class RestTest extends TestBase {
      */
     public function testUnbinaryResource(): void {
         $location = $this->createBinaryResource();
+        $txHeader = self::$config->rest->headers->transactionId;
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -560,11 +609,11 @@ class RestTest extends TestBase {
 
         $this->commitTransaction($txId);
 
-        $resp = self::$client->send($req);
+        $resp = self::$client->send($req->withoutHeader($txHeader));
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertEquals($location . '/metadata', $resp->getHeader('Location')[0]);
 
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $req  = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
@@ -586,6 +635,16 @@ class RestTest extends TestBase {
         $this->commitTransaction($txId);
     }
 
+    public function testGetNone(): void {
+        $location                                                = $this->createBinaryResource();
+        $headers                                                 = $this->getHeaders();
+        $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_NONE;
+        $req                                                     = new Request('get', "$location/metadata", $headers);
+        $resp                                                    = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEmpty((string) $resp->getBody());
+    }
+
     public function testGetRelatives(): void {
         $txId = $this->beginTransaction();
         $m    = [
@@ -600,7 +659,7 @@ class RestTest extends TestBase {
         $this->commitTransaction($txId);
 
         $headers = [
-            self::$config->rest->headers->metadataReadMode       => 'relatives',
+            self::$config->rest->headers->metadataReadMode       => RRI::META_RELATIVES,
             self::$config->rest->headers->metadataParentProperty => 'https://relation',
         ];
         $req     = new Request('get', $m[0]->getUri() . '/metadata', $headers);
@@ -617,7 +676,7 @@ class RestTest extends TestBase {
         $idProp                                                  = self::$config->schema->id;
         $txId                                                    = $this->beginTransaction();
         $headers                                                 = $this->getHeaders($txId);
-        $headers[self::$config->rest->headers->metadataReadMode] = 'resource';
+        $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
 
         $meta1 = (new Graph())->resource(self::$baseUrl);
         $meta1->addResource($idProp, 'http://res1');
@@ -809,6 +868,20 @@ class RestTest extends TestBase {
         $this->assertEquals('-12345-01-01', (string) $g->resource($location)->get('https://old/date1'));
         $this->assertEquals('-4713-01-01', (string) $g->resource($location)->get('https://old/date2'));
         $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
+    }
+
+    /**
+     * @group rest
+     */
+    function testWrongValue(): void {
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral('https://wrong/date', new Literal('foo', null, RDF::XSD_DATE));
+        try {
+            $this->createMetadataResource($meta);
+            $this->assertTrue(false);
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('Wrong property value', $e->getMessage());
+        }
     }
 
     /**

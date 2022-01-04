@@ -33,6 +33,7 @@ use Socket;
 use zozlak\logging\Log;
 use acdhOeaw\arche\core\RepoException;
 use acdhOeaw\arche\lib\Config;
+use acdhOeaw\arche\core\Transaction as T;
 
 /**
  * Description of TransactionController
@@ -41,9 +42,8 @@ use acdhOeaw\arche\lib\Config;
  */
 class TransactionController {
 
-    const TYPE_UNIX                  = 'unix';
-    const TYPE_INET                  = 'inet';
-    const DBERROR_LOCK_NOT_AVAILABLE = '55P03';
+    const TYPE_UNIX = 'unix';
+    const TYPE_INET = 'inet';
 
     /**
      * 
@@ -220,7 +220,7 @@ class TransactionController {
             $txId  = (int) $query->fetchColumn();
             $this->log->info("Transaction $txId created");
 
-            $checkQuery = $pdo->prepare("
+            $checkQuery        = $pdo->prepare("
                 SELECT 
                     state, 
                     extract(epoch from now() - last_request) AS delay 
@@ -229,6 +229,13 @@ class TransactionController {
                 FOR UPDATE NOWAIT
             ");
             $checkQuery->execute([$txId]); // only to make sure it's runs fine before we confirm readiness to the client
+            $checkResLockQuery = $pdo->prepare("
+                SELECT count(*)
+                FROM resources
+                WHERE
+                    transaction_id = ?
+                    AND lock IS NOT NULL
+            ");
 
             $ret = @socket_write($connSocket, $txId . "\n");
             if ($ret === false) {
@@ -236,34 +243,47 @@ class TransactionController {
             } else {
                 $this->log->info("Transaction $txId - client notified");
             }
-            $state = (object) ['state' => Transaction::STATE_ACTIVE, 'delay' => 0];
-            do {
+            $state = $this->makeState(T::STATE_ACTIVE, 0);
+            while (true) {
+                $this->logState($txId, $state); // out of the transaction to minimize critical section
                 usleep($checkInterval);
+
+                $pdo->beginTransaction();
                 try {
                     $checkQuery->execute([$txId]);
                     $state = $checkQuery->fetchObject();
+                    $state = $state ?: $this->makeState(T::STATE_NOTX);
+
+                    $checkResLockQuery->execute([$txId]);
+                    $state->lockedResCount = $checkResLockQuery->fetchColumn();
                 } catch (PDOException $e) {
-                    if ($e->getCode() !== self::DBERROR_LOCK_NOT_AVAILABLE) {
-                        $state = false;
-                    }
+                    $state = $e->getCode() === T::PG_LOCK_FAILURE ? T::STATE_LOCKED : T::STATE_NOTX;
+                    $state = $this->makeState($state);
                 }
-
-                if ($state !== false) {
-                    $this->log->debug("Transaction $txId state: " . $state->state . ", " . $state->delay . " s");
-                } else {
-                    $this->log->info("Transaction $txId state: not exists");
+                $timeoutCond = $state->state === T::STATE_ACTIVE && ($state->delay ?? 0) >= $timeout && ($state->lockedResCount ?? 0) === 0;
+                $stateCond   = $state->state !== T::STATE_ACTIVE && $state->state !== T::STATE_LOCKED;
+                if ($timeoutCond || $stateCond) {
+                    break;
                 }
-            } while ($state !== false && $state->state === Transaction::STATE_ACTIVE && $state->delay < $timeout);
+                $pdo->commit();
+            };
+            $this->logState($txId, $state);
 
-            if ($state === false || $state->state !== Transaction::STATE_COMMIT) {
-                $this->rollbackTransaction($txId, $pdo, $preTxState);
-            } else {
+            if ($state->state !== T::STATE_COMMIT) {
+                $query = $pdo->prepare("UPDATE transactions SET state = ? WHERE transaction_id = ?");
+                $query->execute([T::STATE_ROLLBACK, $txId]);
+            }
+            $pdo->commit();
+
+            if ($state->state === T::STATE_COMMIT) {
                 $this->commitTransaction($txId, $pdo, $preTxState);
+            } else {
+                $this->rollbackTransaction($txId, $pdo, $preTxState);
             }
             $preTxState->query('COMMIT');
 
             $pdo->beginTransaction();
-            $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+            $query = $pdo->prepare("UPDATE resources SET transaction_id = null, lock = null WHERE transaction_id = ?");
             $query->execute([$txId]);
             $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
             $query->execute([$txId]);
@@ -276,7 +296,7 @@ class TransactionController {
                     $pdo->rollBack();
                 }
                 $pdo->beginTransaction();
-                $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+                $query = $pdo->prepare("UPDATE resources SET transaction_id = null, lock = null WHERE transaction_id = ?");
                 $query->execute([$txId]);
                 $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
                 $query->execute([$txId]);
@@ -300,35 +320,56 @@ class TransactionController {
                                          PDO $prevState): void {
         $this->log->info("Transaction $txId - rollback");
 
-        $queryResDel  = $curState->prepare("DELETE FROM resources WHERE id = ?");
-        $queryIdDel   = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
-        $queryRelDel  = $curState->prepare("DELETE FROM relations WHERE id = ?");
-        $queryMetaDel = $curState->prepare("DELETE FROM metadata WHERE id = ?");
-        $queryFtsDel  = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
-        $queryResUpd  = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
-        $queryIdIns   = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
-        $queryRelIns  = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
-        $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $queryFtsIns  = $curState->prepare("INSERT INTO full_text_search (ftsid, id, segments, raw) VALUES (?, ?, ?, ?)");
-        $queryIdSel   = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
-        $queryRelSel  = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
-        $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
-        $queryFtsSel  = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
-        $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
-        $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        $queryResDelCheck = $curState->prepare("
+            SELECT transaction_id
+            FROM
+                resources
+                JOIN relations USING (id)
+            WHERE
+                target_id = ?
+                AND transaction_id <> ?
+            LIMIT 1
+        ");
+        $queryResDel      = $curState->prepare("DELETE FROM resources r WHERE id = ?");
+        $queryResMigrate  = $curState->prepare("UPDATE resources SET transaction_id = ? WHERE id = ?");
+        $queryIdDel       = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
+        $queryRelDel      = $curState->prepare("DELETE FROM relations WHERE id = ?");
+        $queryMetaDel     = $curState->prepare("DELETE FROM metadata WHERE id = ?");
+        $queryFtsDel      = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
+        $queryResUpd      = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $queryIdIns       = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
+        $queryRelIns      = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
+        $queryMetaIns     = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $queryFtsIns      = $curState->prepare("INSERT INTO full_text_search (ftsid, id, segments, raw) VALUES (?, ?, ?, ?)");
+        $queryIdSel       = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
+        $queryRelSel      = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
+        $queryMetaSel     = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
+        $queryFtsSel      = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
+        $queryPrev        = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
+        $queryCur         = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $queryCur->execute([$txId]);
-        $toRestore    = [];
+        $toRestore        = [];
         // deferred foreign key on relations.target_id won't work without a transaction
         $curState->beginTransaction();
-        while ($rid          = (int) $queryCur->fetchColumn()) {
+        $curState->query("CREATE TEMPORARY TABLE _removed_ids AS SELECT * FROM identifiers LIMIT 0");
+        while ($rid              = (int) $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
             $state  = $queryPrev->fetchColumn();
             $binary = new BinaryPayload($rid);
             if ($state === false) {
-                // resource didn't exist before - delete it
+                // resource didn't exist before - delete it but only if it's not referenced
+                // by a resource from other transaction (or no transaction at all)
+                // if it's referenced, keep it but mark it as belonging to the referer transaction
                 $this->log->debug("  deleting $rid");
-                $queryResDel->execute([$rid]);
-                $binary->delete();
+                $queryResDelCheck->execute([$rid, $txId]);
+                $otherTx = $queryResDelCheck->fetchColumn();
+                if ($otherTx === false) {
+                    $queryResDel->execute([$rid]);
+                    $binary->delete();
+                } else {
+                    $this->log->debug("    keeping $rid and migrating to transaction " . ($otherTx ?? 'null'));
+                    $queryResMigrate->execute([$otherTx, $rid]);
+                }
             } else {
                 // must be processed later as they can cause conflicts with resources still to be deleted
                 $toRestore[$rid] = $state;
@@ -404,5 +445,30 @@ class TransactionController {
             $query->execute([$txId]);
             $this->log->info("Transaction $txId - " . $query->rowCount() . " metadata history rows removed");
         }
+    }
+
+    /**
+     * 
+     * @param string $state
+     * @param int|null $delay
+     * @param int|null $lockedResCount
+     * @return object
+     */
+    private function makeState(string $state, ?int $delay = null,
+                               ?int $lockedResCount = null): object {
+        return (object) [
+                'state'          => $state,
+                'delay'          => $delay,
+                'lockedResCount' => $lockedResCount,
+        ];
+    }
+
+    /**
+     * 
+     * @param object $state
+     * @return void
+     */
+    private function logState(int $txId, object $state): void {
+        $this->log->debug("Transaction $txId state: $state->state, " . ($state->delay ?? '?') . " s " . ($state->lockedResCount ?? '?') . " locked resources");
     }
 }
