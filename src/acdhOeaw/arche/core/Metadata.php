@@ -210,7 +210,7 @@ class Metadata {
         return $meta;
     }
 
-    public function save(bool $skipIds = false): void {
+    public function save(): void {
         $spatialProps = RC::$config->spatialSearch->properties ?? [];
         $idProp       = RC::$config->schema->id;
         $query        = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
@@ -233,7 +233,7 @@ class Metadata {
                 VALUES (?, ?, ?) 
                 ON CONFLICT (id, target_id, property) DO NOTHING
             ");
-            $ids        = $skipIds ? [] : self::propertyAsString($meta, $idProp);
+            $ids        = self::propertyAsString($meta, $idProp);
             $properties = array_diff($meta->propertyUris(), [$idProp]);
             foreach ($properties as $p) {
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
@@ -249,7 +249,7 @@ class Metadata {
                     $v = (string) $v;
                     RC::$log->debug("\tadding relation " . $p . " " . $v);
                     // $v may not exist in identifiers table yet, thus special handling
-                    if (!$skipIds && in_array($v, $ids)) {
+                    if (in_array($v, $ids)) {
                         $queryRSelf->execute([$this->id, $this->id, $p]);
                     } else {
                         $queryR->execute([$this->id, $p, $v]);
@@ -296,16 +296,14 @@ class Metadata {
                 }
             }
 
-            if (!$skipIds) {
-                // Postpone processing ids because it would lock identifiers db table
-                // and as a consequence prevent Transaction::createResource() from working
-                // and Transaction::createResouce() may be called by $this->autoAddIds()
-                $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
-                $query->execute([$this->id]);
-                foreach ($ids as $v) {
-                    RC::$log->debug("\tadding id " . $v);
-                    $queryI->execute([$this->id, $v]);
-                }
+            // Postpone processing ids because it would lock identifiers db table
+            // and as a consequence prevent Transaction::createResource() from working
+            // and Transaction::createResouce() may be called by $this->autoAddIds()
+            $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+            $query->execute([$this->id]);
+            foreach ($ids as $v) {
+                RC::$log->debug("\tadding id " . $v);
+                $queryI->execute([$this->id, $v]);
             }
         } catch (PDOException $e) {
             switch ($e->getCode()) {
