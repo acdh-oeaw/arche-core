@@ -391,10 +391,6 @@ class Transaction {
     }
 
     private function fetchData(): void {
-//        $query = $this->pdo->prepare("
-//            UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ?
-//            RETURNING started, last_request AS last, state, snapshot
-//        ");
         $query = $this->pdo->prepare("
             SELECT started, clock_timestamp() AS last, state, snapshot
             FROM transactions
@@ -409,7 +405,6 @@ class Transaction {
         $this->lastRequest = $data->last;
         $this->state       = $data->state;
         $this->snapshot    = $data->snapshot;
-        RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
     }
 
     /**
