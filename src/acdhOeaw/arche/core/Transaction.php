@@ -405,6 +405,7 @@ class Transaction {
         $this->lastRequest = $data->last;
         $this->state       = $data->state;
         $this->snapshot    = $data->snapshot;
+        RC::$log->debug("Transaction $this->id data read state: $this->state lastRequest: $this->lastRequest");
     }
 
     /**

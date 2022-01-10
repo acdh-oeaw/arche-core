@@ -225,6 +225,9 @@ class RestController {
         } catch (RepoLibException $ex) {
             $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
             echo $ex->getMessage();
+        } catch (PDOException $ex) {
+            $statusCode = $ex->getCode() === Transaction::PG_LOCK_FAILURE ? 409 : 500;
+            echo $ex->getMessage();
         } catch (Throwable $ex) {
             self::$log->error($ex);
             $statusCode = 500;
