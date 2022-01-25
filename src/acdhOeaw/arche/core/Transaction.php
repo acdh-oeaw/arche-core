@@ -180,17 +180,17 @@ class Transaction {
             WHERE id = ? 
             FOR UPDATE NOWAIT
         ");
-        $this->executeQuery($query, [$resId], "Resource $resId locked");
+        $this->executeQuery($query, [$resId], "Resource $resId locked ($lockId)");
         $data  = $query->fetchObject();
         if ($data === false) {
             $this->pdo->rollBack();
             throw new BadRequestException('Not found', 404);
         } elseif ($data->txid !== null && $data->txid !== $this->id) {
             $this->pdo->rollBack();
-            throw new BadRequestException('Owned by other transaction', 403);
+            throw new BadRequestException("Owned by other transaction ($data->txid)", 403);
         } elseif ($data->lock !== null && $data->lock !== $lockId) {
             $this->pdo->rollBack();
-            throw new ConflictException('Owned by other request');
+            throw new ConflictException("Owned by other request ($data->lock)");
         }
 
         $query = $this->pdo->prepare("
