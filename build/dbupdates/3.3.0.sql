@@ -7,8 +7,8 @@ ALTER TABLE full_text_search RENAME TO fts;
 
 CREATE TABLE full_text_search (
     ftsid bigint DEFAULT nextval('ftsid_seq') NOT NULL PRIMARY KEY,
-    iid bigint REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
-    ids bigint,
+    id bigint REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    iid bigint,
     mid bigint,
     segments tsvector NOT NULL,
     raw text,
