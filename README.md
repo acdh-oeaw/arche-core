@@ -79,6 +79,7 @@ Supplementary tables include:
 * The `transactions` table which stores information about pending transactions.
 * The `metadata_history` table which stores history of metadata modification. It's automatically filled in using triggers on tables `identifiers`, `relations` and `metadata`.
 * The `full_text_search` table storing a GIST index on a tokenized metadata values and resources' text content allowing for a full text search (see the [Postgresql documentation](https://www.postgresql.org/docs/current/textsearch.html)).
+* The `spatial_search` table storing vector spatial data as PostGIS geography allowing for spatial searches (see the [PostGIS documentation](https://postgis.net/docs/reference.html)).
 * The `raw` table is used only for data migration from the previous ACDH-CH repository solution.
 
 ### Helper functions and views
