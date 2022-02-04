@@ -63,6 +63,8 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
         $pdo = self::$pdo;
         // metadata propagate to spatial_search and full_text_search
         $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -1"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -1 AND raw = '-1'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -2 AND raw = '-2'"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -1"));
         $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata_history"));
     }
@@ -82,16 +84,20 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata WHERE id = -3"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE id = -3"));
         $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -1"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -3 AND raw = '-1'"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search WHERE id = -3"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'objProp' AND value = '-2'"));
 
-        // identifier change propagates to metadata_history        
+        // identifier change propagates to metadata_history and full_text_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("UPDATE identifiers SET ids = '-3' WHERE id = -3");
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'ID' AND value = '-1'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE iid = -3 AND raw = '-3'"));
 
         // relation change propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
@@ -125,7 +131,7 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(0, $this->q("SELECT count(*) FROM identifiers WHERE id = -1"));
         $this->assertEquals(0, $this->q("SELECT count(*) FROM relations"));
         $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata"));
-        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE iid <> -2"));
         $this->assertEquals(0, $this->q("SELECT count(*) FROM spatial_search"));
         $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata_history"));
     }
@@ -133,11 +139,12 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
     public function testOnDeleteOther(): void {
         $pdo = self::$pdo;
 
-        // identifier delete propagates to metadata_history
+        // identifier delete propagates to metadata_history and full_text_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("DELETE FROM identifiers WHERE id = -1");
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE iid <> -2"));
 
         // relation delete propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
@@ -179,12 +186,13 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
     public function testOnTruncateOther(): void {
         $pdo = self::$pdo;
 
-        // truncate identifiers propagates to metadata_history
+        // truncate identifiers propagates to metadata_history and full_text_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("TRUNCATE identifiers");
         $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata_history"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'"));
         $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -2 AND property = 'ID' AND value = '-2'"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE iid IS NOT NULL"));
 
         // truncate relations propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");

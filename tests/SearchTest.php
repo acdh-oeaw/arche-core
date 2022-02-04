@@ -603,6 +603,23 @@ class SearchTest extends TestBase {
         $this->assertEquals("<b>abc</b>", $fts);
     }
 
+    public function testFullTextSearchIds(): void {
+        $countProp = self::$config->schema->searchCount;
+        $opts = [
+            'query'   => [
+                'value[]'     => $this->m[0]->getUri(),
+                'operator[]'  => '@@',
+                'ftsQuery'    => $this->m[0]->getUri(),
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral($countProp)->getValue());
+    }
+    
     /**
      * @group search
      */
