@@ -203,6 +203,7 @@ schema:
     parent: https://vocabs.acdh.oeaw.ac.at/schema#isPartOf
     delete: delete://delete
     searchMatch: search://match
+    searchOrder: search://order
     searchFts: search://fts
     searchCount: search://count
     binarySize: https://vocabs.acdh.oeaw.ac.at/schema#hasBinarySize

@@ -161,6 +161,7 @@ schema:
     parent: https://parent
     delete: delete://delete
     searchMatch: search://match
+    searchOrder: search://order
     searchFts: search://fts
     searchCount: search://count
     binarySize: https://size
