@@ -65,6 +65,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
         self::$pdo     = new PDO(self::$config->dbConn->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        self::$pdo->query("SET application_name TO test_conn");
 
         $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
         $pipes        = [];
@@ -283,9 +284,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
      */
     protected function runSearch(array $opts, string $method = 'get'): Graph {
         $resp = self::$client->request($method, self::$baseUrl . 'search', $opts);
+        $format = explode(';', $resp->getHeader('Content-Type')[0])[0];
         $body = (string) $resp->getBody();
         $g    = new Graph();
-        $g->parse((string) $body, 'text/turtle');
+        $g->parse((string) $body, $format);
         return $g;
     }
 

@@ -83,8 +83,7 @@ class UserApi {
             $data = $this->prepareUserData($data, $user);
         }
 
-        header('Content-Type: application/json');
-        echo json_encode($data);
+        RC::setOutput(json_encode($data), 'application/json');
     }
 
     public function patch(string $user): void {

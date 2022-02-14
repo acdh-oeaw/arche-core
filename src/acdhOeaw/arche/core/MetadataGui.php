@@ -92,22 +92,36 @@ TMPL;
      */
     private $data;
 
-    public function __construct(PDOStatement $query, int $resId,
+    /**
+     * 
+     * @var resource
+     */
+    private $stream;
+
+    /**
+     * 
+     * @param resource $stream
+     * @param PDOStatement $query
+     * @param int $resId
+     * @param string $preferredLang
+     */
+    public function __construct($stream, PDOStatement $query, int $resId,
                                 string $preferredLang = 'en') {
-        $baseUrl    = RC::getBaseUrl();
-        $this->res  = $resId;
-        $this->nmsp = RC::$config->schema->namespaces ?? [];
-        $matchProp  = RC::$config->schema->searchMatch;
-        $idProp     = RC::$config->schema->id;
-        $titleProp  = RC::$config->schema->label;
-        $parentProp = RC::$config->schema->parent;
+        $this->stream = $stream;
+        $baseUrl      = RC::getBaseUrl();
+        $this->res    = $resId;
+        $this->nmsp   = RC::$config->schema->namespaces ?? [];
+        $matchProp    = RC::$config->schema->searchMatch;
+        $idProp       = RC::$config->schema->id;
+        $titleProp    = RC::$config->schema->label;
+        $parentProp   = RC::$config->schema->parent;
 
         if ($resId > 0) {
-            $matchFunc = function(Triple $t) use ($resId): bool {
+            $matchFunc = function (Triple $t) use ($resId): bool {
                 return $t->id === $resId;
             };
         } else {
-            $matchFunc = function(Triple $t) use ($matchProp): bool {
+            $matchFunc = function (Triple $t) use ($matchProp): bool {
                 return $t->property === $matchProp;
             };
         }
@@ -182,10 +196,10 @@ TMPL;
             $title  = 'Search results';
             $header = count($this->data) . ' resource(s) found';
         }
-        echo sprintf(self::TMPL, $title, $header);
+        fwrite($this->stream, sprintf(self::TMPL, $title, $header));
 
         foreach ($this->data as $id => $props) {
-            echo '        <div class="s">' . $this->formatResource($baseUrl . $id) . "</div>\n";
+            fwrite($this->stream, '        <div class="s">' . $this->formatResource($baseUrl . $id) . "</div>\n");
             // title
             $this->outputProperty($props[$titleProp] ?? [], $titleProp, $baseUrl);
             // ids
@@ -202,7 +216,7 @@ TMPL;
             $this->outputProperty($props[self::CHILD_PROP] ?? [], self::CHILD_PROP, $baseUrl);
         }
 
-        echo "    </body>\n</html>";
+        fwrite($this->stream, "    </body>\n</html>");
     }
 
     /**
@@ -214,9 +228,9 @@ TMPL;
      */
     private function outputProperty(array $values, string $p, string $baseUrl): void {
         if (count($values) > 0) {
-            echo '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n";
+            fwrite($this->stream, '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n");
             foreach ($values as $n => $t) {
-                echo '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n";
+                fwrite($this->stream, '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n");
             }
         }
     }

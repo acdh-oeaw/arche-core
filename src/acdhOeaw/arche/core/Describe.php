@@ -39,15 +39,15 @@ use function \GuzzleHttp\json_encode;
  */
 class Describe {
 
-    public function head(): string {
+    public function head(bool $get = false): void {
         $cfg = [
             'version' => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
-            'rest'   => [
+            'rest'    => [
                 'headers'  => RC::$config->rest->headers,
                 'urlBase'  => RC::$config->rest->urlBase,
                 'pathBase' => RC::$config->rest->pathBase
             ],
-            'schema' => RC::$config->schema
+            'schema'  => RC::$config->schema
         ];
         if (filter_input(\INPUT_GET, 'format') === 'application/json') {
             $format = 'application/json';
@@ -62,13 +62,15 @@ class Describe {
             'application/json' => json_encode($cfg),
             default => yaml_emit(json_decode(json_encode($cfg), true)),
         };
-        header("Content-Type: $format");
-        header("Content-Size: " . strlen($response));
-        return $response;
+        RC::setHeader('Content-Size', strlen($response));
+        RC::setHeader('Content-Type', $format);
+        if ($get) {
+            RC::setOutput($response);
+        }
     }
 
     public function get(): void {
-        echo $this->head();
+        $this->head(true);
     }
 
     public function options(int $code = 200): void {

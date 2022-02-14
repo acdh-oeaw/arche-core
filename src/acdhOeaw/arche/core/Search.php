@@ -71,14 +71,14 @@ class Search {
             $pdoStmnt = $repo->getPdoStatementBySearchTerms($terms, $config);
         }
 
-        $meta   = new MetadataReadOnly(0);
+        $meta = new MetadataReadOnly(0);
         $meta->loadFromPdoStatement($repo, $pdoStmnt);
         if ($config->metadataMode === RRI::META_NONE) {
             http_response_code(204);
             return;
         }
-        $format = Metadata::outputHeaders();
-        $meta->outputRdf($format);
+        $format = Metadata::negotiateFormat();
+        RC::setOutput($meta, $format);
     }
 
     public function get(): void {

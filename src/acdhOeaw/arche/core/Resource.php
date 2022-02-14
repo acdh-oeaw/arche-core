@@ -32,6 +32,7 @@ use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 use acdhOeaw\arche\lib\exception\RepoLibException;
+use acdhOeaw\arche\core\util\OutputFile;
 
 /**
  * Description of Resource
@@ -59,17 +60,18 @@ class Resource {
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead();
         RC::$auth->checkAccessRights((int) $this->id, 'read', true);
-        $format = Metadata::outputHeaders();
+        $mode = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+        if ($mode === RRI::META_NONE) {
+            http_response_code(204);
+            return;
+        }
+        $format = Metadata::negotiateFormat();
+        RC::setHeader('Content-Type', $format);
         if ($get) {
-            $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
-            if ($mode === RRI::META_NONE) {
-                http_response_code(204);
-                return;
-            }
             $meta       = new MetadataReadOnly((int) $this->id);
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $meta->loadFromDb(strtolower($mode), $parentProp);
-            $meta->outputRdf($format);
+            RC::setOutput($meta, $format);
         }
     }
 
@@ -132,16 +134,15 @@ class Resource {
         $this->checkCanRead();
         $metaUrl = $this->getUri() . '/metadata';
         try {
-            $binary  = new BinaryPayload((int) $this->id);
-            $headers = $binary->getHeaders();
+            $binary = new BinaryPayload((int) $this->id);
             RC::$auth->checkAccessRights((int) $this->id, 'read', false);
-            foreach ($headers as $h => $v) {
-                header("$h: $v");
+            foreach ($binary->getHeaders() as $header => $value) {
+                RC::setHeader($header, $value);
             }
-            header('Link: <' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
+            RC::addHeader('Link', '<' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
         } catch (NoBinaryException $e) {
             http_response_code(302);
-            header("Location: $metaUrl");
+            RC::setHeader('Location', $metaUrl);
         }
     }
 
@@ -150,7 +151,7 @@ class Resource {
         $binary = new BinaryPayload((int) $this->id);
         $path   = $binary->getPath();
         if (file_exists($path)) {
-            readfile($path);
+            RC::setOutput(new OutputFile($path));
         }
     }
 
@@ -175,8 +176,8 @@ class Resource {
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $meta->loadFromDb(strtolower($mode), $parentProp);
         }
-        $format = Metadata::outputHeaders();
-        $meta->outputRdf($format);
+        $format = Metadata::negotiateFormat();
+        $meta->setResponseBody($format);
     }
 
     public function delete(): void {
@@ -208,8 +209,7 @@ class Resource {
             $graph->resource($base . $res->id)->addResource($idProp, $res->ids);
         }
         $format = Metadata::negotiateFormat();
-        Metadata::outputHeaders($format);
-        echo $graph->serialise($format);
+        RC::setOutput($graph->serialise($format), $format);
 
         $this->deleteReferences();
         $this->deleteResources($txId);

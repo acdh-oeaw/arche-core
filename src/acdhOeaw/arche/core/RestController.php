@@ -35,6 +35,7 @@ use zozlak\logging\Log as Log;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\Config;
 use acdhOeaw\arche\lib\exception\RepoLibException;
+use acdhOeaw\arche\core\util\OutputFile;
 
 /**
  * Description of RestController
@@ -80,6 +81,13 @@ class RestController {
     static public Resource $resource;
     static public Auth $auth;
     static public int $logId;
+    static private string | OutputFile | MetadataReadOnly $output;
+
+    /**
+     * 
+     * @var array<string, array<string>>
+     */
+    static private array $headers;
 
     /**
      *
@@ -95,7 +103,9 @@ class RestController {
             throw new ErrorException($errstr, 500, $errno, $errfile, $errline);
         });
 
-        self::$config = Config::fromYaml($configFile);
+        self::$config  = Config::fromYaml($configFile);
+        self::$output  = '';
+        self::$headers = [];
 
         self::$logId = rand(0, 999999); // short unique request id
         self::$log   = new Log(
@@ -217,6 +227,11 @@ class RestController {
                 throw new RepoException('Not Found', 404);
             }
 
+            // free the database connection
+            if (self::$output instanceof MetadataReadOnly) {
+                self::setHeader('Content-Type', self::$headers['content-type'][0] ?? self::$config->rest->defaultMetadataFormat);
+                self::$output->generateOutput(self::$headers['content-type'][0]);
+            }
             self::$transaction->prolong();
             self::$pdo->commit();
         } catch (BadRequestException $ex) {
@@ -249,10 +264,14 @@ class RestController {
                         }
                     }
                 }
+                self::$output  = '';
+                self::$headers = [];
             }
             if (isset($statusCode)) {
                 http_response_code($statusCode);
             }
+            // output the response AFTER setting the HTTP response code
+            self::sendOutput();
 
             self::$transaction->unlockResources(self::$logId);
 
@@ -272,5 +291,51 @@ class RestController {
     static public function getRequestParameter(string $purpose): ?string {
         return filter_input(\INPUT_GET, self::$requestParam[$purpose]) ??
             filter_input(\INPUT_SERVER, self::getHttpHeaderName($purpose));
+    }
+
+    /**
+     * 
+     * @param string | OutputFile | MetadataReadOnly $output
+     * @param string|null $mimeType
+     * @return void
+     */
+    static public function setOutput(string | OutputFile | MetadataReadOnly $output,
+                                     ?string $mimeType = null): void {
+        self::$output = $output;
+        if (!empty($mimeType)) {
+            self::$headers['Content-Type'] = [$mimeType];
+        }
+    }
+
+    static public function appendOutput(string $output): void {
+        self::$output .= $output;
+    }
+
+    static public function setHeader(string $header, string $value): void {
+        $header                 = strtolower($header);
+        self::$headers[$header] = [$value];
+    }
+
+    static public function addHeader(string $header, string $value): void {
+        $header = strtolower($header);
+        if (!isset(self::$headers[$header])) {
+            self::$headers[$header] = [];
+        }
+        self::$headers[$header][] = $value;
+    }
+
+    static private function sendOutput(): void {
+        foreach (self::$headers as $header => $values) {
+            foreach ($values as $v) {
+                header("$header: $v", false);
+            }
+        }
+        if (is_object(self::$output)) {
+            self::$output->sendOutput();
+        } else {
+            echo self::$output;
+        }
+        self::$output  = '';
+        self::$headers = [];
     }
 }

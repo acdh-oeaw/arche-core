@@ -42,7 +42,9 @@ use acdhOeaw\arche\core\Transaction;
 class ParallelTest extends TestBase {
 
     static public function sleepResource(int $id, Resource $meta, ?string $path): Resource {
+        \acdhOeaw\arche\core\RestController::$log->debug("BEGIN OF SLEEP");
         usleep(100000); // sleep 100 ms
+        \acdhOeaw\arche\core\RestController::$log->debug("END OF SLEEP");
         return $meta;
     }
 
@@ -60,6 +62,48 @@ class ParallelTest extends TestBase {
             'updateMetadata' => self::class . '::sleepResource',
         ];
         self::setHandler($handlers);
+    }
+
+    public function testIssue24(): void {
+        $loc  = $this->createMetadataResource();
+        $conn = pg_connect(substr(self::$config->dbConn->admin, 6));
+        pg_query($conn, "SET application_name TO test_side_conn");
+        pg_query($conn, "BEGIN");
+
+        $tx      = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $tx,
+            'Content-Type'                              => 'application/n-triples',
+            'Eppn'                                      => 'admin',
+        ];
+        // prepare large-enough metadata
+        $meta    = (new Graph())->resource($loc);
+        $meta->addLiteral('http://foo/a', str_repeat("a", 1000));
+        $meta->addLiteral('http://foo/b', str_repeat("b", 1000));
+        $meta->addLiteral('http://foo/c', str_repeat("c", 1000));
+        $meta->addLiteral('http://foo/d', str_repeat("d", 1000));
+        $meta->addLiteral('http://foo/e', str_repeat("e", 1000));
+        $meta->addLiteral('http://foo/f', str_repeat("f", 1000));
+        $meta->addLiteral('http://foo/g', str_repeat("g", 1000));
+        $meta->addLiteral('http://foo/h', str_repeat("h", 1000));
+        $meta->addLiteral('http://foo/i', str_repeat("i", 1000));
+        $meta->addLiteral('http://foo/j', str_repeat("j", 1000));
+        $body    = $meta->getGraph()->serialise('application/n-triples');
+        $req     = new Request('patch', "$loc/metadata", $headers, $body);
+
+        // run a query locking the transaction during handler execution
+        pg_send_query($conn, "SELECT pg_sleep(0.1); UPDATE transactions SET last_request = now() WHERE transaction_id = $tx;");
+        $resp = self::$client->send($req);
+        // release database locks so everything can safely end
+        pg_cancel_query($conn);
+        pg_query($conn, "ROLLBACK;");
+        pg_query($conn, "UPDATE resources SET transaction_id = null;");
+        pg_close($conn);
+        $this->rollbackTransaction($tx);
+
+        // check if 409 has been captured
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->assertStringContainsString('canceling statement due to lock timeout', (string) $resp->getBody());
     }
 
     /**
@@ -359,7 +403,8 @@ class ParallelTest extends TestBase {
         $body3 = $meta3->getGraph()->serialise('application/n-triples');
         $req3  = new Request('post', self::$baseUrl . 'metadata', $headers, $body3);
 
-        $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3];
+        $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3,
+            $req3];
         $delays    = [100, 10000, 10000, 50000, 100000, 100000, 100000, 200000, 200000];
         $responses = $this->runConcurrently($requests, $delays);
 

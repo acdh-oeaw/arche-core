@@ -238,22 +238,26 @@ class Transaction {
         header('Allow: OPTIONS, POST, HEAD, GET, PUT, DELETE');
     }
 
-    public function head(): void {
+    public function head(bool $get = false): void {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
-        header(RC::$config->rest->headers->transactionId . ': ' . $this->id);
-        header('Content-Type: application/json');
+        $response = json_encode([
+                'transactionId' => $this->id,
+                'startedAt'     => $this->startedAt,
+                'lastRequest'   => $this->lastRequest,
+                'state'         => $this->state,
+            ]) . "\n";
+        RC::setHeader(RC::$config->rest->headers->transactionId, $this->id);
+        RC::setHeader('Content-Type', 'application/json');
+        RC::setHeader('Content-Length', strlen($response));
+        if ($get) {
+            RC::setOutput($response);
+        }
     }
 
     public function get(): void {
-        $this->head();
-        echo json_encode([
-            'transactionId' => $this->id,
-            'startedAt'     => $this->startedAt,
-            'lastRequest'   => $this->lastRequest,
-            'state'         => $this->state,
-        ]) . "\n";
+        $this->head(true);
     }
 
     public function delete(): void {

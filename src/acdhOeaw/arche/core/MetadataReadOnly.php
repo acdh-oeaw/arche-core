@@ -137,6 +137,12 @@ class MetadataReadOnly {
      */
     private $pdoStmnt;
 
+    /**
+     * 
+     * @var resource
+     */
+    private $stream;
+
     public function __construct(int $id) {
         $this->id = $id;
     }
@@ -161,13 +167,22 @@ class MetadataReadOnly {
         $this->pdoStmnt = $pdoStatement;
     }
 
+    public function sendOutput(): void {
+        rewind($this->stream);
+        fpassthru($this->stream);
+        fclose($this->stream);
+    }
+
     /**
-     * @return void
+     * 
+     * @param string $format
+     * @throws RepoException
      */
-    public function outputRdf(string $format): void {
+    public function generateOutput(string $format) {
+        $this->stream = fopen('php://temp', 'rw');
         switch ($format) {
             case 'text/html':
-                (new MetadataGui($this->pdoStmnt, $this->id))->output();
+                (new MetadataGui($this->stream, $this->pdoStmnt, $this->id))->output();
                 break;
             case 'application/n-triples':
             case 'application/n-quads':
@@ -187,13 +202,24 @@ class MetadataReadOnly {
             default:
                 throw new RepoException("Unsupported metadata format requested", 400);
         }
+        $this->pdoStmnt = null;
     }
 
+    /**
+     * 
+     * @param string $format
+     * @return void
+     */
     private function serializeEasyRdf(string $format): void {
         $graph = $this->repo->parsePdoStatement($this->pdoStmnt);
-        echo $graph->serialise($format);
+        fwrite($this->stream, $graph->serialise($format));
     }
 
+    /**
+     * 
+     * @param string $format
+     * @return void
+     */
     private function serializeHardf(string $format): void {
         $baseUrl = RC::getBaseUrl();
         $idProp  = RC::$config->schema->id;
@@ -227,18 +253,22 @@ class MetadataReadOnly {
         foreach ($data as $triple) {
             list($prop, $obj) = $this->preparePropObj($triple, 'ns1:', $idProp, false);
             $serializer->addTriple('ns1:' . $triple->id, $prop, $obj, null);
-            echo $serializer->read();
+            fwrite($this->stream, $serializer->read());
         }
-        echo $serializer->end();
+        fwrite($this->stream, $serializer->end());
     }
 
+    /**
+     * 
+     * @return void
+     */
     private function serializeNTriples(): void {
         $baseUrl = self::escapeIri(RC::getBaseUrl());
         $idProp  = self::escapeIri(RC::$config->schema->id);
         while ($triple  = $this->pdoStmnt->fetchObject(Triple::class)) {
             $sbj = $baseUrl . $triple->id;
             list($prop, $obj) = $this->preparePropObj($triple, $baseUrl, $idProp, true);
-            echo "<$sbj> <$prop> $obj .\n";
+            fwrite($this->stream, "<$sbj> <$prop> $obj .\n");
         }
     }
 
