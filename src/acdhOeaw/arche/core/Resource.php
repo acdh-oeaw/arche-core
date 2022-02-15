@@ -255,7 +255,7 @@ class Resource {
             $meta->update(RC::$auth->getCreateRights());
             $meta->merge(Metadata::SAVE_OVERWRITE);
             $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
-            $meta->save(true);
+            $meta->save();
 
             header('Location: ' . $this->getUri());
             http_response_code(201);
@@ -287,7 +287,7 @@ class Resource {
             $meta->update(RC::$auth->getCreateRights());
             $meta->merge(Metadata::SAVE_OVERWRITE);
             $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
-            $meta->save(true);
+            $meta->save();
 
             header('Location: ' . $this->getUri());
             http_response_code(201);

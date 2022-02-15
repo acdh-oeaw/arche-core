@@ -248,9 +248,9 @@ class Transaction {
                 'lastRequest'   => $this->lastRequest,
                 'state'         => $this->state,
             ]) . "\n";
-        RC::setHeader(RC::$config->rest->headers->transactionId, $this->id);
+        RC::setHeader(RC::$config->rest->headers->transactionId, (string) $this->id);
         RC::setHeader('Content-Type', 'application/json');
-        RC::setHeader('Content-Length', strlen($response));
+        RC::setHeader('Content-Length', (string) strlen($response));
         if ($get) {
             RC::setOutput($response);
         }

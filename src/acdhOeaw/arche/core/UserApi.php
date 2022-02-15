@@ -83,7 +83,8 @@ class UserApi {
             $data = $this->prepareUserData($data, $user);
         }
 
-        RC::setOutput(json_encode($data), 'application/json');
+        $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
+        RC::setOutput($data, 'application/json');
     }
 
     public function patch(string $user): void {

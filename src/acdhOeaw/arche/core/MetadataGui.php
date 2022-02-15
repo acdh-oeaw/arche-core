@@ -88,19 +88,19 @@ TMPL;
 
     /**
      *
-     * @var array<string, array>
+     * @var array<string, array<string, array<mixed>>>
      */
     private $data;
 
     /**
      * 
-     * @var resource
+     * @var mixed
      */
     private $stream;
 
     /**
      * 
-     * @param resource $stream
+     * @param mixed $stream
      * @param PDOStatement $query
      * @param int $resId
      * @param string $preferredLang

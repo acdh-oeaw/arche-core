@@ -40,8 +40,8 @@ class Triple {
     public ?string $lang;
     public ?string $uri;
 
-    public function __construct(object $data = null) {
-        foreach ((array) $data ?? [] as $k => $v) {
+    public function __construct(?object $data = null) {
+        foreach ((array) ($data ?? []) as $k => $v) {
             if (property_exists(self::class, $k)) {
                 $this->$k = $v;
             }

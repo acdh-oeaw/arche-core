@@ -139,7 +139,7 @@ class MetadataReadOnly {
 
     /**
      * 
-     * @var resource
+     * @var mixed
      */
     private $stream;
 
@@ -178,7 +178,7 @@ class MetadataReadOnly {
      * @param string $format
      * @throws RepoException
      */
-    public function generateOutput(string $format) {
+    public function generateOutput(string $format): void {
         $this->stream = fopen('php://temp', 'rw');
         switch ($format) {
             case 'text/html':
@@ -202,7 +202,7 @@ class MetadataReadOnly {
             default:
                 throw new RepoException("Unsupported metadata format requested", 400);
         }
-        $this->pdoStmnt = null;
+        unset($this->pdoStmnt);
     }
 
     /**
@@ -255,7 +255,7 @@ class MetadataReadOnly {
             $serializer->addTriple('ns1:' . $triple->id, $prop, $obj, null);
             fwrite($this->stream, $serializer->read());
         }
-        fwrite($this->stream, $serializer->end());
+        fwrite($this->stream, (string) $serializer->end());
     }
 
     /**

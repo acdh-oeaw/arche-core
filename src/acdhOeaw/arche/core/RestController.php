@@ -285,7 +285,7 @@ class RestController {
     }
 
     static public function getHttpHeaderName(string $purpose): string {
-        return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose) ?? throw new RepoException("Unknown HTTP header name for $purpose");
+        return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose ?? throw new RepoException("Unknown HTTP header name for $purpose"));
     }
 
     static public function getRequestParameter(string $purpose): ?string {
@@ -308,6 +308,9 @@ class RestController {
     }
 
     static public function appendOutput(string $output): void {
+        if (!is_string(self::$output)) {
+            throw new RepoException("Can't mix string and non-string output");
+        }
         self::$output .= $output;
     }
 

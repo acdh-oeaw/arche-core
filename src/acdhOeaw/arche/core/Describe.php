@@ -62,7 +62,7 @@ class Describe {
             'application/json' => json_encode($cfg),
             default => yaml_emit(json_decode(json_encode($cfg), true)),
         };
-        RC::setHeader('Content-Size', strlen($response));
+        RC::setHeader('Content-Size', (string) strlen($response));
         RC::setHeader('Content-Type', $format);
         if ($get) {
             RC::setOutput($response);
