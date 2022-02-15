@@ -49,3 +49,4 @@ DROP TABLE fts;
 INSERT INTO full_text_search (iid, segments, raw) SELECT id, to_tsvector('simple', regexp_replace(ids, '^([^:]*):/', '\1 ')), ids FROM identifiers;
 
 END;
+COMMIT;
