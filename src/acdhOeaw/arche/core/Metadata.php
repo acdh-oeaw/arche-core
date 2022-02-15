@@ -96,14 +96,6 @@ class Metadata {
         return HttpAccept::getBestMatch(RC::$config->rest->metadataFormats)->getFullType();
     }
 
-    static public function setResponseHeaders(?string $format = null): string {
-        if (empty($format)) {
-            $format = self::negotiateFormat();
-        }
-        RC::setHeader('Content-Type', $format);
-        return $format;
-    }
-
     private int $id;
     private Graph $graph;
 
@@ -369,7 +361,7 @@ class Metadata {
      * @return void
      */
     public function setResponseBody(string $format): void {
-        RC::setOutput($this->graph->serialise($format));
+        RC::setOutput($this->graph->serialise($format), $format);
     }
 
     private function autoAddId(string $ids): bool {
