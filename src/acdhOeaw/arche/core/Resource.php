@@ -135,8 +135,9 @@ class Resource {
         $metaUrl = $this->getUri() . '/metadata';
         try {
             $binary = new BinaryPayload((int) $this->id);
+            $headers = $binary->getHeaders();
             RC::$auth->checkAccessRights((int) $this->id, 'read', false);
-            foreach ($binary->getHeaders() as $header => $value) {
+            foreach ($headers as $header => $value) {
                 RC::setHeader($header, $value);
             }
             RC::addHeader('Link', '<' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
