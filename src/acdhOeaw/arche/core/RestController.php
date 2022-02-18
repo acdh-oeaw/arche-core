@@ -303,7 +303,7 @@ class RestController {
                                      ?string $mimeType = null): void {
         self::$output = $output;
         if (!empty($mimeType)) {
-            self::$headers['Content-Type'] = [$mimeType];
+            self::setHeader('Content-Type', $mimeType);
         }
     }
 
