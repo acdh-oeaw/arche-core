@@ -231,7 +231,7 @@ class BinaryPayload {
 
     /**
      * 
-     * @return array<string | null>
+     * @return array<?string>
      */
     private function getRequestMetadataRaw(): array {
         $contentDisposition = trim((string) filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
