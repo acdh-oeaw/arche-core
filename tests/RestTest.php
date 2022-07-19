@@ -1004,4 +1004,20 @@ class RestTest extends TestBase {
         $this->assertContains(200, $codes);
         $this->assertContains(409, $codes);
     }
+
+    public function testVariousReadModes(): void {
+        $location  = $this->createMetadataResource();
+        $readModes = [RRI::META_IDS, RRI::META_NEIGHBORS, RRI::META_PARENTS,
+            RRI::META_PARENTS_ONLY, RRI::META_PARENTS_REVERSE, RRI::META_RELATIVES,
+            RRI::META_RELATIVES_ONLY, RRI::META_RELATIVES_REVERSE, RRI::META_RESOURCE];
+        foreach ($readModes as $mode) {
+            $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode($mode));
+            $resp = self::$client->send($req);
+            $this->assertEquals(200, $resp->getStatusCode());
+        }
+
+        $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode(RRI::META_NONE));
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+    }
 }
