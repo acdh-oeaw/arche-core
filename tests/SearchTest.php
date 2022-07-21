@@ -72,6 +72,8 @@ class SearchTest extends TestBase {
         $this->m[1]->addLiteral('https://title2', 'abc');
         $this->m[0]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,10 0,10 10,0 10,0 0))');
         $this->m[1]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))');
+        $this->m[0]->addLiteral('https://url', 'https://foo.bar/baz#bim');
+        $this->m[0]->addResource(self::$config->schema->id, 'https://foo.bar/baz#bom');
         foreach ($this->m as $i) {
             $this->updateResource($i, $txId);
         }
@@ -603,13 +605,19 @@ class SearchTest extends TestBase {
         $this->assertEquals("<b>abc</b>", $fts);
     }
 
+    /**
+     * URIs/URLs can be badly parsed by the Postgresql full text search functions.
+     * Make sure we are able to properly search for them.
+     * @return void
+     */
     public function testFullTextSearchIds(): void {
         $countProp = self::$config->schema->searchCount;
+
         $opts = [
             'query'   => [
-                'value[]'     => $this->m[0]->getUri(),
-                'operator[]'  => '@@',
-                'ftsQuery'    => $this->m[0]->getUri(),
+                'value[]'    => 'https://foo.bar/baz#bim',
+                'operator[]' => '@@',
+                'ftsQuery'   => 'https://foo.bar/baz#bim',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
@@ -618,8 +626,13 @@ class SearchTest extends TestBase {
         $g    = $this->runSearch($opts);
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral($countProp)->getValue());
+
+        $opts['query']['value[]'] = '"https://foo.bar/baz#bom"';
+        $g                        = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral($countProp)->getValue());
     }
-    
+
     /**
      * @group search
      */

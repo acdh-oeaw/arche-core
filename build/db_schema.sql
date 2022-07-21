@@ -348,7 +348,7 @@ BEGIN
     END IF;
     IF TG_OP IN ('UPDATE', 'INSERT') THEN
         INSERT INTO full_text_search (iid, segments, raw)
-            SELECT id, to_tsvector('simple', regexp_replace(ids, '^([^:]*):/', '\1 ')), ids
+            SELECT id, to_tsvector('simple', ids), ids
             FROM allnew;
     END IF;
     RETURN NULL;
@@ -440,5 +440,8 @@ $$;
 CREATE TRIGGER metadata_history_metadata_truncate_trigger    BEFORE TRUNCATE ON metadata    FOR STATEMENT EXECUTE FUNCTION tr_metadata_history_maintain2();
 CREATE TRIGGER metadata_history_identifiers_truncate_trigger BEFORE TRUNCATE ON identifiers FOR STATEMENT EXECUTE FUNCTION tr_metadata_history_maintain2();
 CREATE TRIGGER metadata_history_relations_truncate_trigger   BEFORE TRUNCATE ON relations   FOR STATEMENT EXECUTE FUNCTION tr_metadata_history_maintain2();
+
+-- don't loose protocol from the full text search
+ALTER TEXT SEARCH CONFIGURATION simple ALTER MAPPING FOR protocol WITH simple;
 
 COMMIT;
