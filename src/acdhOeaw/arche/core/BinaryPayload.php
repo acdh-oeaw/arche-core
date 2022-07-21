@@ -53,23 +53,9 @@ class BinaryPayload {
         return $path;
     }
 
-    /**
-     *
-     * @var int
-     */
-    private $id;
-
-    /**
-     * 
-     * @var ?string
-     */
-    private $hash;
-
-    /**
-     * 
-     * @var int
-     */
-    private $size;
+    private int $id;
+    private ?string $hash;
+    private int $size;
 
     public function __construct(int $id) {
         $this->id = $id;
@@ -137,6 +123,7 @@ class BinaryPayload {
      * 
      * @return array<string, mixed>
      * @throws NoBinaryException
+     * @throws RepoException
      */
     public function getHeaders(): array {
         $query = RC::$pdo->prepare("
@@ -159,6 +146,7 @@ class BinaryPayload {
         $headers = [];
         if (!empty($data->size) && file_exists($path)) {
             $headers['Content-Length'] = $data->size;
+            $headers['Accept-Ranges']   = 'bytes';
         } else {
             throw new NoBinaryException();
         }
@@ -168,6 +156,31 @@ class BinaryPayload {
         if (!empty($data->mime)) {
             $headers['Content-Type'] = $data->mime;
         }
+
+        // Handling of HTTP Range header is a little unintuitive:
+        // - it is applied to the output by PHP or maybe Apache where they see
+        //   the 'Accept-Ranges: bytes' response header being set but: 
+        //   - only single range is supported
+        //   - there is no error handling for bad range values
+        // - therefore on our side is to:
+        //   - set the 'Accept-Ranges: bytes' response header
+        //   - check Range validity and throw HTTP 400/416 when needed
+        $range = filter_input(\INPUT_SERVER, 'HTTP_RANGE');
+        if (!empty($range)) {
+            $range = explode('=', $range);
+            if (trim($range[0]) !== 'bytes' || count($range) !== 2) {
+                throw new RepoException('Range Not Satisfiable ', 416);
+            }
+            $range = array_map('trim', explode(',', $range[1]));
+            if (count($range) > 1) {
+                throw new RepoException('Range Not Satisfiable ', 416);
+            }
+            $range = array_map(fn($x) => (int) trim($x), explode('-', $range[0]));
+            if (count($range) !== 2 || $range[0] < 0 || $range[0] > $range[1] || $range[1] > $data->size) {
+                throw new RepoException('Range Not Satisfiable ', 416);
+            }
+        }
+
         return $headers;
     }
 

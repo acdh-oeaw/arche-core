@@ -1020,4 +1020,39 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
     }
+
+    public function testRange(): void {
+        $location = $this->createBinaryResource();
+        $headers  = ['Eppn' => 'admin'];
+        $resp     = self::$client->send(new Request('head', $location, $headers));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals('bytes', $resp->getHeader('Accept-Ranges')[0] ?? '');
+        $length   = (int) $resp->getHeader('Content-Length')[0];
+
+        $chunkSize = 100;
+        $data      = '';
+        for ($i = 0; $i < $length; $i += $chunkSize) {
+            $upperRange       = min($length - 1, $i + $chunkSize - 1);
+            $headers['Range'] = "bytes=$i-$upperRange";
+            $resp             = self::$client->send(new Request('get', $location, $headers));
+            $this->assertEquals(206, $resp->getStatusCode());
+            $chunk            = (string) $resp->getBody();
+            $this->assertEquals($upperRange - $i + 1, strlen($chunk));
+            $data             .= $chunk;
+        }
+        unset($headers['Range']);
+        $resp = self::$client->send(new Request('get', $location, $headers));
+        $this->assertEquals((string) $resp->getBody(), $data);
+
+        $wrongRanges = [
+            'otherunit=0-10',
+            'bytes=0-' . ($length + 1),
+            'bytes=0-10,20-30', // not supported by Apache although perfectly valid
+        ];
+        foreach ($wrongRanges as $range) {
+            $headers['Range'] = 'range';
+            $resp             = self::$client->send(new Request('get', $location, $headers));
+            $this->assertEquals(416, $resp->getStatusCode(), "range: $range");
+        }
+    }
 }
