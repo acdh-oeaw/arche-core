@@ -64,6 +64,8 @@ class Describe {
         };
         RC::setHeader('Content-Size', (string) strlen($response));
         RC::setHeader('Content-Type', $format);
+        RC::setHeader('ETag', '"' . sha1($response) . '"');
+        RC::setHeader('Last-Modified', date("D, d M Y H:i:s", RC::$config->configDate) . " GMT");
         if ($get) {
             RC::setOutput($response);
         }

@@ -1021,7 +1021,7 @@ class RestTest extends TestBase {
         $this->assertEquals(204, $resp->getStatusCode());
     }
 
-    public function testRange(): void {
+    public function testHttpRangeRequest(): void {
         $location = $this->createBinaryResource();
         $headers  = ['Eppn' => 'admin'];
         $resp     = self::$client->send(new Request('head', $location, $headers));
@@ -1054,5 +1054,56 @@ class RestTest extends TestBase {
             $resp             = self::$client->send(new Request('get', $location, $headers));
             $this->assertEquals(416, $resp->getStatusCode(), "range: $range");
         }
+    }
+
+    public function testETagLastModifiedDescibe(): void {
+        $resp    = self::$client->send(new Request('get', self::$baseUrl . "describe"));
+        $this->assertCount(1, $resp->getHeader('ETag'));
+        $lastMod = date("D, d M Y H:i:s", filectime(__DIR__ . '/../config.yaml')) . " GMT";
+        $this->assertEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
+        $this->assertEquals('no-cache', $resp->getHeader('Cache-Control')[0] ?? '');
+    }
+
+    public function testETagLastModifiedResource(): void {
+        $txHeader = self::$config->rest->headers->transactionId;
+        $headers  = [
+            self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
+            'Eppn'                                         => 'admin',
+        ];
+
+        // create a resource and check if headers are there
+        $location = $this->createBinaryResource();
+        $resp    = self::$client->send(new Request('head', $location, $headers));
+        $etag    = $resp->getHeader('Etag')[0] ?? '';
+        $lastMod = $resp->getHeader('Last-Modified')[0] ?? '';
+        $this->assertNotEmpty($etag);
+        $this->assertNotEmpty($lastMod);
+        $this->assertEquals('no-cache', $resp->getHeader('Cache-Control')[0] ?? '');
+
+        // change content and check both headers changed
+        sleep(1);
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, 'test ETag nad Last-Modified headers');
+        $resp               = self::$client->send($req);
+        $this->commitTransaction($txId);
+        unset($headers[$txHeader]);
+        $resp               = self::$client->send(new Request('head', $location, $headers));
+        $this->assertNotEquals($etag, $resp->getHeader('Etag')[0] ?? '');
+        $this->assertNotEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
+        $etag               = $resp->getHeader('Etag')[0] ?? '';
+        $lastMod            = $resp->getHeader('Last-Modified')[0] ?? '';
+
+        // update the resource binary without changing the content - only Last-Modified should change
+        sleep(1);
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, 'test ETag nad Last-Modified headers');
+        $resp               = self::$client->send($req);
+        $this->commitTransaction($txId);
+        unset($headers[$txHeader]);
+        $resp               = self::$client->send(new Request('head', $location, $headers));
+        $this->assertEquals($etag, $resp->getHeader('ETag')[0] ?? '');
+        $this->assertNotEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
     }
 }

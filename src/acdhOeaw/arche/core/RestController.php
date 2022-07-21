@@ -104,6 +104,7 @@ class RestController {
         });
 
         self::$config  = Config::fromYaml($configFile);
+        self::$config->configDate = filectime($configFile);
         self::$output  = '';
         self::$headers = [];
 
@@ -139,6 +140,7 @@ class RestController {
             self::$log->error($e);
             http_response_code(500);
         }
+        self::setHeader('Cache-Control', 'no-cache');
     }
 
     static public function handleRequest(): void {
@@ -151,12 +153,11 @@ class RestController {
                 $origin = self::$config->rest->cors;
                 if ($origin === self::CORS_ORIGIN) {
                     $origin = filter_input(INPUT_SERVER, 'HTTP_ORIGIN') ?? '*';
-                    header('Vary: origin');
+                    self::setHeader('Vary', 'origin');
                 }
-                header("Access-Control-Allow-Origin: $origin");
-                header('Access-Control-Allow-Headers: Accept, Content-Type');
-                header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
-                header('Cache-Control: no-cache');
+                self::setHeader('Access-Control-Allow-Origin', "$origin");
+                self::setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type');
+                self::setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
             }
 
             self::$pdo->beginTransaction();
@@ -329,6 +330,7 @@ class RestController {
 
     static private function sendOutput(): void {
         foreach (self::$headers as $header => $values) {
+            $header = ucwords($header, '-');
             foreach ($values as $v) {
                 header("$header: $v", false);
             }

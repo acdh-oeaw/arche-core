@@ -132,21 +132,27 @@ class BinaryPayload {
                           (SELECT id, value   AS filename FROM metadata WHERE property = ? AND id = ? LIMIT 1) t1
                 FULL JOIN (SELECT id, value   AS mime     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t2 USING (id)
                 FULL JOIN (SELECT id, value_n AS size     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t3 USING (id)
+                FULL JOIN (SELECT id, value   AS hash     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t5 USING (id)
+                FULL JOIN (SELECT id, to_char(value_t, 'Dy, DD Mon YYYY HH24:MI:SS GMT') AS moddate  FROM metadata WHERE property = ? AND id = ? LIMIT 1) t4 USING (id)
         ");
         $query->execute([
             RC::$config->schema->fileName, $this->id,
             RC::$config->schema->mime, $this->id,
-            RC::$config->schema->binarySize, $this->id
+            RC::$config->schema->binarySize, $this->id,
+            RC::$config->schema->hash, $this->id,
+            RC::$config->schema->binaryModificationDate, $this->id,
         ]);
         $data  = $query->fetchObject();
         if ($data === false) {
-            $data = ['filename' => '', 'mime' => '', 'size' => ''];
+            $data = (object) [
+                    'filename' => '', 'mime'     => '', 'size'     => '',
+                    'moddate'  => '', 'hash'     => ''
+            ];
         }
-        $path    = $this->getPath();
-        $headers = [];
+        $path = $this->getPath();
         if (!empty($data->size) && file_exists($path)) {
             $headers['Content-Length'] = $data->size;
-            $headers['Accept-Ranges']   = 'bytes';
+            $headers['Accept-Ranges']  = 'bytes';
         } else {
             throw new NoBinaryException();
         }
@@ -155,6 +161,12 @@ class BinaryPayload {
         }
         if (!empty($data->mime)) {
             $headers['Content-Type'] = $data->mime;
+        }
+        if (!empty($data->moddate)) {
+            $headers['Last-Modified'] = $data->moddate;
+        }
+        if (!empty($data->hash)) {
+            $headers['ETag'] = '"' . $data->hash . "'";
         }
 
         // Handling of HTTP Range header is a little unintuitive:
