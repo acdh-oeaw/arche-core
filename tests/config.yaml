@@ -164,6 +164,7 @@ schema:
     delete: delete://delete
     searchMatch: search://match
     searchOrder: search://order
+    searchOrderValue: search://orderValue
     searchFts: search://fts
     searchCount: search://count
     binarySize: https://size

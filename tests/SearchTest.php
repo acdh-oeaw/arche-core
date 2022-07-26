@@ -63,7 +63,7 @@ class SearchTest extends TestBase {
         $this->m[1]->addLiteral('https://date', new Literal('2019-02-01', null, RDF::XSD_DATE));
         $this->m[2]->addLiteral('https://date', new Literal('2019-03-01', null, RDF::XSD_DATE));
         $this->m[0]->addLiteral('https://number', 10);
-        $this->m[1]->addLiteral('https://number', 20);
+        $this->m[1]->addLiteral('https://number', 2);
         $this->m[2]->addLiteral('https://number', 30);
         $this->m[0]->addResource('https://relation', $this->m[2]->getUri());
         $this->m[1]->addResource('https://relation', $this->m[0]->getUri());
@@ -89,7 +89,7 @@ class SearchTest extends TestBase {
                 'property[0]' => 'https://title',
                 'value[0]'    => 'bcd',
                 'property[1]' => 'https://number',
-                'value[1]'    => '20',
+                'value[1]'    => '2',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
@@ -478,7 +478,7 @@ class SearchTest extends TestBase {
     public function testSql(): void {
         $opts = [
             'query'   => [
-                'sql' => "SELECT id FROM metadata WHERE value_n = 20",
+                'sql' => "SELECT id FROM metadata WHERE value_n = 2",
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
@@ -494,6 +494,8 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testPaging(): void {
+        $countProp = self::$config->schema->searchCount;
+        $valueProp = self::$config->schema->searchOrderValue . '1';
         $opts = [
             'query'   => [
                 'sql'       => "SELECT id FROM resources",
@@ -505,17 +507,51 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals('cde', $g->resource($this->m[2]->getUri())->getLiteral($valueProp)->getValue());
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals('bcd', $g->resource($this->m[1]->getUri())->getLiteral($valueProp)->getValue());
+    }
+
+    /**
+     * @group search
+     */
+    public function testPagingByNumber(): void {
+        $countProp = self::$config->schema->searchCount;
+        $valueProp = self::$config->schema->searchOrderValue . '1';
+        $opts      = [
+            'query'   => [
+                'sql'       => "SELECT id FROM resources",
+                'orderBy[]' => 'https://number',
+                'limit'     => 1,
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g         = $this->runSearch($opts);
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals('2', $g->resource($this->m[1]->getUri())->getLiteral($valueProp)->getValue());
+
+        $opts['query']['offset'] = 1;
+        $g                       = $this->runSearch($opts);
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals('10', $g->resource($this->m[0]->getUri())->getLiteral($valueProp)->getValue());
     }
 
     /**
@@ -793,7 +829,7 @@ class SearchTest extends TestBase {
                 'property[0]' => 'https://title',
                 'value[0]'    => 'bcd',
                 'property[1]' => 'https://number',
-                'value[1]'    => '20',
+                'value[1]'    => '2',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
