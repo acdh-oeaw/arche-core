@@ -60,6 +60,10 @@ class Search {
         $config                         = SearchConfig::factory();
         $config->metadataMode           = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataSearchMode;
         $config->metadataParentProperty = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
+        $resProps                       = (string) RC::getRequestParameter('resourceProperties');
+        $config->resourceProperties     = empty($resProps) ? [] : array_map('trim', explode(',', $resProps));
+        $relProps                       = (string) RC::getRequestParameter('relativesProperties');
+        $config->relativesProperties    = empty($relProps) ? [] : array_map('trim', explode(',', $relProps));
         if (isset($_POST['sql'])) {
             $params   = $_POST['sqlParam'] ?? [];
             $pdoStmnt = $repo->getPdoStatementBySqlQuery($_POST['sql'], $params, $config);

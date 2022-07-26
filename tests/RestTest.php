@@ -432,6 +432,7 @@ class RestTest extends TestBase {
         $resp    = self::$client->send($req);
 
         $this->assertEquals(201, $resp->getStatusCode());
+
         $location = $resp->getHeader('Location')[0];
         $metaN1   = (new Graph())->parse((string) $resp->getBody());
 
@@ -458,7 +459,7 @@ class RestTest extends TestBase {
         $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test/hasDate'), 0, 10));
         $this->assertEquals(123.5, (string) $res->getLiteral('http://test/hasNumber'));
 
-        $this->commitTransaction($txId);
+        $this->assertEquals(204, $this->commitTransaction($txId));
 
         // check if everything is still in place after the transaction end
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
@@ -1009,7 +1010,8 @@ class RestTest extends TestBase {
         $location  = $this->createMetadataResource();
         $readModes = [RRI::META_IDS, RRI::META_NEIGHBORS, RRI::META_PARENTS,
             RRI::META_PARENTS_ONLY, RRI::META_PARENTS_REVERSE, RRI::META_RELATIVES,
-            RRI::META_RELATIVES_ONLY, RRI::META_RELATIVES_REVERSE, RRI::META_RESOURCE];
+            RRI::META_RELATIVES_ONLY, RRI::META_RELATIVES_REVERSE, RRI::META_RESOURCE,
+            '0_0_0_0', '1', '1_2_1', '3_2_1_1', '-1_-3_0_0'];
         foreach ($readModes as $mode) {
             $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode($mode));
             $resp = self::$client->send($req);
@@ -1019,6 +1021,14 @@ class RestTest extends TestBase {
         $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode(RRI::META_NONE));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
+
+        $readModes = ['0_', 'foo', '0_0_0_foo', '0_0_0_2', '0_0_2_0', '1_2_-1'];
+        foreach ($readModes as $mode) {
+            $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode($mode));
+            $resp = self::$client->send($req);
+            $this->assertEquals(400, $resp->getStatusCode());
+            $this->assertStringContainsString('Bad metadata mode', (string) $resp->getBody());
+        }
     }
 
     public function testHttpRangeRequest(): void {
@@ -1073,9 +1083,9 @@ class RestTest extends TestBase {
 
         // create a resource and check if headers are there
         $location = $this->createBinaryResource();
-        $resp    = self::$client->send(new Request('head', $location, $headers));
-        $etag    = $resp->getHeader('Etag')[0] ?? '';
-        $lastMod = $resp->getHeader('Last-Modified')[0] ?? '';
+        $resp     = self::$client->send(new Request('head', $location, $headers));
+        $etag     = $resp->getHeader('Etag')[0] ?? '';
+        $lastMod  = $resp->getHeader('Last-Modified')[0] ?? '';
         $this->assertNotEmpty($etag);
         $this->assertNotEmpty($lastMod);
         $this->assertEquals('no-cache', $resp->getHeader('Cache-Control')[0] ?? '');

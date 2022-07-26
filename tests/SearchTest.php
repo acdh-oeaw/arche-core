@@ -259,14 +259,14 @@ class SearchTest extends TestBase {
     /**
      * @group search
      */
-    public function testMetaReadNeigbors(): void {
+    public function testMetaReadCustomMode(): void {
         $opts = [
             'query'   => [
                 'property[0]' => 'https://title',
                 'value[0]'    => 'abc',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => RRI::META_NEIGHBORS,
+                self::$config->rest->headers->metadataReadMode => '0_0_1_0',
             ],
         ];
         $g    = $this->runSearch($opts);
@@ -274,6 +274,7 @@ class SearchTest extends TestBase {
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
         $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
+        $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
         $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
     }
 
@@ -298,6 +299,39 @@ class SearchTest extends TestBase {
         $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
         $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
         $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
+    }
+
+    /**
+     * @group search
+     */
+    public function testMetaFilterOutputProperties(): void {
+        $opts    = [
+            'query'   => [
+                'property[0]' => 'https://title',
+                'value[0]'    => 'abc',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode       => '0_1_0_0',
+                self::$config->rest->headers->metadataParentProperty => 'https://relation',
+                self::$config->rest->headers->resourceProperties     => 'https://mime,https://title',
+                self::$config->rest->headers->relativesProperties    => 'https://size,http://createUser',
+            ],
+        ];
+        $g       = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
+        $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
+        $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
+        $r       = $g->resource($this->m[0]);
+        $allowed = ['https://mime', 'https://title', 'search://match'];
+        $this->assertCount(3, $r->propertyUris());
+        $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
+        $r       = $g->resource($this->m[2]);
+        $allowed = ['https://size', 'http://createUser'];
+        $this->assertCount(2, $r->propertyUris());
+        $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
     }
 
     /**
@@ -430,12 +464,12 @@ class SearchTest extends TestBase {
                 'value[0]' => 'abc',
             ],
             'headers' => [
-                self::$config->rest->headers->metadataReadMode => 'foo',
+                self::$config->rest->headers->metadataReadMode => '1_0_0_5',
             ],
         ];
         $resp = self::$client->request('get', self::$baseUrl . 'search', $opts);
         $this->assertEquals(400, $resp->getStatusCode());
-        $this->assertEquals('Wrong metadata read mode value foo', (string) $resp->getBody());
+        $this->assertEquals('Bad metadata mode 1_0_0_5', (string) $resp->getBody());
     }
 
     /**

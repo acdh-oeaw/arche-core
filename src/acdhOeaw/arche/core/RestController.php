@@ -59,6 +59,8 @@ class RestController {
         'metadataWriteMode'      => 'writeMode',
         'transactionId'          => 'transactionId',
         'withReferences'         => 'withReferences',
+        'resourceProperties'     => 'resourceProperties',
+        'relativesProperties'    => 'relativesProperties',
     ];
 
     /**
@@ -103,10 +105,10 @@ class RestController {
             throw new ErrorException($errstr, 500, $errno, $errfile, $errline);
         });
 
-        self::$config  = Config::fromYaml($configFile);
+        self::$config             = Config::fromYaml($configFile);
         self::$config->configDate = filectime($configFile);
-        self::$output  = '';
-        self::$headers = [];
+        self::$output             = '';
+        self::$headers            = [];
 
         self::$logId = rand(0, 999999); // short unique request id
         self::$log   = new Log(

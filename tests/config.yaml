@@ -154,6 +154,8 @@ rest:
         metadataWriteMode: X-METADATA-WRITE-MODE
         transactionId: X-TRANSACTION-ID
         withReferences: X-WITH-REFERENCES
+        resourceProperties: X-RESOURCE-PROPERTIES
+        relativesProperties: X-RELATIVES-PROPERTIES
     cors: __origin__
 schema:
     id: https://id

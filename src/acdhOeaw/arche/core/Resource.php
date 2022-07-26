@@ -70,7 +70,7 @@ class Resource {
         if ($get) {
             $meta       = new MetadataReadOnly((int) $this->id);
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
-            $meta->loadFromDb($mode, $parentProp);
+            $meta->loadFromDb($mode, $parentProp, $_GET);
             RC::setOutput($meta, $format);
         }
     }

@@ -151,14 +151,16 @@ class MetadataReadOnly {
         return RC::getBaseUrl() . $this->id;
     }
 
-    public function loadFromDb(string $mode, ?string $property = null): void {
+    public function loadFromDb(string $mode, ?string $parentProperty = null,
+                               array $resourceProperties = [],
+                               array $relativesProperties = []): void {
         $schema         = new Schema(RC::$config->schema);
         $headers        = new Schema(RC::$config->rest->headers);
         $nonRelProp     = RC::$config->metadataManagment->nonRelationProperties;
         $this->repo     = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
+        //$this->repo->setQueryLog(RC::$log);
         $res            = new RepoResourceDb((string) $this->id, $this->repo);
-        $queryData      = $res->getMetadataQuery($mode, $property);
-        $this->pdoStmnt = $this->repo->runQuery($queryData->query, $queryData->param);
+        $this->pdoStmnt = $res->getMetadataStatement($mode, $parentProperty, $resourceProperties, $relativesProperties);
     }
 
     public function loadFromPdoStatement(RepoDb $repo,
