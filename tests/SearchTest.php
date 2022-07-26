@@ -496,7 +496,7 @@ class SearchTest extends TestBase {
     public function testPaging(): void {
         $countProp = self::$config->schema->searchCount;
         $valueProp = self::$config->schema->searchOrderValue . '1';
-        $opts = [
+        $opts      = [
             'query'   => [
                 'sql'       => "SELECT id FROM resources",
                 'orderBy[]' => '^https://title',
@@ -506,7 +506,7 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
+        $g         = $this->runSearch($opts);
         $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
