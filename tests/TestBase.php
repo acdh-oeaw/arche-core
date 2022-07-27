@@ -82,7 +82,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static public function tearDownAfterClass(): void {
         // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
         $s = proc_get_status(self::$txCtrl);
-        posix_kill($s['pid'] + 1, 15);
+        posix_kill($s['pid'] + 1, 9); // 15 is soft
         proc_close(self::$txCtrl);
     }
 
