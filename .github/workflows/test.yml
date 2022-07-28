@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgis/postgis:12-master
+        image: postgis/postgis:14-master
         env:
           POSTGRES_PASSWORD: CmPUpKTW2e
         options: >-
