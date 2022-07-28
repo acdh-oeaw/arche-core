@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgis/postgis:12-master
+        image: postgis/postgis:14-master
         env:
           POSTGRES_PASSWORD: CmPUpKTW2e
         options: >-
@@ -79,15 +79,18 @@ jobs:
     - name: debug
       if: ${{ always() }}
       run: |
-        echo "---------- config.yaml:"
-        cat tests/config.yaml
-        echo "---------- apache.conf:"
-        sudo cat /etc/apache2/sites-available/000-default.conf
-        echo "---------- apache error log"
-        sudo cat /var/log/apache2/error.log
-        echo "---------- apache access log"
-        sudo cat /var/log/apache2/access.log
-        echo "---------- txlog:"
-        cat txlog
+        #echo "---------- config.yaml:"
+        #cat tests/config.yaml
+        #echo "---------- apache.conf:"
+        #sudo cat /etc/apache2/sites-available/000-default.conf
+        #echo "---------- apache error log"
+        #sudo cat /var/log/apache2/error.log
+        #echo "---------- apache access log"
+        #sudo cat /var/log/apache2/access.log
+        #echo "---------- txlog:"
+        #cat txlog
+        echo "select * from full_text_search WHERE mid IS NOT NULL OR iid IS NOT NULL;" | psql
+        echo "----------:"
+        echo "select websearch_to_tsquery('simple', '\"https://foo.bar/baz#bim\"');" | psql
         echo "---------- restlog:"
         cat restlog
