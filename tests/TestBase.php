@@ -67,7 +67,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         self::$pdo->query("SET application_name TO test_conn");
 
-        $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
+        $cmd          = ['php', '-f', __DIR__ . '/../transactionDaemon.php', __DIR__ . '/../config.yaml'];
         $pipes        = [];
         self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
         if (self::$txCtrl === false) {
@@ -80,9 +80,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     }
 
     static public function tearDownAfterClass(): void {
-        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
-        $s = proc_get_status(self::$txCtrl);
-        posix_kill($s['pid'] + 1, 9); // 15 is soft
+        proc_terminate(self::$txCtrl, 15);
+        while (proc_get_status(self::$txCtrl)['running'] ?? false) {
+            usleep(100000);
+        }
         proc_close(self::$txCtrl);
     }
 
@@ -283,10 +284,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
      * @return Graph
      */
     protected function runSearch(array $opts, string $method = 'get'): Graph {
-        $resp = self::$client->request($method, self::$baseUrl . 'search', $opts);
+        $resp   = self::$client->request($method, self::$baseUrl . 'search', $opts);
         $format = explode(';', $resp->getHeader('Content-Type')[0])[0];
-        $body = (string) $resp->getBody();
-        $g    = new Graph();
+        $body   = (string) $resp->getBody();
+        $g      = new Graph();
         $g->parse((string) $body, $format);
         return $g;
     }

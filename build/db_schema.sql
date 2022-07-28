@@ -133,13 +133,15 @@ UNION
 -- UTILITY FUNCTIONS
 -- 
 
-CREATE OR REPLACE FUNCTION get_allowed_resources(acl_prop text, roles json) RETURNS TABLE(id bigint) LANGUAGE sql STABLE AS $$
+CREATE OR REPLACE FUNCTION get_allowed_resources(acl_prop text, roles json) 
+RETURNS TABLE(id bigint) LANGUAGE sql STABLE PARALLEL SAFE AS $$
     SELECT DISTINCT id
     FROM metadata
     WHERE property = acl_prop AND value IN (SELECT json_array_elements_text(roles));
 $$;
 
-CREATE OR REPLACE FUNCTION get_resource_roles(read_prop text, write_prop text) RETURNS TABLE(id bigint, role text, privilege text) LANGUAGE sql STABLE AS $$
+CREATE OR REPLACE FUNCTION get_resource_roles(read_prop text, write_prop text) 
+RETURNS TABLE(id bigint, role text, privilege text) LANGUAGE sql STABLE PARALLEL SAFE AS $$
     SELECT id, value, 'read' 
     FROM resources JOIN metadata USING (id) 
     WHERE property = read_prop 
@@ -208,7 +210,7 @@ CREATE OR REPLACE FUNCTION get_relatives(
     reverse bool default false,
     out id bigint, 
     out n int
-) RETURNS SETOF record LANGUAGE sql STABLE AS $$
+) RETURNS SETOF record LANGUAGE sql STABLE PARALLEL SAFE AS $$
     WITH RECURSIVE ids(id, n, m) AS (
         SELECT res_id, 0, ARRAY[res_id] FROM resources WHERE id = res_id AND state = 'active'
       UNION
@@ -244,7 +246,7 @@ CREATE OR REPLACE FUNCTION get_relatives_metadata(
     max_depth_down integer default -999999, 
     neighbors bool default true,
     reverse bool default false
-) RETURNS SETOF metadata_view LANGUAGE sql STABLE AS $$
+) RETURNS SETOF metadata_view LANGUAGE sql STABLE PARALLEL SAFE AS $$
     WITH ids AS (
         SELECT * FROM get_relatives(res_id, rel_prop, max_depth_up, max_depth_down, neighbors, reverse)
     )
