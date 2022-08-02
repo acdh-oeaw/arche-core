@@ -27,7 +27,6 @@
 namespace acdhOeaw\arche\core;
 
 use DateTime;
-use PDOException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
@@ -166,31 +165,7 @@ class BinaryPayload {
             $headers['Last-Modified'] = $data->moddate;
         }
         if (!empty($data->hash)) {
-            $headers['ETag'] = '"' . $data->hash . "'";
-        }
-
-        // Handling of HTTP Range header is a little unintuitive:
-        // - it is applied to the output by PHP or maybe Apache where they see
-        //   the 'Accept-Ranges: bytes' response header being set but: 
-        //   - only single range is supported
-        //   - there is no error handling for bad range values
-        // - therefore on our side is to:
-        //   - set the 'Accept-Ranges: bytes' response header
-        //   - check Range validity and throw HTTP 400/416 when needed
-        $range = filter_input(\INPUT_SERVER, 'HTTP_RANGE');
-        if (!empty($range)) {
-            $range = explode('=', $range);
-            if (trim($range[0]) !== 'bytes' || count($range) !== 2) {
-                throw new RepoException('Range Not Satisfiable ', 416);
-            }
-            $range = array_map('trim', explode(',', $range[1]));
-            if (count($range) > 1) {
-                throw new RepoException('Range Not Satisfiable ', 416);
-            }
-            $range = array_map(fn($x) => (int) trim($x), explode('-', $range[0]));
-            if (count($range) !== 2 || $range[0] < 0 || $range[0] > $range[1] || $range[1] > $data->size) {
-                throw new RepoException('Range Not Satisfiable ', 416);
-            }
+            $headers['ETag'] = '"' . $data->hash . '"';
         }
 
         return $headers;
