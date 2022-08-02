@@ -18,7 +18,7 @@ $$;
 
 UPDATE full_text_search SET segments = to_tsvector('simple', raw) WHERE iid IS NOT NULL;
 
-DROP FUNCTION get_neighbors_metadata; -- same can be done with get_relatives_metadata(id, null, 0, 0, true, true)
+DROP FUNCTION get_neighbors_metadata;
 DROP FUNCTION get_relatives_metadata;
 DROP FUNCTION get_relatives;
 
@@ -80,6 +80,11 @@ CREATE OR REPLACE FUNCTION get_relatives_metadata(
     SELECT id, property, 'REL'::text AS type, null::text AS lang, target_id::text AS value
     FROM relations r JOIN ids USING (id)
   ;
+$$;
+
+-- for backward compatibility
+CREATE OR REPLACE FUNCTION get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF metadata_view LANGUAGE sql STABLE PARALLEL SAFE AS $$
+    SELECT * FROM get_relatives_metadata(res_id, null, 0, 0, true, true);
 $$;
 
 CREATE OR REPLACE FUNCTION get_allowed_resources(acl_prop text, roles json) 
