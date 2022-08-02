@@ -330,6 +330,51 @@ class RestController {
         self::$headers[$header][] = $value;
     }
 
+    static public function getHeader(string $header): array {
+        return self::$headers[strtolower($header)] ?? [];
+    }
+
+    /**
+     * Returns HTTP Range header parsed into array of requested ranges.
+     * 
+     * Throws HTTP 416 on basic Range header errors (unit other then "bytes",
+     * negative position, end lower then start).
+     * 
+     * **Important remark** - if multiple ranges are requested, it clears the
+     * "Content-Type" and "Content-Length" headers so they aren't emitted before
+     * the `self::$output->sendOutput()` is called.
+     * 
+     * @return array<int, array<string, mixed>>|null
+     * @throws RepoException
+     */
+    static public function getRangeHeader(): ?array {
+        $ranges = filter_input(\INPUT_SERVER, 'HTTP_RANGE');
+        if (empty($ranges)) {
+            return null;
+        }
+
+        $boundary = bin2hex(time());
+        $ranges   = explode('=', $ranges);
+        if (trim($ranges[0]) !== 'bytes' || count($ranges) !== 2) {
+            throw new RepoException('Range Not Satisfiable ', 416);
+        }
+        $ranges = explode(',', $ranges[1]);
+        foreach ($ranges as &$i) {
+            $i = array_map(fn($x) => (int) trim($x), explode('-', $i));
+            if (count($i) !== 2 || $i[0] < 0 || $i[0] > $i[1]) {
+                throw new RepoException('Range Not Satisfiable ', 416);
+            }
+            $i = ['from' => $i[0], 'to' => $i[1], 'boundary' => $boundary];
+        }
+        unset($i);
+
+        if (count($ranges) > 1) {
+            unset(self::$headers['content-type']);
+            unset(self::$headers['content-length']);
+        }
+        return $ranges;
+    }
+
     static private function sendOutput(): void {
         foreach (self::$headers as $header => $values) {
             $header = ucwords($header, '-');

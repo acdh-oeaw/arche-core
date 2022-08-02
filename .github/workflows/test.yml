@@ -69,7 +69,7 @@ jobs:
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
     - name: test
       run: |
-        XDEBUG_MODE=coverage vendor/bin/phpunit
+        XDEBUG_MODE=coverage vendor/bin/phpunit --filter RestTest::testHttpRangeRequest
     - name: coveralls
       run: |
         export COVERALLS_RUN_LOCALLY=1

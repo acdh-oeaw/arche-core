@@ -1048,16 +1048,49 @@ class RestTest extends TestBase {
             $this->assertEquals(206, $resp->getStatusCode());
             $chunk            = (string) $resp->getBody();
             $this->assertEquals($upperRange - $i + 1, strlen($chunk));
+            $this->assertEquals($upperRange - $i + 1, $resp->getHeader('Content-Length')[0] ?? '');
+            $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
             $data             .= $chunk;
         }
         unset($headers['Range']);
         $resp = self::$client->send(new Request('get', $location, $headers));
         $this->assertEquals((string) $resp->getBody(), $data);
+    }
 
+    public function testHttpMultiRangeRequest(): void {
+        $location = $this->createBinaryResource();
+        $headers  = ['Eppn' => 'admin'];
+        $resp     = self::$client->send(new Request('get', $location, $headers));
+        $data     = (string) $resp->getBody();
+
+        $headers['Range'] = "bytes=50-99,75-99,25-83";
+        $resp             = self::$client->send(new Request('get', $location, $headers));
+        $body             = (string) $resp->getBody();
+        $this->assertEquals(206, $resp->getStatusCode());
+        $this->assertStringStartsWith('multipart/byteranges; boundary=', $resp->getHeader('Content-Type')[0] ?? '');
+        $this->assertEquals(strlen($body), $resp->getHeader('Content-Length')[0] ?? -1);
+        $boundary         = (string) preg_replace('/^.*boundary=/', '', trim($resp->getHeader('Content-Type')[0] ?? ''));
+        $body             = explode("--$boundary", $body);
+        $this->assertCount(5, $body);
+        $ranges           = [[], [50, 99], [75, 99], [25, 83]];
+        for ($i = 1; $i < 4; $i++) {
+            $tmp = explode("\r\n", $body[$i]);
+            $this->assertEquals('', $tmp[0]);
+            $this->assertEquals('Content-Type: text/turtle', $tmp[1]);
+            $this->assertEquals('Content-Range: bytes ' . $ranges[$i][0] . '-' . $ranges[$i][1] . '/' . strlen($data), $tmp[2]);
+            $this->assertEquals('', $tmp[3]);
+            $this->assertEquals(substr($data, $ranges[$i][0], $ranges[$i][1] - $ranges[$i][0] + 1), $tmp[4]);
+        }
+        $this->assertEquals("--\r\n", $body[4]);
+    }
+
+    public function testHttpBadRangeRequest(): void {
+        $location    = $this->createBinaryResource();
+        $headers     = ['Eppn' => 'admin'];
         $wrongRanges = [
             'otherunit=0-10',
-            'bytes=0-' . ($length + 1),
-            'bytes=0-10,20-30', // not supported by Apache although perfectly valid
+            'bytes=0-10000',
+            'bytes=0-10,20-10000',
         ];
         foreach ($wrongRanges as $range) {
             $headers['Range'] = 'range';
