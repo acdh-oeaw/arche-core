@@ -27,19 +27,79 @@
 namespace acdhOeaw\arche\core\util;
 
 /**
- * Simple wrapper allowing to distinguish raw output string from a file
+ * Outputs a file to a client optionally honoring the requested ranges.
  *
  * @author zozlak
  */
 class OutputFile {
 
-    private string $path;
+    const CHUNK_SIZE = 10485760; // 10 MB
 
-    public function __construct(string $path) {
+    private string $path;
+    private array $ranges;
+    private ?string $contentType;
+
+    public function __construct(string $path, ?array $ranges,
+                                ?string $contentType) {
         $this->path = $path;
+        if ($ranges !== null) {
+            $this->ranges = $ranges;
+        }
+        $this->contentType = $contentType;
     }
 
     public function sendOutput(): void {
-        readfile($this->path);
+        $size = filesize($this->path);
+        if (!isset($this->ranges)) {
+            if (!empty($this->contentType)) {
+                header("Content-Type: $this->contentType");
+            }
+            header("Content-Length: $size");
+            readfile($this->path);
+        } else {
+            foreach ($this->ranges as $i) {
+                if ($i['to'] >= $size) {
+                    throw new RepoException('Range Not Satisfiable ', 416);
+                }
+            }
+
+            http_response_code(206);
+
+            $boundary    = '';
+            $contentType = '';
+            if (!empty($this->contentType)) {
+                $contentType = "Content-Type: $this->contentType";
+            }
+            if (count($this->ranges) == 1) {
+                header("$contentType");
+                header("Content-Length: " . ($this->ranges[0]['to'] - $this->ranges[0]['from'] + 1));
+            } else {
+                $boundary = "--" . $this->ranges[0]['boundary'];
+                $length   = $size + count($this->ranges) * (2 + strlen($contentType) + 2 + strlen($boundary) + 2) + 2;
+                foreach ($this->ranges as &$i) {
+                    $i['Content-Range'] = "Content-Range: bytes " . $i['from'] . "-" . $i['to'] . "/$size";
+                    $length             += strlen($i['Content-Range']) + 2;
+                }
+                unset($i);
+                header("Content-Type: multipart/byteranges; boundary=" . $this->ranges[0]['boundary']);
+                header("Content-Length: $length");
+            }
+
+            $fh = fopen($this->path, 'r');
+            foreach ($this->ranges as $i) {
+                echo count($this->ranges) > 1 ? "$boundary\r\n$contentType\r\n" . $i['Content-Range'] . "\r\n\r\n" : "";
+                $pos = $i['from'];
+                fseek($fh, $pos);
+                while ($pos < $i['to']) {
+                    echo fread($fh, min(self::CHUNK_SIZE, $i['to'] - $pos + 1));
+                    $pos += self::CHUNK_SIZE;
+                }
+                echo count($this->ranges) > 1 ? "\r\n" : "";
+            }
+            fclose($fh);
+            if (count($this->ranges) > 1) {
+                echo "$boundary--\r\n";
+            }
+        }
     }
 }

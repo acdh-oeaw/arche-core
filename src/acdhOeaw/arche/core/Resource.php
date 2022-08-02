@@ -134,7 +134,7 @@ class Resource {
         $this->checkCanRead();
         $metaUrl = $this->getUri() . '/metadata';
         try {
-            $binary = new BinaryPayload((int) $this->id);
+            $binary  = new BinaryPayload((int) $this->id);
             $headers = $binary->getHeaders();
             RC::$auth->checkAccessRights((int) $this->id, 'read', false);
             foreach ($headers as $header => $value) {
@@ -152,7 +152,9 @@ class Resource {
         $binary = new BinaryPayload((int) $this->id);
         $path   = $binary->getPath();
         if (file_exists($path)) {
-            RC::setOutput(new OutputFile($path));
+            // RC::getRangeHeader() drops it for mutltiple ranges request
+            $contentType = RC::getHeader('Content-Type')[0] ?? null;
+            RC::setOutput(new OutputFile($path, RC::getRangeHeader(), $contentType));
         }
     }
 
