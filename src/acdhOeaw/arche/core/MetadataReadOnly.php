@@ -304,10 +304,13 @@ class MetadataReadOnly {
         static $nonLiteralTypes = ['ID', 'REL', 'URI'];
 
         $literal = !in_array($triple->type, $nonLiteralTypes);
+        $addType = empty($triple->lang);
         if ($triple->type === 'ID') {
             $triple->property = $idProp;
         } elseif ($triple->type === 'REL') {
             $triple->value = $baseUrl . $triple->value;
+        } elseif(in_array($triple->type, $stringTypes)) {
+            $addType = false;
         }
 
         if ($ntriples) {
@@ -323,7 +326,7 @@ class MetadataReadOnly {
         if ($literal) {
             $obj = '"' . $triple->value . '"';
             $obj .= empty($triple->lang) ? '' : "@" . $triple->lang;
-            $obj .= empty($triple->lang) && !in_array($triple->type, $stringTypes) ? '^^' . $triple->type : '';
+            $obj .= $addType ? '^^' . $triple->type : '';
         } else {
             $obj = $triple->value;
         }
