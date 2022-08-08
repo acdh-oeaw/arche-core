@@ -26,7 +26,6 @@
 
 namespace acdhOeaw\arche\core;
 
-use PDO;
 use PDOStatement;
 use pietercolpaert\hardf\TriGWriter;
 use zozlak\RdfConstants as RDF;
@@ -54,7 +53,7 @@ class MetadataReadOnly {
      *
      * @var string[]
      */
-    private static $iriEscapeMap = array(
+    private static $iriEscapeMap = [
         "<"    => "\\u003C",
         ">"    => "\\u003E",
         '"'    => "\\u0022",
@@ -97,19 +96,19 @@ class MetadataReadOnly {
         "\x1E" => "\\u001E",
         "\x1F" => "\\u001F",
         "\x20" => "\\u0020",
-    );
+    ];
 
     /**
      * Characters forbidden in n-triples literals according to
      * https://www.w3.org/TR/n-triples/#grammar-production-STRING_LITERAL_QUOTE
      * @var string[]
      */
-    private static $literalEscapeMap = array(
+    private static $literalEscapeMap = [
         "\n" => '\\n',
         "\r" => '\\r',
         '"'  => '\\"',
         '\\' => '\\\\'
-    );
+    ];
 
     public static function escapeLiteral(string $str): string {
         return strtr($str, self::$literalEscapeMap);
@@ -301,7 +300,10 @@ class MetadataReadOnly {
      */
     private function preparePropObj(Triple $triple, string $baseUrl,
                                     string $idProp, bool $ntriples): array {
-        $literal = !in_array($triple->type, ['ID', 'REL', 'URI']);
+        static $stringTypes     = [RDF::XSD_STRING, 'GEOM'];
+        static $nonLiteralTypes = ['ID', 'REL', 'URI'];
+
+        $literal = !in_array($triple->type, $nonLiteralTypes);
         if ($triple->type === 'ID') {
             $triple->property = $idProp;
         } elseif ($triple->type === 'REL') {
@@ -321,7 +323,7 @@ class MetadataReadOnly {
         if ($literal) {
             $obj = '"' . $triple->value . '"';
             $obj .= empty($triple->lang) ? '' : "@" . $triple->lang;
-            $obj .= empty($triple->lang) && $triple->type !== RDF::XSD_STRING ? '^^' . $triple->type : '';
+            $obj .= empty($triple->lang) && !in_array($triple->type, $stringTypes) ? '^^' . $triple->type : '';
         } else {
             $obj = $triple->value;
         }
