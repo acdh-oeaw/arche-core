@@ -264,7 +264,11 @@ class Resource {
             http_response_code(201);
             $this->getMetadata();
         } catch (Throwable $e) {
-            RC::$transaction->deleteResource($this->id);
+            try {
+                RC::$transaction->deleteResource($this->id);
+            } catch (\Throwable $de) {
+                RC::$log->error($de);
+            }
             throw $e;
         }
     }
