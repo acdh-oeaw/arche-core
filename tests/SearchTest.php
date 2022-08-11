@@ -307,14 +307,15 @@ class SearchTest extends TestBase {
     public function testMetaFilterOutputProperties(): void {
         $opts    = [
             'query'   => [
-                'property[0]' => 'https://title',
-                'value[0]'    => 'abc',
+                'property[0]'            => 'https://title',
+                'value[0]'               => 'abc',
+                'relativesProperties[0]' => 'https://size',
+                'relativesProperties[1]' => 'http://createUser',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode       => '0_1_0_0',
                 self::$config->rest->headers->metadataParentProperty => 'https://relation',
                 self::$config->rest->headers->resourceProperties     => 'https://mime,https://title',
-                self::$config->rest->headers->relativesProperties    => 'https://size,http://createUser',
             ],
         ];
         $g       = $this->runSearch($opts);

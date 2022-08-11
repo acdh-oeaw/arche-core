@@ -296,6 +296,21 @@ class RestController {
             filter_input(\INPUT_SERVER, self::getHttpHeaderName($purpose));
     }
 
+    static public function getRequestParameterAsArray(string $purpose): array {
+        $name = self::$requestParam[$purpose];
+        if (is_array($_POST[$name] ?? null)) {
+            return $_POST[$name];
+        }
+        if (is_array($_GET[$name] ?? null)) {
+            return $_GET[$name];
+        }
+        $value = filter_input(\INPUT_SERVER, self::getHttpHeaderName($purpose));
+        if (empty($value)) {
+            return [];
+        }
+        return array_map('trim', explode(',', $value));
+    }
+
     /**
      * 
      * @param string | OutputFile | MetadataReadOnly $output

@@ -1149,4 +1149,29 @@ class RestTest extends TestBase {
         $this->assertEquals($etag, $resp->getHeader('ETag')[0] ?? '');
         $this->assertNotEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
     }
+
+    public function testFilterOutputProperties(): void {
+        $meta     = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral('https://foo/bar', "baz");
+        $meta->addLiteral('https://baz/bar', "foo");
+        $location = $this->createMetadataResource($meta);
+
+        $opts = ['query' => ['resourceProperties[0]' => 'https://foo/bar']];
+        $resp = self::$client->request('get', $location . '/metadata', $opts);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $g    = new Graph();
+        $g->parse((string) $resp->getBody());
+        $meta = $g->resource($location);
+        $this->assertEquals('baz', (string) $meta->getLiteral('https://foo/bar'));
+        $this->assertNull($meta->getLiteral('https://baz/bar'));
+
+        $opts = ['headers' => [self::$config->rest->headers->resourceProperties => 'https://baz/bar']];
+        $resp = self::$client->request('get', $location . '/metadata', $opts);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $g    = new Graph();
+        $g->parse((string) $resp->getBody());
+        $meta = $g->resource($location);
+        $this->assertEquals('foo', (string) $meta->getLiteral('https://baz/bar'));
+        $this->assertNull($meta->getLiteral('https://foo/bar'));
+    }
 }
