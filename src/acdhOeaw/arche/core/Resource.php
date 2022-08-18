@@ -74,6 +74,12 @@ class Resource {
             $relProps   = RC::getRequestParameterAsArray('relativesProperties');
             $meta->loadFromDb($mode, $parentProp, $resProps, $relProps);
             RC::setOutput($meta, $format);
+
+            if (RC::$handlersCtl->hasHandlers('getMetadata')) {
+                $meta = new Metadata($this->id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                RC::$handlersCtl->handleResource('getMetadata', (int) $this->id, $meta, null);
+            }
         }
     }
 
@@ -157,6 +163,12 @@ class Resource {
             // RC::getRangeHeader() drops it for mutltiple ranges request
             $contentType = RC::getHeader('Content-Type')[0] ?? null;
             RC::setOutput(new OutputFile($path, RC::getRangeHeader(), $contentType));
+
+            if (RC::$handlersCtl->hasHandlers('get')) {
+                $meta = new Metadata($this->id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                RC::$handlersCtl->handleResource('get', (int) $this->id, $meta, $binary->getPath());
+            }
         }
     }
 
