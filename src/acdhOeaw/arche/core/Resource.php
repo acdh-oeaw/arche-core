@@ -78,7 +78,7 @@ class Resource {
             if (RC::$handlersCtl->hasHandlers('getMetadata')) {
                 $meta = new Metadata($this->id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
-                RC::$handlersCtl->handleResource('getMetadata', (int) $this->id, $meta, null);
+                RC::$handlersCtl->handleResource('getMetadata', (int) $this->id, $meta->getResource(), null);
             }
         }
     }
@@ -167,7 +167,7 @@ class Resource {
             if (RC::$handlersCtl->hasHandlers('get')) {
                 $meta = new Metadata($this->id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
-                RC::$handlersCtl->handleResource('get', (int) $this->id, $meta, $binary->getPath());
+                RC::$handlersCtl->handleResource('get', (int) $this->id, $meta->getResource(), $binary->getPath());
             }
         }
     }
