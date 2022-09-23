@@ -302,7 +302,7 @@ class Transaction {
             $this->setState(self::STATE_COMMIT);
         } catch (Throwable $e) {
             $this->setState(self::STATE_ROLLBACK);
-            $this->pdo->rollBack();
+            $this->pdo->commit();
             throw $e;
         }
         $this->releaseAndWait();
