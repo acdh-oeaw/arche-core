@@ -35,6 +35,4 @@ interface SpatialInterface {
     public function getSqlQuery(): string;
 
     public function isInputBinary(): bool;
-
-    public function getCanFail(): bool;
 }

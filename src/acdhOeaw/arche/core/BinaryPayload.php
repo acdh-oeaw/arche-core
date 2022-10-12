@@ -27,7 +27,6 @@
 namespace acdhOeaw\arche\core;
 
 use DateTime;
-use PDOException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
@@ -316,15 +315,7 @@ class BinaryPayload {
         if ($spatial->isInputBinary()) {
             $content = '\x' . bin2hex($content);
         }
-        try {
-            $query->execute([$this->id, $content]);
-        } catch (PDOException $e) {
-            if (!$spatial->getCanFail()) {
-                throw $e;
-            } else {
-                RC::$log->warning("\t\tno extent extracted");
-            }
-        }
+        $query->execute([$this->id, $content]);
     }
 
     private function toBytes(string $number): int {

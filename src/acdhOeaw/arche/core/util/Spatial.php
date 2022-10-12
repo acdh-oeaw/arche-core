@@ -48,7 +48,6 @@ class Spatial implements SpatialInterface {
                 SELECT st_geomfromgeojson(jsonb_path_query(?::jsonb, 'strict $.**.geometry')) AS geom
             ) t
             ",
-            false,
             false
         );
     }
@@ -73,7 +72,6 @@ class Spatial implements SpatialInterface {
                     ARRAY[ARRAY['kml', 'http://www.opengis.net/kml/2.2']]
                 )) AS geom
             ",
-            false,
             false
         );
     }
@@ -95,7 +93,6 @@ class Spatial implements SpatialInterface {
                     ARRAY[ARRAY['gml', 'http://www.opengis.net/gml']]
                 )) AS geom
             ",
-            false,
             false
         );
     }
@@ -115,19 +112,25 @@ class Spatial implements SpatialInterface {
             SELECT CASE st_srid(geom) > 0 WHEN true THEN geom ELSE null END AS geom 
             FROM st_minconvexhull(st_fromgdalraster(?)) AS geom
             ",
-            true,
             true
         );
     }
 
-    private string $query;
-    private bool $binary;
-    private bool $canFail;
+    /**
+     * 
+     * @var string
+     */
+    private $query;
 
-    public function __construct(string $query, bool $binary, bool $canFail) {
-        $this->query   = $query;
-        $this->binary  = $binary;
-        $this->canFail = $canFail;
+    /**
+     * 
+     * @var bool
+     */
+    private $binary;
+
+    public function __construct(string $query, bool $binary) {
+        $this->query  = $query;
+        $this->binary = $binary;
     }
 
     public function getSqlQuery(): string {
@@ -136,9 +139,5 @@ class Spatial implements SpatialInterface {
 
     public function isInputBinary(): bool {
         return $this->binary;
-    }
-
-    public function getCanFail(): bool {
-        return $this->canFail;
     }
 }
