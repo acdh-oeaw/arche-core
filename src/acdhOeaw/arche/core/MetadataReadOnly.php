@@ -150,6 +150,14 @@ class MetadataReadOnly {
         return RC::getBaseUrl() . $this->id;
     }
 
+    /**
+     * 
+     * @param string $mode
+     * @param string|null $parentProperty
+     * @param array<string> $resourceProperties
+     * @param array<string> $relativesProperties
+     * @return void
+     */
     public function loadFromDb(string $mode, ?string $parentProperty = null,
                                array $resourceProperties = [],
                                array $relativesProperties = []): void {

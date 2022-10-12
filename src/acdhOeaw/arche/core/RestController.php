@@ -296,6 +296,11 @@ class RestController {
             filter_input(\INPUT_SERVER, self::getHttpHeaderName($purpose));
     }
 
+    /**
+     * 
+     * @param string $purpose
+     * @return array<string>
+     */
     static public function getRequestParameterAsArray(string $purpose): array {
         $name = self::$requestParam[$purpose];
         if (is_array($_POST[$name] ?? null)) {
@@ -345,6 +350,11 @@ class RestController {
         self::$headers[$header][] = $value;
     }
 
+    /**
+     * 
+     * @param string $header
+     * @return array<string>
+     */
     static public function getHeader(string $header): array {
         return self::$headers[strtolower($header)] ?? [];
     }
@@ -368,7 +378,7 @@ class RestController {
             return null;
         }
 
-        $boundary = bin2hex(time());
+        $boundary = bin2hex((string) time());
         $ranges   = explode('=', $ranges);
         if (trim($ranges[0]) !== 'bytes' || count($ranges) !== 2) {
             throw new RepoException('Range Not Satisfiable ', 416);

@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\core\util;
 
+use acdhOeaw\arche\core\RepoException;
+
 /**
  * Outputs a file to a client optionally honoring the requested ranges.
  *
@@ -36,9 +38,20 @@ class OutputFile {
     const CHUNK_SIZE = 10485760; // 10 MB
 
     private string $path;
+
+    /**
+     * 
+     * @var array<int, array<string, mixed>>
+     */
     private array $ranges;
     private ?string $contentType;
 
+    /**
+     * 
+     * @param string $path
+     * @param array<int, array<string, mixed>>|null $ranges
+     * @param string|null $contentType
+     */
     public function __construct(string $path, ?array $ranges,
                                 ?string $contentType) {
         $this->path = $path;
@@ -85,7 +98,7 @@ class OutputFile {
                 header("Content-Length: $length");
             }
 
-            $fh = fopen($this->path, 'r');
+            $fh = fopen($this->path, 'r') ?: throw new RepoException("Failed to open $this->path");
             foreach ($this->ranges as $i) {
                 echo count($this->ranges) > 1 ? "$boundary\r\n$contentType\r\n" . $i['Content-Range'] . "\r\n\r\n" : "";
                 $pos = $i['from'];
