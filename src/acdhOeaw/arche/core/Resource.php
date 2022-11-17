@@ -60,7 +60,8 @@ class Resource {
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead();
         RC::$auth->checkAccessRights((int) $this->id, 'read', true);
-        $mode = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+        $reqMode = RC::getRequestParameter('metadataReadMode');
+        $mode    = $reqMode ?? RC::$config->rest->defaultMetadataReadMode;
         if ($mode === RRI::META_NONE) {
             http_response_code(204);
             return;
@@ -68,6 +69,9 @@ class Resource {
         $format = Metadata::negotiateFormat();
         RC::setHeader('Content-Type', $format);
         if ($get) {
+            if ($format == 'text/html' && $reqMode === null) {
+                $mode = '1_0_1_0';
+            }
             $meta       = new MetadataReadOnly((int) $this->id);
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $resProps   = RC::getRequestParameterAsArray('resourceProperties');
