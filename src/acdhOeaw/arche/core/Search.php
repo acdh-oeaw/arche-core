@@ -66,9 +66,15 @@ class Search {
             $params   = $_POST['sqlParam'] ?? [];
             $pdoStmnt = $repo->getPdoStatementBySqlQuery($_POST['sql'], $params, $config);
         } else {
+            $keys = [];
+            foreach (['property', 'value', 'language', 'type'] as $i) {
+                if (is_array($_POST[$i] ?? null)) {
+                    $keys += array_keys($_POST[$i]);
+                }
+            }
             $terms = [];
-            for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
-                $terms[] = SearchTerm::factory($n);
+            foreach (array_unique($keys) as $i) {
+                $terms[] = SearchTerm::factory($i);
             }
             $pdoStmnt = $repo->getPdoStatementBySearchTerms($terms, $config);
         }
