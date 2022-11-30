@@ -62,7 +62,7 @@ class Describe {
             'schema'    => RC::$config->schema,
             'collation' => [
                 'default'   => $collation,
-                'available' => RC::$pdo->query("SELECT DISTINCT collcollate FROM pg_collation ORDER BY 1")->fetchAll(PDO::FETCH_COLUMN),
+                'available' => RC::$pdo->query("SELECT DISTINCT collname FROM pg_collation ORDER BY 1")->fetchAll(PDO::FETCH_COLUMN),
             ],
         ];
         if (filter_input(\INPUT_GET, 'format') === 'application/json') {
