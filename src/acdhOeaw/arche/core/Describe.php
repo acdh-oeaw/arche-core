@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core;
 
+use PDO;
 use RuntimeException;
 use zozlak\HttpAccept;
 use Composer\InstalledVersions;
@@ -40,14 +41,29 @@ use function \GuzzleHttp\json_encode;
 class Describe {
 
     public function head(bool $get = false): void {
+        $query = "
+            SELECT coalesce(mv.collation_name, db.datcollate) 
+            FROM
+                (
+                    SELECT collation_name 
+                    FROM information_schema.columns 
+                    WHERE table_catalog = current_database() AND table_schema = 'public' AND table_name = 'metadata' AND column_name = 'value'
+                ) mv,
+                (SELECT datcollate FROM pg_database WHERE datname = current_database()) db
+        ";
+        $collation = RC::$pdo->query($query)->fetchColumn();
         $cfg = [
-            'version' => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
-            'rest'    => [
+            'version'   => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
+            'rest'      => [
                 'headers'  => RC::$config->rest->headers,
                 'urlBase'  => RC::$config->rest->urlBase,
                 'pathBase' => RC::$config->rest->pathBase
             ],
-            'schema'  => RC::$config->schema
+            'schema'    => RC::$config->schema,
+            'collation' => [
+                'default'   => $collation,
+                'available' => RC::$pdo->query("SELECT collname FROM pg_collation")->fetchAll(PDO::FETCH_COLUMN),
+            ],
         ];
         if (filter_input(\INPUT_GET, 'format') === 'application/json') {
             $format = 'application/json';
