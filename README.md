@@ -56,7 +56,8 @@ An environment allowing you to edit code in your host system and run all the tes
 
 ## REST API documentation
 
-https://app.swaggerhub.com/apis/zozlak/arche
+* https://app.swaggerhub.com/apis/zozlak/arche (Swagger/OpenAPI)
+* Guides on https://acdh-oeaw.github.io/arche-docs/
 
 ## Architecture
 
