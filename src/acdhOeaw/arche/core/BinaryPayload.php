@@ -311,9 +311,12 @@ class BinaryPayload {
             $spatial->getSqlQuery()
         );
         $query   = RC::$pdo->prepare($query);
-        $content = (string) file_get_contents($this->getPath(false));
+        $content = trim((string) file_get_contents($this->getPath(false)));
         if ($spatial->isInputBinary()) {
             $content = '\x' . bin2hex($content);
+        } elseif (substr($content, 0, 3) === hex2bin('EFBBBF')) {
+            // skip BOM
+            $content = substr($content, 3);
         }
         $query->execute([$this->id, $content]);
     }

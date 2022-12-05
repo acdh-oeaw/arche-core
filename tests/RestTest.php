@@ -907,6 +907,18 @@ class RestTest extends TestBase {
         $query->execute([$id]);
         $this->assertEquals(1, $query->fetchColumn());
 
+        // geojson with BOM
+        $headers['Content-Disposition'] = 'attachment; filename="test.geojson"';
+        $headers['Content-Type']        = 'application/geo+json';
+        $body                           = hex2bin('EFBBBF') . '{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [2, 3]}}]}';
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0];
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(1, 2), 4326)::geography");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
         // kml
         $headers['Content-Disposition'] = 'attachment; filename="test.kml"';
         $headers['Content-Type']        = 'application/vnd.google-earth.kml+xml';
