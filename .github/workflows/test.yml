@@ -44,7 +44,7 @@ jobs:
         sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/*/fpm/pool.d/www.conf
         sudo service apache2 restart
         sudo /etc/init.d/php8.1-fpm restart
-        chown +x /home/runner /home/runner/work
+        chmod +x /home/runner /home/runner/work
     - name: tika-cache
       uses: actions/cache@v2
       with:
