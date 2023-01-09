@@ -131,7 +131,9 @@ class Resource {
         $meta = RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta, null);
         $targetMeta->loadFromResource($meta);
 
-        $query = RC::$pdo->prepare("DELETE FROM resources WHERE id = ?");
+        $query = RC::$pdo->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $query->execute([self::STATE_DELETED, $srcId]);
+        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$srcId]);
         $targetMeta->save();
         $this->headMetadata(true);
