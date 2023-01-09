@@ -346,7 +346,8 @@ class TransactionController {
         $queryMetaSel     = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
         $queryFtsSel      = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
         $queryPrev        = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
-        $queryCur         = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        // order by state assures 'active' come first which allows avoiding identifiers conflict on restoring ids of deleted resources
+        $queryCur         = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ? ORDER BY state");
         $queryCur->execute([$txId]);
         $toRestore        = [];
         // deferred foreign key on relations.target_id won't work without a transaction
