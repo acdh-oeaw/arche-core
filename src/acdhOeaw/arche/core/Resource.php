@@ -126,7 +126,7 @@ class Resource {
         foreach (array_diff($meta->propertyUris(), [RC::$config->schema->id]) as $p) {
             $srcMeta->delete($p);
         }
-        $meta->deleteResource(RC::$config->schema->id, $meta->getUri());
+        $srcMeta->deleteResource(RC::$config->schema->id, $srcMeta->getUri());
         $meta->merge($srcMeta, [RC::$config->schema->id]);
         RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
         $meta = RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta, null);
