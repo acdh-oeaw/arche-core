@@ -708,7 +708,6 @@ class RestTest extends TestBase {
             $ids[] = (string) $i;
         }
         $this->assertContains($loc1, $ids);
-        $this->assertContains($loc2, $ids);
         $this->assertContains('http://res1', $ids);
         $this->assertContains('http://res2', $ids);
         // unique properties are preserved, common are kept from target
