@@ -355,8 +355,7 @@ class TransactionController {
         $curState->query("CREATE TEMPORARY TABLE _removed_ids AS SELECT * FROM identifiers LIMIT 0");
         while ($rid              = (int) $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
-            $state  = $queryPrev->fetchColumn();
-            $binary = new BinaryPayload($rid);
+            $state = $queryPrev->fetchColumn();
             if ($state === false) {
                 // resource didn't exist before - delete it but only if it's not referenced
                 // by a resource from other transaction (or no transaction at all)
@@ -366,6 +365,7 @@ class TransactionController {
                 $otherTx = $queryResDelCheck->fetchColumn();
                 if ($otherTx === false) {
                     $queryResDel->execute([$rid]);
+                    $binary = new BinaryPayload($rid);
                     $binary->delete();
                 } else {
                     $this->log->debug("    keeping $rid and migrating to transaction " . ($otherTx ?? 'null'));
@@ -406,8 +406,10 @@ class TransactionController {
                 $queryFtsIns->execute($i);
             }
 
-            if (isset($binary)) {
-                $binary->restore((string) $txId);
+            $binary = new BinaryPayload($rid);
+            $ret    = $binary->restore((string) $txId, $this->log);
+            if ($ret) {
+                $this->log->debug("    binary state of $rid restored");
             }
         }
         $curState->commit();

@@ -200,15 +200,30 @@ class BinaryPayload {
         return $meta;
     }
 
-    public function backup(string $suffix): bool {
+    public function backup(string $suffix): void {
         $srcPath = $this->getPath(false);
-        return file_exists($srcPath) && rename($srcPath, $this->getPath(true, $suffix));
+        $dstPath = $this->getPath(true, $suffix);
+        if (file_exists($srcPath)) {
+            rename($srcPath, $dstPath);
+        } else {
+            // mark there was no content
+            file_put_contents($dstPath, '');
+        }
     }
 
     public function restore(string $suffix): bool {
         $backupPath = $this->getPath(false, $suffix);
         if (file_exists($backupPath)) {
-            return rename($backupPath, $this->getPath(true));
+            $targetPath = $this->getPath(true);
+            if (filesize($backupPath) > 0) {
+                rename($backupPath, $targetPath);
+            } else {
+                unlink($backupPath);
+                if (file_exists($targetPath)) {
+                    unlink($targetPath);
+                }
+            }
+            return true;
         }
         return false;
     }

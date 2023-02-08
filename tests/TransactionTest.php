@@ -31,6 +31,7 @@ use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use function \GuzzleHttp\json_encode;
 use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\core\BinaryPayload;
 
 /**
  * Description of TransactionTest
@@ -351,17 +352,16 @@ class TransactionTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    
-   /**
-    * - tx1 creates res1 and res2
-    * - tx2 creates res3 pointing to res1
-    * - tx1 is rolled back
-    * - tx2 is commited
-    * res 1 should stay because it's referenced by res3 while res2 should be 
-    * deleted by the transaction controller
-    * 
-    * @group transactions
-    */
+    /**
+     * - tx1 creates res1 and res2
+     * - tx2 creates res3 pointing to res1
+     * - tx1 is rolled back
+     * - tx2 is commited
+     * res 1 should stay because it's referenced by res3 while res2 should be 
+     * deleted by the transaction controller
+     * 
+     * @group transactions
+     */
     public function testParallelCommonResourceRollbackCommit(): void {
         $relProp = self::$config->schema->parent;
 
@@ -377,17 +377,74 @@ class TransactionTest extends TestBase {
         sleep(2);
 
         $meta3 = $this->getResourceMeta($loc3);
-        $this->assertEquals($loc1, (string)$meta3->getResource($relProp));
-        
-        $req1 = new Request('get', "$loc1/metadata");
+        $this->assertEquals($loc1, (string) $meta3->getResource($relProp));
+
+        $req1  = new Request('get', "$loc1/metadata");
         $resp1 = self::$client->send($req1);
         $this->assertEquals(200, $resp1->getStatusCode());
-        $req2 = new Request('get', "$loc2/metadata");
+        $req2  = new Request('get', "$loc2/metadata");
         $resp2 = self::$client->send($req2);
         $this->assertEquals(404, $resp2->getStatusCode());
-        
-    }    
-    
+    }
+
+    /**
+     * - create a metadata-only resource in a separate transaction
+     * - upload its binary in the other transaction and rollback this transaction
+     */
+    public function testMetaToBinaryRollback(): void {
+        $loc        = $this->createMetadataResource();
+        $rid        = (int) preg_replace('`^.*/`', '', $loc);
+        $storageLoc = BinaryPayload::getStorageDir($rid, self::$config->storage->dir, 0, self::$config->storage->levels) . "/$rid";
+        $testReq    = new Request('get', $loc, ['Eppn' => 'admin']);
+
+        $tx   = $this->beginTransaction();
+        $resp = self::$client->send($testReq);
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertEquals("$loc/metadata", $resp->getHeader('Location')[0] ?? '');
+
+        $headers = [
+            self::$config->rest->headers->transactionId => $tx,
+            'Content-Disposition'                       => 'attachment; filename="test.ttl"',
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
+        ];
+        $req     = new Request('put', $loc, $headers, (string) file_get_contents(__DIR__ . '/data/test.ttl'));
+        $resp    = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $resp    = self::$client->send($testReq);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals((string) file_get_contents(__DIR__ . '/data/test.ttl'), (string) $resp->getBody());
+        $this->assertFileExists($storageLoc);
+
+        $this->rollbackTransaction($tx);
+        $resp = self::$client->send($testReq);
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertFileDoesNotExist($storageLoc);
+    }
+
+    public function testUpdateBinaryRollback(): void {
+        $loc         = $this->createBinaryResource();
+        $testReq     = new Request('get', $loc, ['Eppn' => 'admin']);
+        $prevContent = (string) self::$client->send($testReq)->getBody();
+
+        $tx      = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $tx,
+            'Eppn'                                      => 'admin',
+        ];
+        $req     = new Request('put', $loc, $headers, "adjusted content");
+        $resp    = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $resp    = self::$client->send($testReq);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals("adjusted content", (string) $resp->getBody());
+
+        $this->rollbackTransaction($tx);
+        $resp = self::$client->send($testReq);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals($prevContent, (string) $resp->getBody());
+    }
+
     /**
      * @group transactions
      */

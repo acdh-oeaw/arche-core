@@ -183,6 +183,7 @@ class Resource {
         $this->checkCanWrite();
 
         $binary = new BinaryPayload((int) $this->id);
+        $binary->backup((string) RC::$transaction->getId());
         $binary->upload();
 
         $meta = new Metadata($this->id);
