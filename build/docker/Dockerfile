@@ -16,8 +16,8 @@ RUN locale-gen en_US.UTF-8 && \
     rm /var/www/html/* && \
     chown -R www-data:www-data /var/www && \
     su -l www-data -c 'mkdir /var/www/tika' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.4.1/tika-server-standard-2.4.1.jar > /var/www/tika/tika-server.jar' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.4.1/tika-app-2.4.1.jar > /var/www/tika/tika-app.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.7.0/tika-server-standard-2.7.0.jar > /var/www/tika/tika-server.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.7.0/tika-app-2.7.0.jar > /var/www/tika/tika-app.jar' && \
     chown -R www-data:www-data /var/run/postgresql
 COPY /root /
 WORKDIR /var/www/html
