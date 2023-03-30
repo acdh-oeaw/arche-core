@@ -55,17 +55,24 @@ class BinaryPayload {
     private int $id;
     private ?string $hash;
     private int $size;
+    private string $tmpPath;
 
     public function __construct(int $id) {
         $this->id = $id;
     }
 
+    public function __destruct() {
+        if (!empty($this->tmpPath) && file_exists($this->tmpPath)) {
+            unlink($this->tmpPath);
+        }
+    }
+
     public function upload(): void {
-        $tmpPath    = RC::$config->storage->tmpDir . '/' . $this->id;
-        $input      = fopen('php://input', 'rb') ?: throw new RepoException("Failed to open request body as a file");
-        $output     = fopen($tmpPath, 'wb') ?: throw new RepoException("Failed to open local temporary storage");
-        $this->size = 0;
-        $hash       = hash_init(RC::$config->storage->hashAlgorithm);
+        $this->tmpPath = RC::$config->storage->tmpDir . '/' . $this->id;
+        $input         = fopen('php://input', 'rb') ?: throw new RepoException("Failed to open request body as a file");
+        $output        = fopen($this->tmpPath, 'wb') ?: throw new RepoException("Failed to open local temporary storage");
+        $this->size    = 0;
+        $hash          = hash_init(RC::$config->storage->hashAlgorithm);
         while (!feof($input)) {
             $buffer     = (string) fread($input, 1048576);
             hash_update($hash, $buffer);
@@ -78,13 +85,6 @@ class BinaryPayload {
         $digest = filter_input(INPUT_SERVER, 'HTTP_DIGEST'); // client-side hash to be compared after the upload
         if (!empty($digest)) {
             //TODO - see https://fedora.info/2018/11/22/spec/#http-post
-        }
-
-        $targetPath = $this->getPath(true);
-        rename($tmpPath, $targetPath);
-        if ($this->size === 0) {
-            $this->hash = null;
-            unlink($targetPath);
         }
 
         list($mimeType, $fileName) = $this->getRequestMetadataRaw();
@@ -115,6 +115,13 @@ class BinaryPayload {
             $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
             RC::$log->debug("skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+        }
+
+        $targetPath = $this->getPath(true);
+        rename($this->tmpPath, $targetPath);
+        if ($this->size === 0) {
+            $this->hash = null;
+            unlink($targetPath);
         }
     }
 
@@ -289,7 +296,7 @@ class BinaryPayload {
         $tika  = RC::$config->fullTextSearch->tikaLocation;
         if (substr($tika, 0, 4) === 'http') {
             $client = new Client(['http_errors' => false]);
-            $input  = fopen($this->getPath(false), 'r') ?: throw new RepoException("Failed to open binary for indexing");
+            $input  = fopen($this->tmpPath, 'r') ?: throw new RepoException("Failed to open binary for indexing");
             $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
             $resp   = $client->send($req);
             if ($resp->getStatusCode() === 200) {
@@ -326,7 +333,7 @@ class BinaryPayload {
             $spatial->getSqlQuery()
         );
         $query   = RC::$pdo->prepare($query);
-        $content = trim((string) file_get_contents($this->getPath(false)));
+        $content = (string) file_get_contents($this->tmpPath);
         if ($spatial->isInputBinary()) {
             $content = '\x' . bin2hex($content);
         } elseif (substr($content, 0, 3) === hex2bin('EFBBBF')) {

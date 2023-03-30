@@ -116,17 +116,8 @@ class Spatial implements SpatialInterface {
         );
     }
 
-    /**
-     * 
-     * @var string
-     */
-    private $query;
-
-    /**
-     * 
-     * @var bool
-     */
-    private $binary;
+    private string $query;
+    private bool $binary;
 
     public function __construct(string $query, bool $binary) {
         $this->query  = $query;
