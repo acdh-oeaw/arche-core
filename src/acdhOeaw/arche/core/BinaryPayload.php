@@ -114,7 +114,7 @@ class BinaryPayload {
             RC::$log->debug("\tupdating spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
             $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
-            RC::$log->debug("skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+            RC::$log->debug("\tskipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
 
         $targetPath = $this->getPath(true);
@@ -310,7 +310,7 @@ class BinaryPayload {
             }
         } else {
             $output = $ret    = '';
-            exec($tika . ' ' . escapeshellarg($this->getPath(false)), $output, $ret);
+            exec($tika . ' ' . escapeshellarg($this->tmpPath) . ' 2>&1', $output, $ret);
             $output = implode($output);
             if ($ret === 0) {
                 $bodyLen = strlen($output);
@@ -319,6 +319,8 @@ class BinaryPayload {
                 }
                 $query->execute([$this->id, $output, $bodyLen <= $limit ? $output : null]);
                 $result = true;
+            } else {
+                RC::$log->error("\t\textraction failed with code $ret and message: $output");
             }
         }
         return $result;

@@ -330,8 +330,8 @@ class SearchTest extends TestBase {
         $this->assertCount(3, $r->propertyUris());
         $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
         $r       = $g->resource($this->m[2]);
-        $allowed = ['https://size', 'http://createUser'];
-        $this->assertCount(2, $r->propertyUris());
+        $allowed = ['https://size', 'http://createUser', 'https://relation'];
+        $this->assertCount(3, $r->propertyUris());
         $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
     }
 
