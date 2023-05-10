@@ -199,7 +199,7 @@ TMPL;
         fwrite($this->stream, sprintf(self::TMPL, $title, $header));
 
         foreach ($this->data as $id => $props) {
-            fwrite($this->stream, '        <div class="s">' . $this->formatResource($baseUrl . $id) . "</div>\n");
+            fwrite($this->stream, '        <a href="' . htmlentities($baseUrl . $id) . '" class="s">' . $this->formatResource($baseUrl . $id) . "</a>\n");
             // title
             $this->outputProperty($props[$titleProp] ?? [], $titleProp, $baseUrl);
             // ids
