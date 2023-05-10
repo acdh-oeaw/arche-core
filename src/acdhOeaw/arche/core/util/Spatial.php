@@ -43,9 +43,18 @@ class Spatial implements SpatialInterface {
     static public function fromGeojson(): Spatial {
         return new self(
             "
-            SELECT st_union(geom) AS geom 
+            WITH
+                input AS (
+                    SELECT ?::jsonb AS geojson
+                ),
+                srid AS (
+                    SELECT substring(coalesce(geojson->'crs'->'properties'->>'name', '4326') from '[0-9]+$')::int AS srid
+                    FROM input
+                )
+            SELECT st_union(geom) AS geom
             FROM (
-                SELECT st_geomfromgeojson(jsonb_path_query(?::jsonb, 'strict $.**.geometry')) AS geom
+                SELECT st_setsrid(st_geomfromgeojson(jsonb_path_query(geojson, 'strict $.**.geometry')), srid) AS geom
+                FROM input, srid
             ) t
             ",
             false
