@@ -40,24 +40,27 @@ use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Specialized version of the Metadata class.
- * Supports only read from database but developed with low memory footprint in mind.
+ * Supports only reading the metadata but can stream the output assuring small
+ * memory footprint.
  * 
  * Uses various serializers depending on the output format.
  * 
- * API is a subset of the Metadata class API.
- *
  * @author zozlak
  */
 class MetadataReadOnly {
 
     private int $id;
+    private string $format;
     private RepoDb $repo;
     private PDOStatement $pdoStmnt;
+    private bool $pdoStmntSafe = false;
 
     /**
-     * Number of triples cached before the RdfNamespace object initialization
+     * Parameters of the loadFromDb call stored for lazy initialization.
+     * 
+     * @var array<string, mixed>
      */
-    private int $triplesCacheCount = 1000;
+    private array $loadFromDbParams;
 
     /**
      * 
@@ -73,7 +76,14 @@ class MetadataReadOnly {
         return RC::getBaseUrl() . $this->id;
     }
 
+    public function setFormat(string $format): void {
+        $this->format = $format;
+    }
+
     /**
+     * Sets up parameters for loading the metadata from the database.
+     * 
+     * The actual data loading happens when the lazyLoadFromDb() is called.
      * 
      * @param string $mode
      * @param string|null $parentProperty
@@ -84,57 +94,93 @@ class MetadataReadOnly {
     public function loadFromDb(string $mode, ?string $parentProperty = null,
                                array $resourceProperties = [],
                                array $relativesProperties = []): void {
-        $schema         = new Schema(RC::$config->schema);
-        $headers        = new Schema(RC::$config->rest->headers);
-        $nonRelProp     = RC::$config->metadataManagment->nonRelationProperties;
-        $this->repo     = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
-        //$this->repo->setQueryLog(RC::$log);
-        $res            = new RepoResourceDb((string) $this->id, $this->repo);
-        $this->pdoStmnt = $res->getMetadataStatement($mode, $parentProperty, $resourceProperties, $relativesProperties);
-    }
-
-    public function loadFromPdoStatement(RepoDb $repo,
-                                         PDOStatement $pdoStatement): void {
-        $this->repo     = $repo;
-        $this->pdoStmnt = $pdoStatement;
-    }
-
-    public function sendOutput(): void {
-        rewind($this->stream);
-        fpassthru($this->stream);
-        fclose($this->stream);
+        $this->loadFromDbParams = [
+            'mode'                => $mode,
+            'parentProperty'      => $parentProperty,
+            'resourceProperties'  => $resourceProperties,
+            'relativesProperties' => $relativesProperties,
+        ];
     }
 
     /**
      * 
-     * @param string $format
-     * @throws RepoException
+     * @param RepoDb $repo
+     * @param PDOStatement $pdoStatement
+     * @param bool $safe set to `true` if the `$pdoStatement` does not require
+     *   to be freed on the `freeDbConnection()` call
+     * @return void
      */
-    public function generateOutput(string $format): void {
-        $this->stream = fopen('php://temp', 'rw') ?: throw new RepoException("Failed to open output stream");
-        
-        if ($format === 'text/html') {
+    public function loadFromPdoStatement(RepoDb $repo,
+                                         PDOStatement $pdoStatement,
+                                         bool $safe = false): void {
+        $this->repo         = $repo;
+        $this->pdoStmnt     = $pdoStatement;
+        $this->pdoStmntSafe = $safe;
+    }
+
+    public function sendOutput(int $triplesCacheCount = 1000): void {
+        try {
+            if (isset($this->stream)) {
+                rewind($this->stream);
+                fpassthru($this->stream);
+                fclose($this->stream);
+            } else {
+                RC::$log->debug("Streaming the output");
+                $this->stream = fopen('php://output', 'w') ?: throw new RepoException("Failed to open output stream");
+                $this->generateOutput($triplesCacheCount);
+                fclose($this->stream);
+            }
+        } catch (\Throwable $ex) {
+            http_response_code(500);
+            RC::$log->error($ex);
+        }
+    }
+
+    public function freeDbConnection(): void {
+        if (isset($this->pdoStmnt) && !$this->pdoStmntSafe) {
+            RC::$log->debug("Materializing output in the memory");
+            $this->stream = fopen('php://temp', 'rw') ?: throw new RepoException("Failed to open output stream");
+            $this->generateOutput();
+        }
+    }
+
+    public function lazyLoadFromDb(): void {
+        if (isset($this->pdoStmnt) || !isset($this->loadFromDbParams)) {
+            return;
+        }
+        $schema     = new Schema(RC::$config->schema);
+        $headers    = new Schema(RC::$config->rest->headers);
+        $nonRelProp = RC::$config->metadataManagment->nonRelationProperties;
+        $this->repo = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
+        //$this->repo->setQueryLog(RC::$log);
+
+        $res = new RepoResourceDb((string) $this->id, $this->repo);
+
+        $mode           = $this->loadFromDbParams['mode'];
+        $parentProp     = $this->loadFromDbParams['parentProperty'];
+        $resProps       = $this->loadFromDbParams['resourceProperties'];
+        $relProps       = $this->loadFromDbParams['relativesProperties'];
+        $this->pdoStmnt = $res->getMetadataStatement($mode, $parentProp, $resProps, $relProps);
+        unset($this->loadFromDbParams);
+    }
+
+    private function generateOutput(int $triplesCacheCount): void {
+        if ($this->format === 'text/html') {
             $serializer = new MetadataGui($this->stream, $this->pdoStmnt, $this->id);
             $serializer->output();
         } else {
-            try {
-                $serializer = Serializer::getSerializer($format);
-            } catch (RdfIoException) {
-                throw new RepoException("Unsupported metadata format requested", 400);
-            }
-            $iter = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $this->triplesCacheCount);
-
-            // prepare URI namespace aliases
-            $nmsp = $this->getRdfNamespace($iter);
-
+            $serializer = Serializer::getSerializer($this->format);
+            $iter       = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
+            $nmsp       = $this->getNamespaces($iter, $triplesCacheCount);
             $serializer->serializeStream($this->stream, $iter, $nmsp);
         }
         unset($this->pdoStmnt);
+        unset($this->repo);
     }
 
-    private function getRdfNamespace(TriplesIterator $iter): RdfNamespaceInterface {
+    private function getNamespaces(TriplesIterator $iter, int $triplesCacheCount): RdfNamespaceInterface {
         $nmsp = new RdfNamespace();
-        for ($n = 0; $n < $this->triplesCacheCount - 1 && $iter->valid(); $n++) {
+        for ($n = 0; $n < $triplesCacheCount - 1 && $iter->valid(); $n++) {
             $quad = $iter->current();
             $nmsp->shorten($quad->getSubject(), true);
             $nmsp->shorten($quad->getPredicate(), true);

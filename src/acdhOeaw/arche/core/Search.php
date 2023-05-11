@@ -51,6 +51,7 @@ class Search {
         $this->pdo = new PDO(RC::$config->dbConn->guest);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_search");
+        $this->pdo->query("BEGIN TRANSACTION READ ONLY");
 
         $schema                         = new Schema(RC::$config->schema);
         $headers                        = new Schema(RC::$config->rest->headers);
@@ -80,7 +81,7 @@ class Search {
         }
 
         $meta = new MetadataReadOnly(0);
-        $meta->loadFromPdoStatement($repo, $pdoStmnt);
+        $meta->loadFromPdoStatement($repo, $pdoStmnt, true);
         if ($config->metadataMode === RRI::META_NONE) {
             http_response_code(204);
             return;

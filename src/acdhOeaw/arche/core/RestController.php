@@ -230,13 +230,15 @@ class RestController {
                 throw new RepoException('Not Found', 404);
             }
 
-            // free the database connection
             if (self::$output instanceof MetadataReadOnly) {
-                self::setHeader('Content-Type', self::$headers['content-type'][0] ?? self::$config->rest->defaultMetadataFormat);
-                self::$output->generateOutput(self::$headers['content-type'][0]);
+                self::$output->freeDbConnection();
             }
             self::$transaction->prolong();
             self::$pdo->commit();
+            if (self::$output instanceof MetadataReadOnly) {
+                // here it doesn't lock the database any more but errors will still be captured
+                self::$output->lazyLoadFromDb();
+            }
         } catch (BadRequestException $ex) {
             $statusCode = $ex->getCode();
             echo $ex->getMessage();
@@ -247,7 +249,6 @@ class RestController {
             $statusCode = $ex->getCode() === Transaction::PG_LOCK_FAILURE ? 409 : 500;
             echo $ex->getMessage();
         } catch (Throwable $ex) {
-            self::$log->error($ex);
             $statusCode = 500;
         } finally {
             if (isset($ex)) {
@@ -273,7 +274,7 @@ class RestController {
             if (isset($statusCode)) {
                 http_response_code($statusCode);
             }
-            // output the response AFTER setting the HTTP response code
+            // output the response AFTER setting the HTTP response code and BEFORE unlocking resources
             self::sendOutput();
 
             self::$transaction->unlockResources(self::$logId);
@@ -327,6 +328,9 @@ class RestController {
         self::$output = $output;
         if (!empty($mimeType)) {
             self::setHeader('Content-Type', $mimeType);
+            if ($output instanceof MetadataReadOnly) {
+                $output->setFormat($mimeType);
+            }
         }
     }
 
