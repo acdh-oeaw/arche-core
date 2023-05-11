@@ -20,8 +20,8 @@
         "zozlak/logging": "^1",
         "zozlak/rdf-constants": "^1",
         "php-amqplib/php-amqplib": "^3.1",
-        "pietercolpaert/hardf": "^0.2.0",
-        "ml/json-ld": "^1.2"
+        "sweetrdf/quick-rdf-io": "^1.0",
+        "sweetrdf/simple-rdf": "^1.0"
     },
     "autoload": {
         "psr-4": {
@@ -33,5 +33,6 @@
         "phpunit/phpunit": "^9",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
-    }
+    },
+    "minimum-stability": "RC"
 }

@@ -162,7 +162,7 @@ TMPL;
                     $this->data[$triple->value][self::CHILD_PROP] = [];
                 }
                 $t                                              = clone($triple);
-                $t->value                                       = $t->id;
+                $t->value                                       = (string) $t->id;
                 $this->data[$triple->value][self::CHILD_PROP][] = $t;
             }
         }
@@ -178,7 +178,7 @@ TMPL;
         unset($v);
 
         foreach ($this->titles as $k => &$v) {
-            $v = htmlentities($v->value);
+            $v = htmlentities((string) $v->value);
         }
         unset($v);
     }
