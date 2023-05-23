@@ -44,10 +44,11 @@ use acdhOeaw\arche\core\util\OutputFile;
  */
 class RestController {
 
-    const ID_CREATE    = 0;
-    const ACCESS_READ  = 1;
-    const ACCESS_WRITE = 2;
-    const CORS_ORIGIN  = '__origin__';
+    const ID_CREATE             = 0;
+    const ACCESS_READ           = 1;
+    const ACCESS_WRITE          = 2;
+    const CORS_ORIGIN           = '__origin__';
+    const TRIPLES_CACHE_DEFAULT = 1000;
 
     /**
      * 
@@ -412,7 +413,7 @@ class RestController {
             }
         }
         if (is_object(self::$output)) {
-            self::$output->sendOutput();
+            self::$output->sendOutput(self::$config->rest->outputTriplesCache ?? self::TRIPLES_CACHE_DEFAULT);
         } else {
             echo self::$output;
         }
