@@ -31,7 +31,7 @@ use rdfInterface\NamedNodeInterface;
 use rdfInterface\RdfNamespaceInterface;
 use simpleRdf\RdfNamespace;
 use quickRdfIo\Util as Serializer;
-use quickRdfIo\RdfIoException;
+use quickRdfIo\JsonLdStreamSerializer;
 use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\RepoDb;
 use acdhOeaw\arche\lib\RepoResourceDb;
@@ -169,9 +169,15 @@ class MetadataReadOnly {
             $serializer = new MetadataGui($this->stream, $this->pdoStmnt, $this->id);
             $serializer->output();
         } else {
-            $serializer = Serializer::getSerializer($this->format);
-            $iter       = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
-            $nmsp       = $this->getNamespaces($iter, $triplesCacheCount);
+            $jsonld = ['application/ld+json', 'application/json'];
+            if (in_array($this->format, $jsonld)) {
+                // TODO and what about initializing $nmsp first, then checking the triples count and for small enough counts using the non-streaming?
+                $serializer = new JsonLdStreamSerializer(JsonLdStreamSerializer::MODE_TRIPLES);
+            } else {
+                $serializer = Serializer::getSerializer($this->format);
+            }
+            $iter = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
+            $nmsp = $this->getNamespaces($iter, $triplesCacheCount);
             $serializer->serializeStream($this->stream, $iter, $nmsp);
         }
         unset($this->pdoStmnt);
