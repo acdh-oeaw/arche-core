@@ -169,15 +169,17 @@ class MetadataReadOnly {
             $serializer = new MetadataGui($this->stream, $this->pdoStmnt, $this->id);
             $serializer->output();
         } else {
+            $iter       = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
+            $nmsp       = $this->getNamespaces($iter, $triplesCacheCount);
+            $largeCount = $iter->key() !== null;
+            $iter->rewind();
+
             $jsonld = ['application/ld+json', 'application/json'];
-            if (in_array($this->format, $jsonld)) {
-                // TODO and what about initializing $nmsp first, then checking the triples count and for small enough counts using the non-streaming?
+            if ($largeCount && in_array($this->format, $jsonld)) {
                 $serializer = new JsonLdStreamSerializer(JsonLdStreamSerializer::MODE_TRIPLES);
             } else {
                 $serializer = Serializer::getSerializer($this->format);
             }
-            $iter = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
-            $nmsp = $this->getNamespaces($iter, $triplesCacheCount);
             $serializer->serializeStream($this->stream, $iter, $nmsp);
         }
         unset($this->pdoStmnt);
@@ -196,7 +198,6 @@ class MetadataReadOnly {
             }
             $iter->next();
         }
-        $iter->rewind();
         return $nmsp;
     }
 }
