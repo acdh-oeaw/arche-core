@@ -732,6 +732,65 @@ class RestTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
+    /**
+     * @see https://github.com/acdh-oeaw/arche-core/issues/28
+     * @return void
+     */
+    public function testMergeRollback(): void {
+        $idProp = self::$config->schema->id;
+
+        $meta1 = (new Graph())->resource(self::$baseUrl);
+        $meta1->addResource($idProp, 'http://res1');
+        $meta1->addLiteral('http://bar', '1');
+        $meta2 = (new Graph())->resource(self::$baseUrl);
+        $meta2->addResource($idProp, 'http://res2');
+        $meta2->addLiteral('http://bar', 'A');
+        $loc1  = $this->createMetadataResource($meta1);
+        $loc2  = $this->createMetadataResource($meta2);
+        $id1   = substr($loc1, strlen(self::$baseUrl));
+        $id2   = substr($loc2, strlen(self::$baseUrl));
+
+        // as the https://github.com/acdh-oeaw/arche-core/issues/28 depends on
+        // the order of rows returned by the database query try different
+        // resource merging order and repeat the test a few times
+        foreach ([0, 1] as $order) {
+            $mergeUrl = $order ? "$id2/$id1" : "$id1/$id2";
+            for ($i = 0; $i < 3; $i++) {
+                $txId                                                    = $this->beginTransaction();
+                $headers                                                 = $this->getHeaders($txId);
+                $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
+
+                $req  = new Request('put', self::$baseUrl . "merge/$mergeUrl", $headers);
+                $resp = self::$client->send($req);
+                $this->assertEquals(200, $resp->getStatusCode());
+                $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+                $this->assertEquals($order ? 200 : 404, $resp->getStatusCode(), "$mergeUrl");
+                $resp = self::$client->send(new Request('get', "$loc2/metadata"));
+                $this->assertEquals($order ? 404 : 200, $resp->getStatusCode(), "$mergeUrl");
+
+                $this->assertEquals(204, $this->rollbackTransaction($txId));
+
+                $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
+                $this->assertEquals(200, $resp->getStatusCode());
+                $g       = new Graph();
+                $g->parse((string) $resp->getBody());
+                $metaRes = $g->resource($loc1);
+                $ids     = array_map(fn($x) => (string) $x, $metaRes->allResources($idProp));
+                $this->assertContains('http://res1', $ids);
+                $this->assertEquals('1', (string) $metaRes->getLiteral('http://bar'));
+
+                $resp    = self::$client->send(new Request('get', "$loc2/metadata"));
+                $this->assertEquals(200, $resp->getStatusCode());
+                $g       = new Graph();
+                $g->parse((string) $resp->getBody());
+                $metaRes = $g->resource($loc2);
+                $ids     = array_map(fn($x) => (string) $x, $metaRes->allResources($idProp));
+                $this->assertContains('http://res2', $ids);
+                $this->assertEquals('A', (string) $metaRes->getLiteral('http://bar'));
+            }
+        }
+    }
+
     public function testBadMetaMethod(): void {
         $location = $this->createBinaryResource();
         $headers  = [
