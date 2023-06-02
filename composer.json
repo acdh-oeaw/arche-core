@@ -15,7 +15,7 @@
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7 | ^6",
         "acdh-oeaw/easyrdf": ">=0.15.3",
-        "acdh-oeaw/arche-lib": "^5.5.0-RC5",
+        "acdh-oeaw/arche-lib": "^5.5.1",
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": "^1",
         "zozlak/rdf-constants": "^1",
@@ -33,6 +33,5 @@
         "phpunit/phpunit": "^9",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
-    },
-    "minimum-stability": "RC"
+    }
 }
