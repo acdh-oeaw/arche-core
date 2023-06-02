@@ -404,7 +404,7 @@ class Transaction {
         $query->execute([$this->id]);
         $data  = $query->fetchObject();
         if ($data === false) {
-            throw new BadRequestException("Transaction $this->id doesn't exist");
+            throw new BadRequestException("Transaction $this->id doesn't exist", 400);
         }
         $this->startedAt   = $data->started;
         $this->lastRequest = $data->last;

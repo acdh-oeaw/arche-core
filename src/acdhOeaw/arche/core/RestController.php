@@ -139,9 +139,11 @@ class RestController {
             self::$log->error($e);
             http_response_code($e->getCode());
             echo $e->getMessage();
+            self::logFinalStatus();
         } catch (Throwable $e) {
             self::$log->error($e);
             http_response_code(500);
+            self::logFinalStatus();
         }
         self::setHeader('Cache-Control', 'no-cache');
     }
@@ -279,9 +281,7 @@ class RestController {
             self::sendOutput();
 
             self::$transaction->unlockResources(self::$logId);
-
-            self::$log->info("Return code " . http_response_code());
-            self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
+            self::logFinalStatus();
         }
     }
 
@@ -419,5 +419,10 @@ class RestController {
         }
         self::$output  = '';
         self::$headers = [];
+    }
+
+    static private function logFinalStatus(): void {
+        self::$log->info("Return code " . http_response_code());
+        self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
     }
 }
