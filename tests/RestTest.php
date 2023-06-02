@@ -33,6 +33,7 @@ use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\Metadata;
+use acdhOeaw\arche\core\BinaryPayload;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
@@ -755,7 +756,9 @@ class RestTest extends TestBase {
         // resource merging order and repeat the test a few times
         foreach ([0, 1] as $order) {
             $mergeUrl = $order ? "$id2/$id1" : "$id1/$id2";
-            for ($i = 0; $i < 3; $i++) {
+            for ($i = 0;
+                $i < 3;
+                $i++) {
                 $txId                                                    = $this->beginTransaction();
                 $headers                                                 = $this->getHeaders($txId);
                 $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
@@ -1112,7 +1115,9 @@ class RestTest extends TestBase {
 
         $chunkSize = 100;
         $data      = '';
-        for ($i = 0; $i < $length; $i += $chunkSize) {
+        for ($i = 0;
+            $i < $length;
+            $i += $chunkSize) {
             $upperRange       = min($length - 1, $i + $chunkSize - 1);
             $headers['Range'] = "bytes=$i-$upperRange";
             $resp             = self::$client->send(new Request('get', $location, $headers));
@@ -1144,7 +1149,9 @@ class RestTest extends TestBase {
         $body             = explode("--$boundary", $body);
         $this->assertCount(5, $body);
         $ranges           = [[], [50, 99], [75, 99], [25, 83]];
-        for ($i = 1; $i < 4; $i++) {
+        for ($i = 1;
+            $i < 4;
+            $i++) {
             $tmp = explode("\r\n", $body[$i]);
             $this->assertEquals('', $tmp[0]);
             $this->assertEquals('Content-Type: text/turtle', $tmp[1]);
@@ -1244,5 +1251,114 @@ class RestTest extends TestBase {
         $meta = $g->resource($location);
         $this->assertEquals('foo', (string) $meta->getLiteral('https://baz/bar'));
         $this->assertNull($meta->getLiteral('https://foo/bar'));
+    }
+
+    /**
+     * Tests hardcore failures on binary upload which should not normally happen.
+     * Still we want to make sure they are handled correctly and no binaries get
+     * corrupted, etc.
+     */
+    public function testPutErrors1(): void {
+        // create meta-only resource
+        $location   = $this->createMetadataResource();
+        $id         = preg_replace('`^.*/`', '', $location);
+        $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
+        $req        = new Request('get', $location, $this->getHeaders());
+        $resp       = self::$client->send($req);
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertFileDoesNotExist($binaryPath);
+
+        $tmpDir   = self::$config->storage->tmpDir;
+        $txHeader = self::$config->rest->headers->transactionId;
+        $headers  = [
+            self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
+            'Content-Disposition'                          => 'attachment; filename="RestTest.php"',
+            'Content-Type'                                 => 'application/php',
+            'Eppn'                                         => 'admin',
+        ];
+        $body     = (string) file_get_contents(__FILE__);
+
+        // scenario 1. breaking the full text search indexing throws error in BinaryPayload::upload()
+        self::$pdo->beginTransaction();
+        self::$pdo->query("LOCK TABLE full_text_search IN EXCLUSIVE MODE");
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, $body);
+        $resp               = self::$client->send($req);
+        self::$pdo->rollBack();
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->waitForTransactionEnd($txId);
+        $this->assertCount(2, scandir($tmpDir));
+        $this->assertCount(2, scandir(dirname($binaryPath)));
+
+        // scenario 2. breaking the final metadata save after handlers 
+        // throws error almost at the end of the Resource::put()
+        self::$pdo->beginTransaction();
+        self::$pdo->query("LOCK TABLE metadata IN EXCLUSIVE MODE");
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, $body);
+        $resp               = self::$client->send($req);
+        self::$pdo->rollBack();
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->waitForTransactionEnd($txId);
+        $this->assertCount(2, scandir($tmpDir));
+        $this->assertCount(2, scandir(dirname($binaryPath)));
+    }
+
+    /**
+     * Tests hardcore failures on binary upload which should not normally happen.
+     * Still we want to make sure they are handled correctly and no binaries get
+     * corrupted, etc.
+     */
+    public function testPutErrors2(): void {
+        // create meta-only resource
+        $location   = $this->createBinaryResource();
+        $id         = preg_replace('`^.*/`', '', $location);
+        $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
+        $req        = new Request('get', $location, $this->getHeaders());
+        $resp       = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertFileExists($binaryPath);
+        $refContent = file_get_contents($binaryPath);
+
+        $tmpDir   = self::$config->storage->tmpDir;
+        $txHeader = self::$config->rest->headers->transactionId;
+        $headers  = [
+            self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
+            'Content-Disposition'                          => 'attachment; filename="RestTest.php"',
+            'Content-Type'                                 => 'application/php',
+            'Eppn'                                         => 'admin',
+        ];
+        $body     = (string) file_get_contents(__FILE__);
+
+        // scenario 1. breaking the full text search indexing throws error in BinaryPayload::upload()
+        self::$pdo->beginTransaction();
+        self::$pdo->query("LOCK TABLE full_text_search IN EXCLUSIVE MODE");
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, $body);
+        $resp               = self::$client->send($req);
+        self::$pdo->rollBack();
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->waitForTransactionEnd($txId);
+        $this->assertCount(2, scandir($tmpDir));
+        $this->assertCount(3, scandir(dirname($binaryPath)));
+        $this->assertEquals($refContent, file_get_contents($binaryPath));
+
+        // scenario 2. breaking the final metadata save after handlers 
+        // throws error almost at the end of the Resource::put()
+        self::$pdo->beginTransaction();
+        self::$pdo->query("LOCK TABLE metadata IN EXCLUSIVE MODE");
+        $txId               = $this->beginTransaction();
+        $headers[$txHeader] = $txId;
+        $req                = new Request('put', $location, $headers, $body);
+        $resp               = self::$client->send($req);
+        self::$pdo->rollBack();
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->waitForTransactionEnd($txId);
+        $this->assertCount(2, scandir($tmpDir));
+        $this->assertCount(3, scandir(dirname($binaryPath)));
+        $this->assertEquals($refContent, file_get_contents($binaryPath));
     }
 }

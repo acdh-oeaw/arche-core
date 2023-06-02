@@ -133,6 +133,17 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp->getStatusCode();
     }
 
+    protected function waitForTransactionEnd(int $txId, int $tMax = 5): void {
+        $req  = new Request('get', self::$baseUrl . 'transaction?transactionId=' . $txId);
+        $resp = null;
+        while ($tMax > 0 && $resp?->getStatusCode() !== 400) {
+            usleep(500000);
+            $resp = self::$client->send($req);
+            $tMax -= 0.5;
+        }
+        $this->assertGreaterThan(0, $tMax, "Timeout while waiting for the transaction end");
+    }
+
     protected function createMetadata(?string $uri = null): Resource {
         $g = new Graph();
         $r = $g->resource($uri ?? self::$baseUrl);
