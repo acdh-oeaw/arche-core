@@ -172,6 +172,7 @@ class MetadataReadOnly {
             $iter       = new TriplesIterator($this->pdoStmnt, RC::getBaseUrl(), RC::$config->schema->id, $triplesCacheCount);
             $nmsp       = $this->getNamespaces($iter, $triplesCacheCount);
             $largeCount = $iter->key() !== null;
+            $iter->sort();
             $iter->rewind();
 
             $jsonld = ['application/ld+json', 'application/json'];

@@ -107,6 +107,23 @@ class TriplesIterator implements QuadIteratorInterface {
         return isset($this->triple);
     }
 
+    public function sort(): void {
+        $subjects = [];
+        foreach ($this->cache as $triple) {
+            $subjects[$triple->getSubject()->getValue()][$triple->getPredicate()->getValue()][] = $triple->getObject();
+        }
+        $this->cache = [];
+        foreach ($subjects as $sbj => $properties) {
+            $sbj = DF::namedNode($sbj);
+            foreach ($properties as $prop => $objects) {
+                $prop = DF::namedNode($prop);
+                foreach ($objects as $obj) {
+                    $this->cache[] = DF::quad($sbj, $prop, $obj);
+                }
+            }
+        }
+    }
+
     private function getObject(Triple $triple): TermInterface {
         static $nonLiteralTypes = ['ID', 'REL', 'URI'];
 
