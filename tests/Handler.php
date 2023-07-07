@@ -95,11 +95,10 @@ class Handler {
         return $meta;
     }
 
-    static public function throwException(int $id, Resource $meta,
-                                           ?string $path): Resource {
+    static public function throwException(int $id, Resource $meta, ?string $path): Resource {
         throw new RepoException("Just throw an exception", 400);
     }
-    
+
     /**
      *
      * @var \PhpAmqpLib\Connection\AMQPStreamConnection
@@ -163,8 +162,9 @@ class Handler {
         $data->meta->addLiteral('https://rpc/property', 'update rpc');
 
         $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $body = json_encode(['status' => 0, 'metadata' => $rdf]);
         $opts = ['correlation_id' => $req->get('correlation_id')];
-        $msg  = new AMQPMessage($rdf, $opts);
+        $msg  = new AMQPMessage($body, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
@@ -177,12 +177,26 @@ class Handler {
         $data->meta->addLiteral('https://rpc/property', 'create rpc');
 
         $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $body = json_encode(['status' => 0, 'metadata' => $rdf]);
         $opts = ['correlation_id' => $req->get('correlation_id')];
-        $msg  = new AMQPMessage($rdf, $opts);
+        $msg  = new AMQPMessage($body, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
+    public function onCreateRpcError(AMQPMessage $req): void {
+        $this->log->debug("\t\tonCreateRpcError");
+        $data = $this->parse($req->body);
+        $this->log->debug("\t\t\tfor " . $data->uri);
+
+        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $body = json_encode(['status' => 400, 'message' => 'metadata is always wrong']);
+        $opts = ['correlation_id' => $req->get('correlation_id')];
+        $msg  = new AMQPMessage($body, $opts);
+        $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
+        $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
+    }
+    
     public function onCommitRpc(AMQPMessage $req): void {
         $this->log->debug("\t\tonCommitRpc");
         $data = json_decode($req->body); // method, transactionId, resourceIds
@@ -202,7 +216,8 @@ class Handler {
         $pdo->commit();
 
         $opts = ['correlation_id' => $req->get('correlation_id')];
-        $msg  = new AMQPMessage('', $opts);
+        $body = json_encode(['status' => 0]);
+        $msg  = new AMQPMessage($body, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }

@@ -249,6 +249,18 @@ class HandlersController {
     }
 
     /**
+     * Handles the AMQP message received from a handler.
+     * 
+     * The message should be a JSON with at least `status` property.
+     * Status 0 means successful execution and any other value indicates an error.
+     * 
+     * In case of error an exception is being thrown with the exception code
+     * equal to the `status` property value and exception message read from 
+     * the `message` field of the response (if it's not preset, a generic
+     * error message is used).
+     * 
+     * In `status` equals 0, then the `metadata` property value (or an empty
+     * string if this property doesn't exist) is parsed as application/n-triples.
      * 
      * @param AMQPMessage $msg
      * @return void
@@ -257,9 +269,15 @@ class HandlersController {
         $id = $msg->get('correlation_id');
         RC::$log->debug("\t\tresponse with id $id received");
         if (key_exists($id, $this->queue)) {
-            // works also for an empty message body
+            $msg = json_decode($msg->body);
+            if (!is_object($msg) || !isset($msg->status)) {
+                throw new RepoException('Wrong response from a handler', 500);
+            }
+            if ($msg->status !== 0) {
+                throw new RepoException($msg->message ?? 'Non-zero handler status', $msg->status);
+            }
             $graph            = new Graph();
-            $graph->parse($msg->body, 'application/n-triples');
+            $graph->parse($msg->metadata ?? '', 'application/n-triples');
             $this->queue[$id] = $graph;
         }
     }

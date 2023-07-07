@@ -44,7 +44,7 @@ An environment allowing you to edit code in your host system and run all the tes
   2020-06-04 14:06:52,309 INFO success: rabbitmq entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
   2020-06-04 14:06:52,309 INFO success: tika entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
   ```
-  then hit `CTRL+C`
+  then hit `CTRL+c`
 * Enter the docker container and run tests inside it
   ```bash
   docker exec -ti -u www-data arche-dev /bin/bash

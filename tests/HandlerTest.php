@@ -206,7 +206,26 @@ class HandlerTest extends TestBase {
     /**
      * @group handler
      */
-    public function testRpcTimeoutExceptio(): void {
+    public function testRpcError(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'  => HC::TYPE_RPC,
+                'queue' => 'onCreateRpcError',
+            ],
+            ], true);
+
+        $location = $this->createBinaryResource();
+        $meta     = $this->getResourceMeta($location);
+
+        $resp = $this->updateResource($this->getResourceMeta($location));
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertStringContainsString('metadata is always wrong', (string) $resp->getBody());
+    }
+
+    /**
+     * @group handler
+     */
+    public function testRpcTimeoutException(): void {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'  => HC::TYPE_RPC,
@@ -222,6 +241,9 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
     }
 
+    /**
+     * @group handler
+     */
     public function testRpcTimeoutNoException(): void {
         $this->setHandlers([
             'updateMetadata' => [
@@ -338,7 +360,7 @@ class HandlerTest extends TestBase {
         ]);
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        
+
         $txId = $this->beginTransaction();
         try {
             $this->createBinaryResource($txId);
