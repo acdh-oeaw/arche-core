@@ -32,6 +32,7 @@ use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\SearchConfig;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
@@ -558,7 +559,16 @@ class SearchTest extends TestBase {
     /**
      * @group search
      */
-    public function testFullTextSearch1(string $result = null): void {
+    public function testFullTextSearch1(?array $expected = null): void {
+        $expected ??= [
+            self::$config->schema->id => '<b>verbunden</b>',
+            SearchConfig::FTS_BINARY  => "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht",
+            'http://another/match'    => '<b>verbunden</b>',
+        ];
+
+        $ftsValueProp = self::$config->schema->searchFts;
+        $ftsPropProp  = self::$config->schema->searchFtsProperty;
+
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         self::reloadTxCtrlConfig();
@@ -575,6 +585,9 @@ class SearchTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
         $meta     = $this->extractResource($resp, $location);
+        $meta->addLiteral('http://another/match', 'foo bar verbunden foo baz');
+        $meta->addResource(self::$config->schema->id, 'http://verbunden');
+        $this->updateResource($meta, $txId);
         $this->commitTransaction($txId);
 
         $opts = [
@@ -584,7 +597,6 @@ class SearchTest extends TestBase {
                 'value[]'              => 'verbunden',
                 'operator[]'           => '@@',
                 'ftsQuery'             => 'verbunden',
-                'ftsProperty'          => SearchTerm::PROPERTY_BINARY,
                 'ftsMaxFragments'      => 3,
                 'ftsFragmentDelimiter' => '@',
                 'ftsMinWords'          => 1,
@@ -594,15 +606,39 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
+        // with all properties matching the search
         $g    = $this->runSearch($opts);
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($meta->getUri())->propertyUris()));
-
-        $fts = (string) $g->resource($meta->getUri())->getLiteral(self::$config->schema->searchFts);
-        $fts = str_replace("\n", '', $fts);
-        $this->assertEquals($result ?? "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht", $fts);
+        $res  = $g->resource($meta->getUri());
+        for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
+            $value = (string) $res->getLiteral($ftsValueProp . $i);
+            $value = str_replace("\n", '', $value);
+            $prop  = (string) $res->getLiteral($ftsPropProp . $i);
+            $this->assertArrayHasKey($prop, $expected);
+            $this->assertEquals($expected[$prop], $value);
+        }
+        $this->assertCount($i - 1, $expected);
+        // with 2 out of 3 properties matching the search
+        $expected                        = array_slice($expected, 1);
+        $opts['query']['ftsProperty[0]'] = array_keys($expected)[0];
+        $opts['query']['ftsProperty[1]'] = array_keys($expected)[1];
+        $g                               = $this->runSearch($opts);
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($meta->getUri())->propertyUris()));
+        $res                             = $g->resource($meta->getUri());
+        for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
+            $value = (string) $res->getLiteral($ftsValueProp . $i);
+            $value = str_replace("\n", '', $value);
+            $prop  = (string) $res->getLiteral($ftsPropProp . $i);
+            $this->assertArrayHasKey($prop, $expected);
+            $this->assertEquals($expected[$prop], $value);
+        }
+        $this->assertCount($i - 1, $expected);
     }
 
     public function testFullTextSearch2(): void {
@@ -610,12 +646,17 @@ class SearchTest extends TestBase {
         $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
-        $this->testFullTextSearch1('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@Kettenbrücken ) miteinander <b>verbunden</b> . Zoll für@Donautal <b>verbunden</b> . Das Klima entspricht');
+        $expected = [
+            SearchConfig::FTS_BINARY  => 'aufs engste <b>verbunden</b> . Auf  kleinasiatischem@Kettenbrücken ) miteinander <b>verbunden</b> . Zoll für@Donautal <b>verbunden</b> . Das Klima entspricht',
+            self::$config->schema->id => '<b>verbunden</b>',
+            'http://another/match'    => '<b>verbunden</b>',
+        ];
+        $this->testFullTextSearch1($expected);
     }
 
     public function testFullTextSearch3(): void {
         // by metadata property
-        $opts = [
+        $opts  = [
             'query'   => [
                 'property[]'  => 'https://title',
                 'value[]'     => 'abc',
@@ -627,53 +668,58 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
+        $g     = $this->runSearch($opts);
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $fts  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts);
-        $this->assertEquals("<b>abc</b>", $fts);
+        $value = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
+        $this->assertEquals("<b>abc</b>", $value);
+        $this->assertEquals("https://title", $prop);
 
         // by lang
-        $opts = [
+        $opts  = [
             'query'   => [
-                'property[]'  => 'https://title',
-                'language[]'  => 'pl',
-                'value[]'     => 'bcd',
-                'operator[]'  => '@@',
-                'ftsQuery'    => 'bcd',
-                'ftsProperty' => 'https://title',
+                'property[]'    => 'https://title',
+                'language[]'    => 'pl',
+                'value[]'       => 'bcd',
+                'operator[]'    => '@@',
+                'ftsQuery'      => 'bcd',
+                'ftsProperty[]' => 'https://title',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
+        $g     = $this->runSearch($opts);
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $fts  = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFts);
-        $this->assertEquals("<b>bcd</b>", $fts);
+        $value = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
+        $this->assertEquals("<b>bcd</b>", $value);
+        $this->assertEquals("https://title", $prop);
 
         // by property and lang
-        $opts = [
+        $opts  = [
             'query'   => [
-                'language[]'  => 'en',
-                'value[]'     => 'abc',
-                'operator[]'  => '@@',
-                'ftsQuery'    => 'abc',
-                'ftsProperty' => 'https://title',
+                'language[]' => 'en',
+                'value[]'    => 'abc',
+                'operator[]' => '@@',
+                'ftsQuery'   => 'abc',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
+        $g     = $this->runSearch($opts);
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $fts  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts);
-        $this->assertEquals("<b>abc</b>", $fts);
+        $value = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
+        $this->assertEquals("<b>abc</b>", $value);
+        $this->assertEquals("https://title", $prop);
     }
 
     /**

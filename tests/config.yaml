@@ -166,6 +166,7 @@ schema:
     searchOrder: search://order
     searchOrderValue: search://orderValue
     searchFts: search://fts
+    searchFtsProperty: search://ftsProperty
     searchCount: search://count
     binarySize: https://size
     fileName: https://file

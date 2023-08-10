@@ -15,13 +15,14 @@
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7 | ^6",
         "acdh-oeaw/easyrdf": ">=0.15.3",
-        "acdh-oeaw/arche-lib": "^5.5.1",
+        "acdh-oeaw/arche-lib": "^5.6.0",
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": "^1",
         "zozlak/rdf-constants": "^1",
         "php-amqplib/php-amqplib": "^3.1",
         "sweetrdf/quick-rdf-io": "^1.0",
-        "sweetrdf/simple-rdf": "^1.0"
+        "sweetrdf/simple-rdf": "^2.0.0-RC2",
+        "sweetrdf/rdf-interface": "^2.0.0-RC2"
     },
     "autoload": {
         "psr-4": {
