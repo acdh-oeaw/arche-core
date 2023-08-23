@@ -77,6 +77,11 @@ class Search {
             foreach (array_unique($keys) as $i) {
                 $terms[] = SearchTerm::factory($i);
             }
+            if (empty($config->ftsQuery)) {
+                $config->ftsQuery    = [];
+                $config->ftsProperty = [];
+                $config->readFtsConfigFromTerms($terms);
+            }
             $pdoStmnt = $repo->getPdoStatementBySearchTerms($terms, $config);
         }
 
