@@ -160,8 +160,9 @@ class RestController {
                     $origin = filter_input(INPUT_SERVER, 'HTTP_ORIGIN') ?? '*';
                     self::setHeader('Vary', 'origin');
                 }
+                $headers = implode(', ', (array) self::$config->rest->headers);
                 self::setHeader('Access-Control-Allow-Origin', "$origin");
-                self::setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type');
+                self::setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type, ' . $headers);
                 self::setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
             }
 
