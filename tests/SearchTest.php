@@ -619,7 +619,7 @@ class SearchTest extends TestBase {
         for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
             $value = (string) $res->getLiteral($ftsValueProp . $i);
             $value = str_replace("\n", '', $value);
-            $prop  = (string) $res->getResource($ftsPropProp . $i);
+            $prop  = (string) $res->get($ftsPropProp . $i);
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
         }
@@ -633,7 +633,7 @@ class SearchTest extends TestBase {
         for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
             $value = (string) $res->getLiteral($ftsValueProp . $i);
             $value = str_replace("\n", '', $value);
-            $prop  = (string) $res->getResource($ftsPropProp . $i);
+            $prop  = (string) $res->get($ftsPropProp . $i);
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
             $this->assertEquals($opts['query']['value[]'], (string) $res->getLiteral($ftsQueryProp . $i));
@@ -778,7 +778,7 @@ class SearchTest extends TestBase {
         for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
             $value          = (string) $res->getLiteral($ftsValueProp . $i);
             $value          = str_replace("\n", '', $value);
-            $prop           = (string) $res->getResource($ftsPropProp . $i);
+            $prop           = (string) $res->get($ftsPropProp . $i);
             $query          = (string) $res->getLiteral($ftsQueryProp . $i);
             $results[$prop] = ['v' => $value, 'q' => $query];
         }
