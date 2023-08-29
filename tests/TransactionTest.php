@@ -30,6 +30,7 @@ use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use function \GuzzleHttp\json_encode;
+use quickRdf\DatasetNode;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\BinaryPayload;
 
@@ -40,7 +41,8 @@ use acdhOeaw\arche\core\BinaryPayload;
  */
 class TransactionTest extends TestBase {
 
-    static public function sleepResource(int $id, Resource $meta, ?string $path): Resource {
+    static public function sleepResource(int $id, DatasetNode $meta,
+                                         ?string $path): DatasetNode {
         $c = RC::$config->transactionController;
         usleep(($c->timeout << 20) + ($c->checkInterval << 10));
         return $meta;

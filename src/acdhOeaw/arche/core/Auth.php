@@ -26,8 +26,8 @@
 
 namespace acdhOeaw\arche\core;
 
-use EasyRdf\Graph;
-use EasyRdf\Resource;
+use quickRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\AuthInterface;
 use zozlak\queryPart\QueryPart;
@@ -155,24 +155,24 @@ class Auth implements AuthInterface {
         }
     }
 
-    public function getCreateRights(): Resource {
+    public function getCreateRights(): DatasetNode {
         $c     = RC::$config->accessControl;
-        $graph = new Graph();
-        $meta  = $graph->newBNode();
+        $node  = DF::blankNode();
+        $graph = new DatasetNode($node);
 
         $role = $this->getUserName();
         foreach ($c->create->creatorRights as $i) {
-            $meta->addLiteral($c->schema->$i, $role);
+            $graph->add(DF::Quad($node, DF::namedNode($c->schema->$i), DF::literal($role)));
         }
 
         foreach ($c->create->assignRoles as $privilege => $roles) {
             foreach ($roles as $role) {
                 $prop = $c->schema->$privilege;
-                $meta->addLiteral($prop, $role);
+                $graph->add(DF::Quad($node, DF::namedNode($prop), DF::literal($role)));
             }
         }
 
-        return $meta;
+        return $graph;
     }
 
     /**

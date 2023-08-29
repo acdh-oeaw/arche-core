@@ -30,6 +30,7 @@ use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
+use quickRdf\DatasetNode;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\Metadata;
 use acdhOeaw\arche\core\Transaction;
@@ -41,7 +42,8 @@ use acdhOeaw\arche\core\Transaction;
  */
 class ParallelTest extends TestBase {
 
-    static public function sleepResource(int $id, Resource $meta, ?string $path): Resource {
+    static public function sleepResource(int $id, DatasetNode $meta,
+                                         ?string $path): DatasetNode {
         \acdhOeaw\arche\core\RestController::$log->debug("BEGIN OF SLEEP");
         usleep(100000); // sleep 100 ms
         \acdhOeaw\arche\core\RestController::$log->debug("END OF SLEEP");

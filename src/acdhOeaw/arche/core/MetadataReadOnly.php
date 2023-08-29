@@ -29,7 +29,7 @@ namespace acdhOeaw\arche\core;
 use PDOStatement;
 use rdfInterface\NamedNodeInterface;
 use rdfInterface\RdfNamespaceInterface;
-use simpleRdf\RdfNamespace;
+use quickRdf\RdfNamespace;
 use quickRdfIo\Util as Serializer;
 use quickRdfIo\JsonLdStreamSerializer;
 use acdhOeaw\arche\lib\Schema;
@@ -164,7 +164,7 @@ class MetadataReadOnly {
         unset($this->loadFromDbParams);
     }
 
-    private function generateOutput(int $triplesCacheCount): void {
+    private function generateOutput(int $triplesCacheCount = 1000): void {
         if ($this->format === 'text/html') {
             $serializer = new MetadataGui($this->stream, $this->pdoStmnt, $this->id);
             $serializer->output();

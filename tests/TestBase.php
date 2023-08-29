@@ -71,7 +71,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $pipes        = [];
         self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
         if (self::$txCtrl === false) {
-            throw new RuntimeException('failed to start handlerRun.php');
+            throw new RuntimeException('failed to start the transactionDaemon');
         }
 
         // give services like the transaction manager or tika time to start

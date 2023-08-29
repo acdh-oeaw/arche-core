@@ -28,13 +28,18 @@ namespace acdhOeaw\arche\core;
 
 use DateTime;
 use PDOException;
-use RuntimeException;
 use EasyRdf\Format;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
-use EasyRdf\Literal;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
+use quickRdf\Dataset;
+use quickRdf\DatasetNode;
+use quickRdf\NamedNode;
+use quickRdf\Literal;
+use quickRdf\Quad;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfUtil;
+use termTemplates\QuadTemplate as QT;
+use rdfInterface2easyRdf\AsRdfInterface;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\RepoDb;
@@ -63,20 +68,6 @@ class Metadata {
     ];
     const DATE_TYPES     = [RDF::XSD_DATE, RDF::XSD_DATE_TIME];
 
-    /**
-     * 
-     * @param Resource $resource
-     * @param string $property
-     * @return array<string>
-     */
-    static public function propertyAsString(Resource $resource, string $property): array {
-        $values = [];
-        foreach ($resource->all($property) as $i) {
-            $values[] = (string) $i;
-        }
-        return $values;
-    }
-
     static public function idAsUri(int $id): string {
         return RC::getBaseUrl() . $id;
     }
@@ -97,21 +88,21 @@ class Metadata {
     }
 
     private int $id;
-    private Graph $graph;
+    private DatasetNode $graph;
 
     public function __construct(?int $id = null) {
         if ($id !== null) {
-            $this->id = $id;
+            $this->id    = $id;
+            $this->graph = new DatasetNode(DF::namedNode($this->getUri()));
         }
-        $this->graph = new Graph();
     }
 
     public function setId(int $id): void {
-        $oldMeta  = $this->getResource();
         $this->id = $id;
-        if ($oldMeta !== null) {
-            $meta        = $oldMeta->copy([], '/^$/', $this->getUri());
-            $this->graph = $meta->getGraph();
+        if (isset($this->graph)) {
+            $node        = DF::namedNode($this->getUri());
+            $this->graph->forEach(fn(Quad $x) => $x->withSubject($node));
+            $this->graph = $this->graph->withNode($node);
         }
     }
 
@@ -119,37 +110,50 @@ class Metadata {
         return isset($this->id) ? self::idAsUri($this->id) : RC::getBaseUrl();
     }
 
+    public function getDatasetNode(): DatasetNode {
+        return $this->graph;
+    }
+
     /**
      * 
-     * @param \EasyRdf\Resource $newMeta
+     * @param DatasetNode $newMeta
      * @param array<string> $preserve
      * @return void
      */
-    public function update(Resource $newMeta, array $preserve = []): void {
-        $this->graph->resource($this->getUri())->merge($newMeta, $preserve);
+    public function update(DatasetNode $newMeta, array $preserve = []): void {
+        $node = $this->graph->getNode();
+        foreach ($newMeta->listPredicates() as $predicate) {
+            if (!in_array($predicate->getValue(), $preserve)) {
+                $this->graph->delete(new QT(predicate: $predicate));
+            }
+        }
+        $this->graph->add($newMeta->map(fn($x) => $x->withSubject($node))->withNode($node));
     }
 
     public function loadFromRequest(string $resUri = null): int {
-        $body   = (string) file_get_contents('php://input');
-        $format = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
-        if (empty($body) && empty($format)) {
-            $format = 'application/n-triples';
+        $format      = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+        $length      = (int) filter_input(INPUT_SERVER, 'CONTENT_LENGTH');
+        $node        = DF::namedNode($this->getUri());
+        $this->graph = new DatasetNode($node);
+        if ($length > 0) {
+            if (empty($format)) {
+                $format = 'application/n-triples';
+            }
+            $this->graph->add(RdfUtil::parse(fopen('php://input', 'r'), new DF(), $format));
         }
-        $graph = new Graph();
-        $count = $graph->parse($body, $format);
 
-        if (empty($resUri)) {
-            $resUri = $this->getUri();
+        if (!empty($resUri)) {
+            $filter = new QT(DF::namedNode($resUri));
+            $this->graph->getDataset()->forEach(fn($x) => $x->withSubject($node), $filter);
         }
-        if (count($graph->resource($resUri)->propertyUris()) === 0) {
-            RC::$log->warning("No metadata for $resUri \n" . $graph->serialise('turtle'));
+        if (count($this->graph) === 0) {
+            RC::$log->warning("No metadata for $resUri \n" . RdfUtil::serialize($this->graph->getDataset(), 'text/turtle'));
         }
-        $graph->resource($resUri)->copy([], '/^$/', $this->getUri(), $this->graph);
-        return $count;
+        return count($this->graph);
     }
 
-    public function loadFromResource(Resource $res): void {
-        $this->graph = $res->getGraph();
+    public function loadFromResource(DatasetNode $res): void {
+        $this->graph = $res;
     }
 
     public function loadFromDb(string $mode, ?string $property = null): void {
@@ -159,58 +163,50 @@ class Metadata {
         $repo        = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
         $res         = new RepoResourceDb((string) $this->id, $repo);
         $res->loadMetadata(true, $mode, $property);
-        $this->graph = $res->getGraph()->getGraph();
+        $this->graph = new DatasetNode(DF::namedNode($res->getUri()));
+        $this->graph->add(AsRdfInterface::asRdfInterface($res->getGraph()->getGraph(), new DF()));
     }
 
-    public function getResource(): Resource {
-        return $this->graph->resource($this->getUri());
-    }
-
-    public function merge(string $mode): Resource {
-        $uri = $this->getUri();
+    public function merge(string $mode): DatasetNode {
         switch ($mode) {
             case self::SAVE_ADD:
                 RC::$log->debug("\tadding metadata");
-                $tmp  = new Metadata($this->id);
-                $tmp->loadFromDb(RRI::META_RESOURCE);
-                $meta = $tmp->graph->resource($uri);
-                $new  = $this->graph->resource($uri);
-                foreach ($new->propertyUris() as $p) {
-                    foreach ($new->all($p) as $v) {
-                        $meta->add($p, $v);
-                    }
-                }
+                $meta = new Metadata($this->id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                $meta = $meta->getDatasetNode();
+                $meta->add($this->graph);
                 break;
             case self::SAVE_MERGE:
                 RC::$log->debug("\tmerging metadata");
-                $tmp  = new Metadata($this->id);
-                $tmp->loadFromDb(RRI::META_RESOURCE);
-                $meta = $tmp->graph->resource($uri);
-                $meta->merge($this->graph->resource($uri), [RC::$config->schema->id]);
+                $meta = new Metadata($this->id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                $meta = $meta->getDatasetNode();
+                foreach ($this->graph->listPredicates()->skip([RC::$schema->id]) as $predicate) {
+                    $meta->delete(new QT(predicate: $predicate));
+                }
+                $meta->add($this->graph);
                 break;
             case self::SAVE_OVERWRITE:
                 RC::$log->debug("\toverwriting metadata");
-                $meta = $this->graph->resource($uri);
+                $meta = $this->graph;
                 break;
             default:
                 throw new RepoException('Wrong metadata merge mode ' . $mode, 400);
         }
         $this->manageSystemMetadata($meta);
-        RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
+        RC::$log->debug("\n" . RdfUtil::serialize($meta, 'text/turtle'));
 
-        $this->graph = $meta->getGraph();
+        $this->graph = $meta;
         return $meta;
     }
 
     public function save(): void {
         $spatialProps = RC::$config->spatialSearch->properties ?? [];
-        $idProp       = RC::$config->schema->id;
         $query        = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
         $query->execute([$this->id]);
         $query        = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
         $query->execute([$this->id]);
 
-        $meta = $this->graph->resource($this->getUri());
         try {
             $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING mid");
             $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
@@ -225,20 +221,17 @@ class Metadata {
                 VALUES (?, ?, ?) 
                 ON CONFLICT (id, target_id, property) DO NOTHING
             ");
-            $ids        = self::propertyAsString($meta, $idProp);
-            $properties = array_diff($meta->propertyUris(), [$idProp]);
-            foreach ($properties as $p) {
+            $allButIds  = $this->graph->getIterator(new QT(predicate: RC::$schema->id, negate: true));
+            $ids        = $this->graph->listObjects(new QT(predicate: RC::$schema->id))->getValues();
+            foreach ($allButIds as $triple) {
+                $p = $triple->getPredicate()->getValue();
+                $v = $triple->getObject();
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
-                    $resources = [];
-                    $literals  = $meta->all($p);
-                } else {
-                    $resources = $meta->allResources($p);
-                    $literals  = $meta->allLiterals($p);
+                    $v = DF::literal($triple->getObject()->getValue(), null, self::TYPE_URI);
                 }
-                $spatial = in_array($p, $spatialProps);
 
-                foreach ($resources as $v) {
-                    $v = (string) $v;
+                if ($v instanceof NamedNode) {
+                    $v = $v->getValue();
                     RC::$log->debug("\tadding relation " . $p . " " . $v);
                     // $v may not exist in identifiers table yet, thus special handling
                     if (in_array($v, $ids)) {
@@ -252,14 +245,12 @@ class Metadata {
                             }
                         }
                     }
-                }
-
-                foreach ($literals as $v) {
-                    /* @var $v \EasyRdf\Literal */
-                    $lang = '';
-                    $type = is_a($v, '\EasyRdf\Resource') ? self::TYPE_URI : $v->getDatatypeUri();
-                    $type = $spatial ? self::TYPE_GEOM : $type;
-                    $vv   = (string) $v;
+                } elseif ($v instanceof Literal) {
+                    $vv = $v->getValue();
+                    if (in_array($p, $spatialProps)) {
+                        $v = $v->withDatatype(self::TYPE_GEOM);
+                    }
+                    $type = $v->getDatatype();
                     if (in_array($type, self::NUMERIC_TYPES)) {
                         $param = [$this->id, $p, $type, '', $vv, null, $vv];
                     } else if (in_array($type, self::DATE_TYPES)) {
@@ -276,12 +267,7 @@ class Metadata {
                         }
                         $param = [$this->id, $p, $type, '', $vn, $vt, $vv];
                     } else {
-                        if (empty($type)) {
-                            $type = RDF::XSD_STRING;
-                        }
-                        if ($type === RDF::XSD_STRING && $v instanceof \EasyRdf\Literal) {
-                            $lang = $v->getLang() ?? '';
-                        }
+                        $lang  = $v->getLang() ?? '';
                         $param = [$this->id, $p, $type, $lang, null, null, $vv];
                     }
                     $queryV->execute($param);
@@ -290,7 +276,7 @@ class Metadata {
 
             // Postpone processing ids because it would lock identifiers db table
             // and as a consequence prevent Transaction::createResource() from working
-            // and Transaction::createResouce() may be called by $this->autoAddIds()
+            // while Transaction::createResouce() may be called by $this->autoAddIds()
             $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
             $query->execute([$this->id]);
             foreach ($ids as $v) {
@@ -315,41 +301,43 @@ class Metadata {
      * Updates system-managed metadata, e.g. who and when lastly modified a resource
      * @return void
      */
-    private function manageSystemMetadata(Resource $meta): void {
+    private function manageSystemMetadata(DatasetNode $meta): void {
+        $node   = $this->graph->getNode();
+        $schema = RC::$schema;
+
         // delete properties scheduled for removal
-        $delProp = RC::$config->schema->delete;
-        foreach ($meta->all($delProp) as $i) {
-            $meta->deleteResource((string) $i);
-            $meta->delete((string) $i);
+        foreach ($meta->listObjects(new QT(predicate: $schema->delete)) as $i) {
+            $meta->delete(new QT(predicate: $i));
         }
-        $meta->deleteResource($delProp);
+        $meta->delete(new QT(predicate: $schema->delete));
 
         // repo-id
-        $meta->addResource(RC::$config->schema->id, $this->getUri());
+        $meta->add(DF::quad($node, $schema->id, $node));
 
-        $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
-        $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         // creation date & user
-        if ($meta->getLiteral(RC::$config->schema->creationDate) === null) {
-            $meta->addLiteral(RC::$config->schema->creationDate, new Literal($date, null, $type));
+        $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
+        if ($meta->none(new QT(predicate: $schema->creationDate))) {
+            $meta->add(DF::quad($node, $schema->creationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
         }
-        if ($meta->getLiteral(RC::$config->schema->creationUser) === null) {
-            $meta->addLiteral(RC::$config->schema->creationUser, RC::$auth->getUserName());
+        if ($meta->none(new QT(predicate: $schema->creationUser))) {
+            $meta->add(DF::quad($node, $schema->creationUser, DF::literal(RC::$auth->getUserName())));
         }
         // last modification date & user
-        $meta->delete(RC::$config->schema->modificationDate);
-        $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
-        $meta->delete(RC::$config->schema->modificationUser);
-        $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
+        $meta->delete(new QT(predicate: $schema->modificationDate));
+        $meta->add(DF::quad($node, $schema->modificationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
+        $meta->delete(new QT(predicate: $schema->modificationUser));
+        $meta->add(DF::quad($node, $schema->modificationUser, DF::literal(RC::$auth->getUserName())));
 
         // check single id in the repo base url namespace which maches object's $id property
-        foreach ($meta->all(RC::$config->schema->id) as $i) {
-            if (!is_a($i, Resource::class)) {
+        $baseUrl    = RC::getBaseUrl();
+        $baseUrlLen = strlen($baseUrl);
+        foreach ($meta->listObjects(new QT(predicate: $schema->id)) as $i) {
+            if (!($i instanceof NamedNode)) {
                 throw new RepoException('Non-resource identifier', 400);
             }
-            $i = (string) $i;
-            if (strpos($i, RC::getBaseUrl()) === 0) {
-                $i = substr($i, strlen(RC::getBaseUrl()));
+            $i = $i->getValue();
+            if (str_starts_with($i, $baseUrl)) {
+                $i = substr($i, $baseUrlLen);
                 if ($i !== (string) $this->id) {
                     throw new RepoException("Id in the repository base URL namespace which does not match the resource id $i !== " . $this->id, 400);
                 }
@@ -361,7 +349,7 @@ class Metadata {
      * @return void
      */
     public function setResponseBody(string $format): void {
-        RC::setOutput($this->graph->serialise($format), $format);
+        RC::setOutput(RdfUtil::serialize($this->graph->getDataset(), $format));
     }
 
     private function autoAddId(string $ids): bool {

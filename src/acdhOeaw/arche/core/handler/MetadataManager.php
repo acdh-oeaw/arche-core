@@ -26,8 +26,10 @@
 
 namespace acdhOeaw\arche\core\handler;
 
-use EasyRdf\Resource;
-use EasyRdf\Literal;
+use quickRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
+use quickRdf\NamedNode;
+use termTemplates\QuadTemplate as QT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\util\Triple;
 
@@ -38,37 +40,42 @@ use acdhOeaw\arche\core\util\Triple;
  */
 class MetadataManager {
 
-    static public function manage(int $id, Resource $meta, ?string $path): Resource {
+    static public function manage(int $id, DatasetNode $meta, ?string $path): DatasetNode {
         foreach (RC::$config->metadataManager->fixed as $p => $vs) {
+            $p = DF::namedNode($p);
             foreach ($vs as $v) {
                 self::addMetaValue($meta, $p, new Triple($v));
             }
         }
         foreach (RC::$config->metadataManager->default as $p => $vs) {
-            if (count($meta->all($p)) === 0) {
+            $p = DF::namedNode($p);
+            if ($meta->none(new QT(predicate: $p))) {
                 foreach ($vs as $v) {
                     self::addMetaValue($meta, $p, new Triple($v));
                 }
             }
         }
         foreach (RC::$config->metadataManager->forbidden as $p) {
-            $meta->delete($p);
-            $meta->deleteResource($p);
+            $meta->delete(new QT(predicate: DF::namedNode($p)));
         }
         foreach (RC::$config->metadataManager->copying as $sp => $tp) {
-            foreach ($meta->all($sp) as $v) {
-                $meta->add($tp, $v);
+            $sp   = DF::namedNode($sp);
+            $tp   = DF::namedNode($tp);
+            $node = $meta->getNode();
+            foreach ($meta->getIterator(new QT(predicate: $sp)) as $triple) {
+                $meta->add(DF::quad($node, $tp, $triple->getObject()));
             }
         }
         return $meta;
     }
 
-    static private function addMetaValue(Resource $meta, string $p, Triple $v): void {
+    static private function addMetaValue(DatasetNode $meta, NamedNode $p,
+                                         Triple $v): void {
         if (isset($v->uri)) {
-            $meta->addResource($p, $v->uri);
+            $meta->add(DF::quad($meta->getNode(), $p, DF::namedNode($v->uri)));
         } else {
-            $literal = new Literal((string) $v->value, $v->lang ?? null, $v->type ?? null);
-            $meta->addLiteral($p, $literal);
+            $literal = DF::literal((string) $v->value, $v->lang ?? null, $v->type ?? null);
+            $meta->add(DF::quad($meta->getNode(), $p, $literal));
         }
     }
 }

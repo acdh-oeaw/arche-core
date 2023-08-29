@@ -27,11 +27,11 @@
 namespace acdhOeaw\arche\core;
 
 use DateTime;
-use EasyRdf\Graph;
-use EasyRdf\Literal;
-use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
+use quickRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\util\SpatialInterface;
 use acdhOeaw\arche\lib\BinaryPayload as BP;
@@ -178,33 +178,32 @@ class BinaryPayload {
         return $headers;
     }
 
-    public function getRequestMetadata(): Resource {
+    public function getRequestMetadata(): DatasetNode {
         list($contentType, $fileName) = $this->getRequestMetadataRaw();
 
-        $graph = new Graph();
-        $meta  = $graph->newBNode();
-        $meta->addLiteral(RC::$config->schema->mime, $contentType);
+        $node  = DF::blankNode();
+        $graph = new DatasetNode($node);
+        $graph->add(DF::Quad($node, RC::$schema->mime, DF::literal($contentType)));
         if (!empty($fileName)) {
-            $meta->addLiteral(RC::$config->schema->fileName, $fileName);
+            $graph->add(DF::Quad($node, RC::$schema->fileName, DF::literal($fileName)));
         } else {
-            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->fileName);
+            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->fileName));
         }
         if ($this->size > 0) {
-            $meta->addLiteral(RC::$config->schema->binarySize, $this->size);
+            $graph->add(DF::Quad($node, RC::$schema->binarySize, DF::literal($this->size)));
         } else {
-            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->binarySize);
+            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->binarySize));
         }
         if ($this->size > 0) {
-            $meta->addLiteral(RC::$config->schema->hash, $this->hash);
+            $graph->add(DF::Quad($node, RC::$schema->hash, DF::literal($this->hash)));
         } else {
-            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->hash);
+            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->hash));
         }
         // Last modification date & user
         $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
-        $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
-        $meta->addLiteral(RC::$config->schema->binaryModificationDate, new Literal($date, null, $type));
-        $meta->addLiteral(RC::$config->schema->binaryModificationUser, RC::$auth->getUserName());
-        return $meta;
+        $graph->add(DF::Quad($node, RC::$schema->binaryModificationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
+        $graph->add(DF::Quad($node, RC::$schema->binaryModificationUser, DF::literal(RC::$auth->getUserName())));
+        return $graph;
     }
 
     public function backup(string $suffix): void {

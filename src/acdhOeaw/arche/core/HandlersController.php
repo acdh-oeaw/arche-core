@@ -27,11 +27,14 @@
 namespace acdhOeaw\arche\core;
 
 use Composer\Autoload\ClassLoader;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
+use quickRdf\Dataset;
+use quickRdf\DatasetNode;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\NQuadsParser;
+use quickRdfIo\NQuadsSerializer;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Config;
 use function \GuzzleHttp\json_encode;
@@ -130,8 +133,8 @@ class HandlersController {
         return isset($this->handlers[$method]);
     }
 
-    public function handleResource(string $method, int $id, Resource $res,
-                                   ?string $path): Resource {
+    public function handleResource(string $method, int $id, DatasetNode $res,
+                                   ?string $path): DatasetNode {
         if (!isset($this->handlers[$method])) {
             return $res;
         }
@@ -184,19 +187,20 @@ class HandlersController {
     }
 
     private function callRpcResource(string $method, string $queue, int $id,
-                                     Resource $res, ?string $path): Resource {
-        $data   = json_encode([
+                                     DatasetNode $res, ?string $path): DatasetNode {
+        $serializer = new NQuadsSerializer();
+        $data       = json_encode([
             'method'   => $method,
             'path'     => $path,
-            'uri'      => $res->getUri(),
+            'uri'      => $res->getNode()->getValue(),
             'id'       => $id,
-            'metadata' => $res->getGraph()->serialise('application/n-triples'),
+            'metadata' => $serializer->serialize($res),
         ]);
-        $result = $this->sendRmqMessage($queue, $data);
+        $result     = $this->sendRmqMessage($queue, $data);
         if ($result === null) {
             $result = $res;
         } else {
-            $result = $result->resource($res->getUri());
+            $result = (new DatasetNode($res->getNode()))->withDataset($result);
         }
         return $result;
     }
@@ -205,10 +209,10 @@ class HandlersController {
      * 
      * @param string $queue
      * @param string $data
-     * @return mixed
+     * @return null|Dataset
      * @throws RepoException
      */
-    private function sendRmqMessage(string $queue, string $data): mixed {
+    private function sendRmqMessage(string $queue, string $data): null | Dataset {
         $id               = uniqid();
         RC::$log->debug("\tcalling RPC handler with id $id using the $queue queue");
         $opts             = ['correlation_id' => $id, 'reply_to' => $this->rmqQueue];
@@ -224,10 +228,10 @@ class HandlersController {
             if ($this->rmqExceptionOnTimeout) {
                 throw new RepoException("$queue handler timeout", 500);
             }
-            RC::$log->debug("\tRPC handler with id $id using the $queue queue ended");
+            RC::$log->debug("\tRPC handler with id $id using the $queue queue ended with a timeout");
             return null;
         }
-        RC::$log->debug("\RPC handler with id $id using the $queue queue ended");
+        RC::$log->debug("\tRPC handler with id $id using the $queue queue ended");
         return $this->queue[$id];
     }
 
@@ -276,8 +280,9 @@ class HandlersController {
             if ($msg->status !== 0) {
                 throw new RepoException($msg->message ?? 'Non-zero handler status', $msg->status);
             }
-            $graph            = new Graph();
-            $graph->parse($msg->metadata ?? '', 'application/n-triples');
+            $parser           = new NQuadsParser(new DF(), false, NQuadsParser::MODE_TRIPLES);
+            $graph            = new Dataset();
+            $graph->add($parser->parse($msg->metadata ?? ''));
             $this->queue[$id] = $graph;
         }
     }

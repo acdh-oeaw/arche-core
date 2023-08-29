@@ -33,6 +33,7 @@ use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
 use acdhOeaw\arche\core\Transaction;
+use acdhOeaw\arche\core\util\Schema;
 use acdhOeaw\arche\lib\Config;
 use acdhOeaw\arche\lib\exception\RepoLibException;
 use acdhOeaw\arche\core\util\OutputFile;
@@ -78,6 +79,7 @@ class RestController {
         'application/*'         => 'application/n-triples',
     ];
     static public Config $config;
+    static public Schema $schema;
     static public Log $log;
     static public PDO $pdo;
     static public Transaction $transaction;
@@ -108,6 +110,7 @@ class RestController {
 
         self::$config             = Config::fromYaml($configFile);
         self::$config->configDate = filectime($configFile);
+        self::$schema             = Schema::fromConfig(self::$config);
         self::$output             = '';
         self::$headers            = [];
 
@@ -229,7 +232,7 @@ class RestController {
                 }
             } else if ($method === 'Put' && preg_match('>^merge/([0-9]+)/([0-9]+)/?$>', $path, $matches)) {
                 self::$resource = new Resource($matches[2]);
-                self::$resource->merge($matches[1]);
+                self::$resource->merge((int) $matches[1]);
             } else {
                 throw new RepoException('Not Found', 404);
             }

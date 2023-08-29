@@ -667,12 +667,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g     = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $r     = $g->resource($this->m[0]->getUri());
+        $this->assertGreaterThan(0, count($r->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
+        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
         $this->assertEquals("<b>abc</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("abc", $query);
@@ -690,12 +691,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g     = $this->runSearch($opts);
+        $r     = $g->resource($this->m[1]->getUri());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($r->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
+        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
         $this->assertEquals("<b>bcd</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("bcd", $query);
@@ -712,12 +714,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g     = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $r     = $g->resource($this->m[0]->getUri());
+        $this->assertGreaterThan(0, count($r->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
+        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
+        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
         $this->assertEquals("<b>abc</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("abc", $query);

@@ -27,7 +27,11 @@
 namespace acdhOeaw\arche\core;
 
 use Throwable;
-use EasyRdf\Graph;
+use quickRdf\Dataset;
+use quickRdf\Quad;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfUtil;
+use termTemplates\QuadTemplate as QT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
@@ -82,7 +86,7 @@ class Resource {
             if (RC::$handlersCtl->hasHandlers('getMetadata')) {
                 $meta = new Metadata($this->id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
-                RC::$handlersCtl->handleResource('getMetadata', (int) $this->id, $meta->getResource(), null);
+                RC::$handlersCtl->handleResource('getMetadata', (int) $this->id, $meta->getDatasetNode(), null);
             }
         }
     }
@@ -97,7 +101,7 @@ class Resource {
         $meta->loadFromRequest();
         $mode = RC::getRequestParameter('metadataWriteMode') ?? RC::$config->rest->defaultMetadataWriteMode;
         $meta->merge(strtolower($mode));
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta->getResource(), null));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta->getDatasetNode(), null));
         $meta->save();
         $this->getMetadata();
     }
@@ -118,17 +122,19 @@ class Resource {
 
         $srcMeta    = new Metadata($srcId);
         $srcMeta->loadFromDb(RRI::META_RESOURCE);
-        $srcMeta    = $srcMeta->getResource();
+        $srcMeta    = $srcMeta->getDatasetNode();
         $targetMeta = new Metadata($this->id);
         $targetMeta->loadFromDb(RRI::META_RESOURCE);
 
-        $meta = $targetMeta->getResource();
-        foreach (array_diff($meta->propertyUris(), [RC::$config->schema->id]) as $p) {
-            $srcMeta->delete($p);
+        $meta = $targetMeta->getDatasetNode();
+        $node = $meta->getNode();
+        foreach ($meta->listPredicates()->skip([RC::$schema->id]) as $p) {
+            $srcMeta->delete(new QT(predicate: $p));
         }
-        $srcMeta->deleteResource(RC::$config->schema->id, $srcMeta->getUri());
-        $meta->merge($srcMeta, [RC::$config->schema->id]);
-        RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
+        $srcMeta->delete(new QT(predicate: RC::$schema->id, object: $srcMeta->getNode()));
+        $meta->add($srcMeta->map(fn(Quad $x) => $x->withSubject($node))->withNode($node));
+
+        RC::$log->debug("\n" . RdfUtil::serialize($meta, 'text/turtle'));
         $meta = RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta, null);
         $targetMeta->loadFromResource($meta);
 
@@ -174,7 +180,7 @@ class Resource {
             if (RC::$handlersCtl->hasHandlers('get')) {
                 $meta = new Metadata($this->id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
-                RC::$handlersCtl->handleResource('get', (int) $this->id, $meta->getResource(), $binary->getPath());
+                RC::$handlersCtl->handleResource('get', (int) $this->id, $meta->getDatasetNode(), $binary->getPath());
             }
         }
     }
@@ -189,7 +195,7 @@ class Resource {
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
         $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', (int) $this->id, $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', (int) $this->id, $meta->getDatasetNode(), $binary->getPath()));
         $meta->save();
 
         $mode = RC::getRequestParameter('metadataReadMode') ?? RRI::META_NONE;
@@ -226,15 +232,15 @@ class Resource {
         $this->deleteCheckReferences($txId, (bool) ((int) $delRefs));
         RC::$auth->batchCheckAccessRights('delres', 'write', false);
 
-        $graph  = new Graph();
-        $idProp = RC::$config->schema->id;
+        $graph  = new Dataset();
+        $idProp = DF::namedNode(RC::$config->schema->id);
         $base   = RC::getBaseUrl();
         $query  = RC::$pdo->query("SELECT id, i.ids FROM identifiers i JOIN delres USING (id)");
         while ($res    = $query->fetchObject()) {
-            $graph->resource($base . $res->id)->addResource($idProp, $res->ids);
+            $graph->add(DF::quad(DF::namedNode($base . $res->id), $idProp, DF::namedNode($res->ids)));
         }
         $format = Metadata::negotiateFormat();
-        RC::setOutput($graph->serialise($format), $format);
+        RC::setOutput(RdfUtil::serialize($graph, $format), $format);
 
         $this->deleteReferences();
         $this->deleteResources($txId);
@@ -256,7 +262,7 @@ class Resource {
 
         $meta = new Metadata($this->id);
         $meta->loadFromDb(RRI::META_RESOURCE);
-        RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getResource(), null);
+        RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getDatasetNode(), null);
 
         RC::$log->debug((string) json_encode($query->fetchObject()));
         http_response_code(204);
@@ -279,7 +285,7 @@ class Resource {
             $meta->update($binary->getRequestMetadata());
             $meta->update(RC::$auth->getCreateRights());
             $meta->merge(Metadata::SAVE_OVERWRITE);
-            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getDatasetNode(), $binary->getPath()));
             $meta->save();
 
             header('Location: ' . $this->getUri());
@@ -304,18 +310,17 @@ class Resource {
     public function postCollectionMetadata(): void {
         $this->checkCanCreate();
 
-        $idProp   = RC::$config->schema->id;
         $meta     = new Metadata();
         $count    = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
-        $metaRes  = $meta->getResource();
-        $ids      = Metadata::propertyAsString($metaRes, $idProp);
+        $metaRes  = $meta->getDatasetNode();
+        $ids      = $metaRes->listObjects(new QT(predicate: RC::$schema->id))->getValues();
         $this->id = RC::$transaction->createResource(RC::$logId, $ids);
         try {
             $meta->setId($this->id);
             $meta->update(RC::$auth->getCreateRights());
             $meta->merge(Metadata::SAVE_OVERWRITE);
-            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
+            $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getDatasetNode(), null));
             $meta->save();
 
             header('Location: ' . $this->getUri());
@@ -465,7 +470,7 @@ class Resource {
                 $meta = new Metadata($id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
                 try {
-                    $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $id, $meta->getResource(), null));
+                    $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $id, $meta->getDatasetNode(), null));
                     $meta->save();
                 } catch (RepoLibException $e) {
                     $errors .= "Error while removing reference from resource $id: " . $e->getMessage() . "\n";
@@ -504,7 +509,7 @@ class Resource {
             if (RC::$handlersCtl->hasHandlers('delete')) {
                 $meta = new Metadata($id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
-                RC::$handlersCtl->handleResource('delete', $id, $meta->getResource(), $binary->getPath());
+                RC::$handlersCtl->handleResource('delete', $id, $meta->getDatasetNode(), $binary->getPath());
                 $meta->merge(Metadata::SAVE_MERGE);
                 $meta->save();
             }

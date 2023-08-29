@@ -407,7 +407,7 @@ class TransactionController {
             }
 
             $binary = new BinaryPayload($rid);
-            $ret    = $binary->restore((string) $txId, $this->log);
+            $ret    = $binary->restore((string) $txId);
             if ($ret) {
                 $this->log->debug("    binary state of $rid restored");
             }

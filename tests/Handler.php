@@ -28,10 +28,13 @@ namespace acdhOeaw\arche\core\tests;
 
 use PDO;
 use RuntimeException;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
+use simpleRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
+use quickRdfIo\NQuadsParser;
+use quickRdfIo\NQuadsSerializer;
+use termTemplates\QuadTemplate as QT;
 use zozlak\logging\Log;
 use acdhOeaw\arche\core\RepoException;
 use acdhOeaw\arche\core\RestController as RC;
@@ -87,15 +90,16 @@ class Handler {
         $pdo->commit();
     }
 
-    static public function deleteReference(int $id, Resource $meta,
+    static public function deleteReference(int $id, DatasetNode $meta,
                                            ?string $path): Resource {
-        if (count($meta->all(self::CHECKTRIGGER_PROP)) > 0 && count($meta->all(self::CHECK_PROP)) === 0) {
+        if ($meta->any(new QT(predicate: DF::namedNode(self::CHECKTRIGGER_PROP))) && $meta->none(new QT(predicate: DF::namedNode(self::CHECK_PROP)))) {
             throw new RepoException(self::CHECK_PROP . " is missing");
         }
         return $meta;
     }
 
-    static public function throwException(int $id, Resource $meta, ?string $path): Resource {
+    static public function throwException(int $id, DatasetNode $meta,
+                                          ?string $path): Resource {
         throw new RepoException("Just throw an exception", 400);
     }
 
@@ -159,9 +163,9 @@ class Handler {
         $this->log->debug("\t\t\tfor " . $data->uri);
 
         usleep(300000);
-        $data->meta->addLiteral('https://rpc/property', 'update rpc');
+        $data->meta->add(DF::quad($data->meta->getNode(), DF::namedNode('https://rpc/property'), DF::literal('update rpc')));
 
-        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 0, 'metadata' => $rdf]);
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($body, $opts);
@@ -174,9 +178,9 @@ class Handler {
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
 
-        $data->meta->addLiteral('https://rpc/property', 'create rpc');
+        $data->meta->add(DF::quad($data->meta->getNode(), DF::namedNode('https://rpc/property'), DF::literal('create rpc')));
 
-        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 0, 'metadata' => $rdf]);
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($body, $opts);
@@ -189,14 +193,14 @@ class Handler {
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
 
-        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
+        $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 400, 'message' => 'metadata is always wrong']);
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($body, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
-    
+
     public function onCommitRpc(AMQPMessage $req): void {
         $this->log->debug("\t\tonCommitRpc");
         $data = json_decode($req->body); // method, transactionId, resourceIds
@@ -224,9 +228,14 @@ class Handler {
 
     private function parse(string $msg): Config {
         $data       = new Config(json_decode($msg));
-        $graph      = new Graph();
-        $graph->parse($data->metadata, 'application/n-triples');
-        $data->meta = $graph->resource($data->uri);
+        $parser     = new NQuadsParser(new DF(), false, NQuadsParser::MODE_TRIPLES);
+        $data->meta = new DatasetNode(DF::namedNode($data->uri));
+        $data->meta->add($parser->parse($data->metadata));
         return $data;
+    }
+
+    private function serialize(DatasetNode $dataset): string {
+        $serializer = new NQuadsSerializer();
+        return $serializer->serialize($dataset->getDataset());
     }
 }
