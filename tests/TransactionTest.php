@@ -26,11 +26,12 @@
 
 namespace acdhOeaw\arche\core\tests;
 
-use EasyRdf\Graph;
-use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
-use function \GuzzleHttp\json_encode;
+use quickRdf\Dataset;
 use quickRdf\DatasetNode;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfIoUtil;
+use termTemplates\QuadTemplate as QT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\BinaryPayload;
 
@@ -197,9 +198,9 @@ class TransactionTest extends TestBase {
         $req  = new Request('delete', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $meta = new Graph();
-        $meta->parse($resp->getBody());
-        $this->assertEquals($location, (string) $meta->resource($location)->getResource(self::$config->schema->id));
+        $meta = new Dataset();
+        $meta->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertTrue($meta->any(new QT(DF::namedNode($location), self::$schema->id, DF::namedNode($location))));
 
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -228,7 +229,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $res1 = $this->extractResource($resp, $location);
+        $this->extractResource($resp, $location);
 
         // PATCH
         $txId = $this->beginTransaction();
@@ -237,12 +238,12 @@ class TransactionTest extends TestBase {
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $req     = new Request('patch', $location . '/metadata', $headers, self::$serializer->serialize($meta));
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res2->getLiteral('http://test/hasTitle'));
+        $this->assertEquals('test.ttl', $this->extractValue($res2, self::$schema->fileName));
+        $this->assertEquals('title', $this->extractValue($res2, 'http://test/hasTitle'));
 
         $this->rollbackTransaction($txId);
 
@@ -251,21 +252,22 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
+        $this->assertEquals('test.ttl', $this->extractValue($res3, self::$schema->fileName));
+        $this->assertNull($this->extractValue($res3, 'http://test/hasTitle'));
     }
 
     /**
      * @group transactions
      */
     public function testForeignCheckLoop(): void {
-        $txId  = $this->beginTransaction();
-        $loc1  = $this->createMetadataResource(null, $txId);
-        $meta1 = (new Graph())->resource(self::$baseUrl);
-        $meta1->addResource('http://relation', $loc1);
-        $loc2  = $this->createMetadataResource($meta1, $txId);
-        $meta2 = (new Graph())->resource($loc1);
-        $meta2->addResource('http://relation', $loc2);
+        $relProp = DF::namedNode('http://relation');
+        $txId    = $this->beginTransaction();
+        $loc1    = $this->createMetadataResource(null, $txId);
+        $meta1   = new DatasetNode(self::$baseNode);
+        $meta1->add(DF::quad(self::$baseNode, $relProp, DF::namedNode($loc1)));
+        $loc2    = $this->createMetadataResource($meta1, $txId);
+        $meta2   = new DatasetNode(self::$baseNode);
+        $meta2->add(DF::quad(self::$baseNode, $relProp, DF::namedNode($loc2)));
         $this->updateResource($meta2, $txId);
         $this->rollbackTransaction($txId);
 
@@ -302,25 +304,27 @@ class TransactionTest extends TestBase {
      * @group transactions
      */
     public function testPassIdWithinTransaction(): void {
-        $meta1 = (new Graph())->resource(self::$baseUrl);
-        $meta1->addResource(self::$config->schema->id, 'https://my/id');
+        $meta1 = new DatasetNode(self::$baseNode);
+        $meta1->add(DF::quad(self::$baseNode, self::$schema->id, DF::namedNode('https://my/id')));
         $loc1  = $this->createMetadataResource($meta1);
 
         $txId = $this->beginTransaction();
 
-        $meta2 = (new Graph())->resource($loc1);
-        $meta2->addResource(self::$config->schema->delete, self::$config->schema->id);
+        $meta2 = new DatasetNode(DF::namedNode($loc1));
+        $meta2->add(DF::quad(DF::namedNode($loc1), self::$schema->delete, self::$schema->id));
         $resp  = $this->updateResource($meta2, $txId);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta3 = $this->extractResource($resp, $loc1);
-        $this->assertEquals(1, count($meta3->all(self::$config->schema->id)));
-        $this->assertEquals($loc1, (string) $meta3->getResource(self::$config->schema->id));
+        $ids   = $meta3->copy(new QT(predicate: self::$schema->id));
+        $this->assertCount(1, $ids);
+        $this->assertEquals($loc1, $ids[0]->getObject()->getValue());
 
         $loc2  = $this->createMetadataResource($meta1);
         $meta4 = $this->getResourceMeta($loc2);
-        $this->assertEquals(2, count($meta4->all(self::$config->schema->id)));
-        foreach ($meta4->all(self::$config->schema->id) as $i) {
-            $this->assertContains((string) $i, [$loc2, 'https://my/id']);
+        $ids   = $meta4->copy(new QT(predicate: self::$schema->id));
+        $this->assertCount(2, $ids);
+        foreach ($ids->listObjects()->getValues() as $i) {
+            $this->assertContains($i, [$loc2, 'https://my/id']);
         }
 
         $this->assertEquals(204, $this->commitTransaction($txId));
@@ -365,21 +369,19 @@ class TransactionTest extends TestBase {
      * @group transactions
      */
     public function testParallelCommonResourceRollbackCommit(): void {
-        $relProp = self::$config->schema->parent;
-
         $tx1   = $this->beginTransaction();
         $tx2   = $this->beginTransaction();
         $loc1  = $this->createMetadataResource(null, $tx1);
         $loc2  = $this->createMetadataResource(null, $tx1);
-        $meta3 = (new Graph())->resource(self::$baseUrl);
-        $meta3->addResource($relProp, $loc1);
+        $meta3 = new DatasetNode(self::$baseNode);
+        $meta3->add(DF::quad(self::$baseNode, self::$schema->parent, DF::namedNode($loc1)));
         $loc3  = $this->createMetadataResource($meta3, $tx2);
         $this->rollbackTransaction($tx1);
         $this->commitTransaction($tx2);
         sleep(2);
 
         $meta3 = $this->getResourceMeta($loc3);
-        $this->assertEquals($loc1, (string) $meta3->getResource($relProp));
+        $this->assertEquals($loc1, $this->extractValue($meta3, self::$schema->parent));
 
         $req1  = new Request('get', "$loc1/metadata");
         $resp1 = self::$client->send($req1);
@@ -490,7 +492,7 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp->getBody(), $location);
-        $this->assertEquals('value1', $res->getLiteral($prop));
+        $this->assertEquals('value1', $this->extractValue($res, $prop));
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
         $resp = self::$client->send($req);

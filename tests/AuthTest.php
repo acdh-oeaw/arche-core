@@ -26,7 +26,8 @@
 
 namespace acdhOeaw\arche\core\tests;
 
-use EasyRdf\Graph;
+use quickRdf\DataFactory as DF;
+use quickRdf\DatasetNode;
 use GuzzleHttp\Psr7\Request;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
@@ -153,8 +154,8 @@ class AuthTest extends TestBase {
 
         $cfg['accessControl']['create']['assignRoles']['write'] = [];
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        $meta                                                   = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource($relProp, $loc1);
+        $meta                                                   = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad(self::$baseNode, DF::namedNode($relProp), DF::namedNode($loc1)));
         $loc2                                                   = $this->createMetadataResource($meta, $txId);
 
         $headers = [

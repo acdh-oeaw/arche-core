@@ -28,8 +28,6 @@ namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\StreamInterface;
 use acdhOeaw\arche\lib\Config;
 
 /**

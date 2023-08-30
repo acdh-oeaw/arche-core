@@ -26,10 +26,10 @@
 
 namespace acdhOeaw\arche\core\tests;
 
-use EasyRdf\Graph;
-use EasyRdf\Resource;
-use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
+use quickRdf\DatasetNode;
+use quickRdf\DataFactory as DF;
+use termTemplates\QuadTemplate as QT;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\SearchTerm;
 use acdhOeaw\arche\lib\SearchConfig;
@@ -57,24 +57,29 @@ class SearchTest extends TestBase {
             $this->getResourceMeta($this->createBinaryResource($txId)),
             $this->getResourceMeta($this->createBinaryResource($txId)),
         ];
-        $this->m[0]->addLiteral('https://title', new Literal('abc', 'en'));
-        $this->m[1]->addLiteral('https://title', new Literal('bcd', 'pl'));
-        $this->m[2]->addLiteral('https://title', 'cde');
-        $this->m[0]->addLiteral('https://date', new Literal('2019-01-01', null, RDF::XSD_DATE));
-        $this->m[1]->addLiteral('https://date', new Literal('2019-02-01', null, RDF::XSD_DATE));
-        $this->m[2]->addLiteral('https://date', new Literal('2019-03-01', null, RDF::XSD_DATE));
-        $this->m[0]->addLiteral('https://number', 10);
-        $this->m[1]->addLiteral('https://number', 2);
-        $this->m[2]->addLiteral('https://number', 30);
-        $this->m[0]->addResource('https://relation', $this->m[2]->getUri());
-        $this->m[1]->addResource('https://relation', $this->m[0]->getUri());
-        $this->m[2]->addResource('https://relation', $this->m[0]->getUri());
-        $this->m[0]->addResource(self::$config->metadataManagment->nonRelationProperties[0], 'https://test/type');
-        $this->m[1]->addLiteral('https://title2', 'abc');
-        $this->m[0]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,10 0,10 10,0 10,0 0))');
-        $this->m[1]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))');
-        $this->m[0]->addLiteral('https://url', 'https://foo.bar/baz#bim');
-        $this->m[0]->addResource(self::$config->schema->id, 'https://foo.bar/baz#bom');
+        list($m0, $m1, $m2) = array_map(fn($x) => $x->getNode(), $this->m);
+        $prop    = DF::namedNode('https://title');
+        $this->m[0]->add(DF::quad($m0, $prop, DF::literal('abc', 'en')));
+        $this->m[1]->add(DF::quad($m1, $prop, DF::literal('bcd', 'pl')));
+        $this->m[2]->add(DF::quad($m2, $prop, DF::literal('cde')));
+        $prop    = DF::namedNode('https://date');
+        $this->m[0]->add(DF::quad($m0, $prop, DF::literal('2019-01-01', null, RDF::XSD_DATE)));
+        $this->m[1]->add(DF::quad($m1, $prop, DF::literal('2019-02-01', null, RDF::XSD_DATE)));
+        $this->m[2]->add(DF::quad($m2, $prop, DF::literal('2019-03-01', null, RDF::XSD_DATE)));
+        $prop    = DF::namedNode('https://number');
+        $this->m[0]->add(DF::quad($m0, $prop, DF::literal(10)));
+        $this->m[1]->add(DF::quad($m1, $prop, DF::literal(2)));
+        $this->m[2]->add(DF::quad($m2, $prop, DF::literal(30)));
+        $prop    = DF::namedNode('https://relation');
+        $this->m[0]->add(DF::quad($m0, $prop, $m2));
+        $this->m[1]->add(DF::quad($m1, $prop, $m0));
+        $this->m[2]->add(DF::quad($m2, $prop, $m0));
+        $this->m[0]->add(DF::quad($m0, DF::namedNode(self::$config->metadataManagment->nonRelationProperties[0]), DF::namedNode('https://test/type')));
+        $this->m[1]->add(DF::quad($m1, DF::namedNode('https://title2'), DF::literal('abc')));
+        $this->m[0]->add(DF::quad($m0, DF::namedNode(self::$config->spatialSearch->properties[0]), DF::literal('POLYGON((0 0,10 0,10 10,0 10,0 0))')));
+        $this->m[1]->add(DF::quad($m1, DF::namedNode(self::$config->spatialSearch->properties[0]), DF::literal('POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))')));
+        $this->m[0]->add(DF::quad($m0, DF::namedNode('https://url'), DF::literal('https://foo.bar/baz#bim')));
+        $this->m[0]->add(DF::quad($m0, self::$schema->id, DF::namedNode('https://foo.bar/baz#bom')));
         foreach ($this->m as $i) {
             $this->updateResource($i, $txId);
         }
@@ -97,9 +102,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -109,7 +114,7 @@ class SearchTest extends TestBase {
         $opts = [
             'query'   => [
                 'property[0]' => 'https://relation',
-                'value[0]'    => $this->m[0]->getUri(),
+                'value[0]'    => $this->m[0]->getNode()->getValue(),
                 'type[0]'     => RDF::RDFS_RESOURCE,
             ],
             'headers' => [
@@ -117,14 +122,14 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
 
         $opts = [
             'query'   => [
                 'property[0]' => 'https://relation',
-                'value[0]'    => $this->m[0]->getUri(),
+                'value[0]'    => $this->m[0]->getNode()->getValue(),
                 'type[0]'     => SearchTerm::TYPE_RELATION,
             ],
             'headers' => [
@@ -132,9 +137,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -144,16 +149,16 @@ class SearchTest extends TestBase {
         $opts = [
             'query'   => [
                 'property[0]' => 'https://relation',
-                'value[0]'    => $this->m[2]->getUri(),
+                'value[0]'    => $this->m[2]->getNode()->getValue(),
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -171,9 +176,9 @@ class SearchTest extends TestBase {
             'value[0]'    => 'https://test/type',
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
 
         $opts['query'] = [
             'property[0]' => self::$config->metadataManagment->nonRelationProperties[0],
@@ -181,9 +186,9 @@ class SearchTest extends TestBase {
             'type[0]'     => SearchTerm::TYPE_RELATION,
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
 
         $opts['query'] = [
             'property[0]' => self::$config->metadataManagment->nonRelationProperties[0],
@@ -191,9 +196,9 @@ class SearchTest extends TestBase {
             'type[0]'     => RDF::XSD_ANY_URI,
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -211,9 +216,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -232,9 +237,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -252,9 +257,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -271,12 +276,12 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
-        $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
-        $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode(), self::$schema->searchMatch)));
     }
 
     /**
@@ -294,19 +299,19 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
-        $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
-        $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode(), self::$schema->searchMatch)));
     }
 
     /**
      * @group search
      */
     public function testMetaFilterOutputProperties(): void {
-        $opts    = [
+        $opts  = [
             'query'   => [
                 'property[0]'            => 'https://title',
                 'value[0]'               => 'abc',
@@ -319,28 +324,27 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->resourceProperties     => 'https://mime,https://title',
             ],
         ];
-        $g       = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
-        $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
-        $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
-        $r       = $g->resource($this->m[0]);
-        $allowed = ['https://mime', 'https://title', 'search://match'];
-        $this->assertCount(3, $r->propertyUris());
-        $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
-        $r       = $g->resource($this->m[2]);
-        $allowed = ['https://size', 'http://createUser', 'https://relation'];
-        $this->assertCount(3, $r->propertyUris());
-        $this->assertCount(0, array_diff($r->propertyUris(), $allowed));
+        $g     = $this->runSearch($opts);
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode(), self::$schema->searchMatch)));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode(), self::$schema->searchMatch)));
+        $props = $g->listPredicates(new QT($this->m[0]->getNode()))->getValues();
+        sort($props);
+        $this->assertEquals(['https://mime', 'https://title', 'search://match'], $props);
+        $props = $g->listPredicates(new QT($this->m[2]->getNode()))->getValues();
+        sort($props);
+        $this->assertEquals(['http://createUser', 'https://relation', 'https://size'], $props);
     }
 
     /**
      * @group search
      */
     public function testByLang(): void {
-        $opts = [
+        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $opts      = [
             'query'   => [
                 'value[0]'    => 'abc',
                 'language[0]' => 'en',
@@ -349,11 +353,11 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $g         = $this->runSearch($opts);
+        $this->assertEquals(1, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
 
         $opts = [
             'query'   => [
@@ -365,10 +369,10 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals(0, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
 
         $opts = [
             'query'   => [
@@ -379,14 +383,15 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals(1, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     public function testMultipleValues(): void {
-        $opts = [
+        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $opts      = [
             'query'   => [
                 'value[0][0]' => 'abc',
                 'value[0][1]' => 'bcd',
@@ -395,11 +400,11 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g    = $this->runSearch($opts);
-        $this->assertEquals(2, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $g         = $this->runSearch($opts);
+        $this->assertEquals(2, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     public function testMultipleProperties(): void {
@@ -414,9 +419,9 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
@@ -487,17 +492,17 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
      * @group search
      */
     public function testPaging(): void {
-        $countProp = self::$config->schema->searchCount;
-        $valueProp = self::$config->schema->searchOrderValue . '1';
+        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
         $opts      = [
             'query'   => [
                 'sql'       => "SELECT id FROM resources",
@@ -509,27 +514,27 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertEquals('cde', $g->resource($this->m[2]->getUri())->getLiteral($valueProp)->getValue());
+        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+        $this->assertEquals('cde', $g->listObjects(new QT($this->m[2]->getNode(), $valueProp))->current()?->getValue());
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertEquals('bcd', $g->resource($this->m[1]->getUri())->getLiteral($valueProp)->getValue());
+        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $this->assertEquals('bcd', $g->listObjects(new QT($this->m[1]->getNode(), $valueProp))->current()?->getValue());
     }
 
     /**
      * @group search
      */
     public function testPagingByNumber(): void {
-        $countProp = self::$config->schema->searchCount;
-        $valueProp = self::$config->schema->searchOrderValue . '1';
+        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
         $opts      = [
             'query'   => [
                 'sql'       => "SELECT id FROM resources",
@@ -541,19 +546,19 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertEquals('2', $g->resource($this->m[1]->getUri())->getLiteral($valueProp)->getValue());
+        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $this->assertEquals('2', $g->listObjects(new QT($this->m[1]->getNode(), $valueProp))->current()?->getValue());
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral($countProp)?->getValue());
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertEquals('10', $g->resource($this->m[0]->getUri())->getLiteral($valueProp)->getValue());
+        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $this->assertEquals('10', $g->listObjects(new QT($this->m[0]->getNode(), $valueProp))->current()?->getValue());
     }
 
     /**
@@ -586,8 +591,10 @@ class SearchTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
         $meta     = $this->extractResource($resp, $location);
-        $meta->addLiteral('http://another/match', 'foo bar verbunden foo baz');
-        $meta->addResource(self::$config->schema->id, 'http://verbunden');
+        $meta->add([
+            DF::quad($meta->getNode(), DF::namedNode('http://another/match'), DF::literal('foo bar verbunden foo baz')),
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://verbunden')),
+        ]);
         $this->updateResource($meta, $txId);
         $this->commitTransaction($txId);
 
@@ -611,32 +618,33 @@ class SearchTest extends TestBase {
         ];
         // with all properties matching the search
         $g        = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($meta->getUri())->propertyUris()));
-        $res      = $g->resource($meta->getUri());
-        for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
-            $value = (string) $res->getLiteral($ftsValueProp . $i);
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $res      = new DatasetNode($meta->getNode(), $g);
+        $this->assertGreaterThan(0, count($res));
+        for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
+            $value = $this->extractValue($res, $ftsValueProp . $i);
             $value = str_replace("\n", '', $value);
-            $prop  = (string) $res->get($ftsPropProp . $i);
+            $prop  = $this->extractValue($res, $ftsPropProp . $i);
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
         }
         $this->assertCount($i - 1, $expected);
         $g   = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($meta->getUri())->propertyUris()));
-        $res = $g->resource($meta->getUri());
-        for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
-            $value = (string) $res->getLiteral($ftsValueProp . $i);
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $res = new DatasetNode($meta->getNode(), $g);
+        $this->assertGreaterThan(0, count($res));
+        for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
+            $value = $this->extractValue($res, $ftsValueProp . $i);
             $value = str_replace("\n", '', $value);
-            $prop  = (string) $res->get($ftsPropProp . $i);
+            $prop  = $this->extractValue($res, $ftsPropProp . $i);
+            $query = $this->extractValue($res, $ftsQueryProp . $i);
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
-            $this->assertEquals($opts['query']['value[]'], (string) $res->getLiteral($ftsQueryProp . $i));
+            $this->assertEquals($opts['query']['value[]'], $query);
         }
         $this->assertCount($i - 1, $expected);
     }
@@ -655,8 +663,11 @@ class SearchTest extends TestBase {
     }
 
     public function testFullTextSearch3(): void {
+        $ftsValueProp = self::$config->schema->searchFts;
+        $ftsPropProp  = self::$config->schema->searchFtsProperty;
+        $ftsQueryProp = self::$config->schema->searchFtsQuery;
         // by metadata property
-        $opts  = [
+        $opts         = [
             'query'   => [
                 'property[]' => 'https://title',
                 'value[]'    => 'abc',
@@ -666,14 +677,14 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g     = $this->runSearch($opts);
-        $r     = $g->resource($this->m[0]->getUri());
-        $this->assertGreaterThan(0, count($r->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $g            = $this->runSearch($opts);
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $r            = $this->m[0]->getNode();
+        $value        = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
+        $prop         = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
+        $query        = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
         $this->assertEquals("<b>abc</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("abc", $query);
@@ -691,13 +702,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g     = $this->runSearch($opts);
-        $r     = $g->resource($this->m[1]->getUri());
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($r->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $r     = $this->m[1]->getNode();
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $value = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
+        $prop  = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
+        $query = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
         $this->assertEquals("<b>bcd</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("bcd", $query);
@@ -714,13 +725,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g     = $this->runSearch($opts);
-        $r     = $g->resource($this->m[0]->getUri());
-        $this->assertGreaterThan(0, count($r->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $value = (string) $r->getLiteral(self::$config->schema->searchFts . '1');
-        $prop  = (string) $r->getResource(self::$config->schema->searchFtsProperty . '1');
-        $query = (string) $r->getLiteral(self::$config->schema->searchFtsQuery . '1');
+        $r     = $this->m[0]->getNode();
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $value = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
+        $prop  = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
+        $query = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
         $this->assertEquals("<b>abc</b>", $value);
         $this->assertEquals("https://title", $prop);
         $this->assertEquals("abc", $query);
@@ -731,21 +742,22 @@ class SearchTest extends TestBase {
         $ftsPropProp  = self::$config->schema->searchFtsProperty;
         $ftsQueryProp = self::$config->schema->searchFtsQuery;
         $idProp       = self::$config->schema->id;
-
-        $txId     = $this->beginTransaction();
-        $headers  = [
+        $txId         = $this->beginTransaction();
+        $headers      = [
             self::$config->rest->headers->transactionId => $txId,
             'Content-Disposition'                       => 'attachment; filename="baedeker.xml"',
             'Eppn'                                      => 'admin',
         ];
-        $body     = (string) file_get_contents(__DIR__ . '/data/baedeker.xml');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
-        $resp     = self::$client->send($req);
+        $body         = (string) file_get_contents(__DIR__ . '/data/baedeker.xml');
+        $req          = new Request('post', self::$baseUrl, $headers, $body);
+        $resp         = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0];
-        $meta     = $this->extractResource($resp, $location);
-        $meta->addLiteral('http://another/match', 'foo bar verbunden foo baz');
-        $meta->addResource($idProp, 'http://verbunden');
+        $location     = $resp->getHeader('Location')[0];
+        $meta         = $this->extractResource($resp, $location);
+        $meta->add([
+            DF::quad($meta->getNode(), DF::namedNode('http://another/match'), DF::literal('foo bar verbunden foo baz')),
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://verbunden')),
+        ]);
         $this->updateResource($meta, $txId);
         $this->commitTransaction($txId);
 
@@ -772,17 +784,17 @@ class SearchTest extends TestBase {
         ];
         $g       = $this->runSearch($opts);
         $g       = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($meta->getUri())->propertyUris()));
-        $res     = $g->resource($meta->getUri());
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $this->assertTrue($g->any(new QT($meta->getNode())));
+        $res     = new DatasetNode($meta->getNode(), $g);
         $results = [];
-        for ($i = 1; $res->getLiteral($ftsValueProp . $i); $i++) {
-            $value          = (string) $res->getLiteral($ftsValueProp . $i);
+        for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
+            $value          = $this->extractValue($res, $ftsValueProp . $i);
             $value          = str_replace("\n", '', $value);
-            $prop           = (string) $res->get($ftsPropProp . $i);
-            $query          = (string) $res->getLiteral($ftsQueryProp . $i);
+            $prop           = $this->extractValue($res, $ftsPropProp . $i);
+            $query          = $this->extractValue($res, $ftsQueryProp . $i);
             $results[$prop] = ['v' => $value, 'q' => $query];
         }
         $this->assertCount(3, $results);
@@ -814,13 +826,13 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral($countProp)->getValue());
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertEquals(1, $g->listObjects(new QT(self::$baseNode))->current()?->getValue());
 
         $opts['query']['value[]'] = '"https://foo.bar/baz#bom"';
         $g                        = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral($countProp)->getValue());
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertEquals(1, $g->listObjects(new QT(self::$baseNode))->current()?->getValue());
     }
 
     /**
@@ -835,9 +847,9 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testVeryOldDate(): void {
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral('https://date', new Literal('-12345-01-01', null, RDF::XSD_DATE));
-        $uri  = $this->getResourceMeta($this->createMetadataResource($meta));
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad(self::$baseNode, DF::namedNode('https://date'), DF::literal('-12345-01-01', null, RDF::XSD_DATE)));
+        $uri  = $this->getResourceMeta($this->createMetadataResource($meta))->getNode();
 
         $opts = [
             'query'   => [
@@ -850,10 +862,10 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($uri)->propertyUris()));
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+        $this->assertTrue($g->any(new QT($uri)));
 
         $opts = [
             'query'   => [
@@ -867,10 +879,10 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($uri)->propertyUris()));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[0]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[1]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[2]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($uri))));
 
         $opts = [
             'query'   => [
@@ -883,10 +895,10 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($uri)->propertyUris()));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[0]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[1]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[2]->getNode()))));
+        $this->assertCount(0, $g->copy(new QT($uri)));
     }
 
     /**
@@ -905,9 +917,9 @@ class SearchTest extends TestBase {
             'value[0]'    => 'POINT(0 0)',
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[0]->getNode()))));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[1]->getNode()))));
+        $this->assertCount(0, $g->copy(new QT($this->m[2]->getNode())));
 
         // intersects with distance
         $opts['query'] = [
@@ -915,9 +927,9 @@ class SearchTest extends TestBase {
             'value[0]'    => 'POINT(10.001 10.001)',
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[0]->getNode()))));
+        $this->assertCount(0, $g->copy(new QT($this->m[1]->getNode())));
+        $this->assertCount(0, $g->copy(new QT($this->m[2]->getNode())));
 
         // db value contains search value
         $opts['query'] = [
@@ -925,9 +937,9 @@ class SearchTest extends TestBase {
             'value[0]'    => 'POINT(-5 -5)',
         ];
         $g             = $this->runSearch($opts);
-        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertCount(0, $g->copy(new QT($this->m[0]->getNode())));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[1]->getNode()))));
+        $this->assertCount(0, $g->copy(new QT($this->m[2]->getNode())));
 
         // search value contains db value
         $opts['query'] = [
@@ -935,9 +947,9 @@ class SearchTest extends TestBase {
             'value[0]'    => 'POLYGON((-5 -5,-5 10,10 10,10 -5,-5 -5))',
         ];
         $g             = $this->runSearch($opts);
-        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->copy(new QT($this->m[0]->getNode()))));
+        $this->assertCount(0, $g->copy(new QT($this->m[1]->getNode())));
+        $this->assertCount(0, $g->copy(new QT($this->m[2]->getNode())));
     }
 
     /**

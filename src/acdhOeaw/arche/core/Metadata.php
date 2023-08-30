@@ -31,7 +31,6 @@ use PDOException;
 use EasyRdf\Format;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
-use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\NamedNode;
 use quickRdf\Literal;
@@ -147,7 +146,7 @@ class Metadata {
             $this->graph->getDataset()->forEach(fn($x) => $x->withSubject($node), $filter);
         }
         if (count($this->graph) === 0) {
-            RC::$log->warning("No metadata for $resUri \n" . RdfUtil::serialize($this->graph->getDataset(), 'text/turtle'));
+            RC::$log->warning("No metadata for $node \n" . RdfUtil::serialize($this->graph->getDataset(), 'text/turtle'));
         }
         return count($this->graph);
     }
@@ -349,7 +348,7 @@ class Metadata {
      * @return void
      */
     public function setResponseBody(string $format): void {
-        RC::setOutput(RdfUtil::serialize($this->graph->getDataset(), $format));
+        RC::setOutput(RdfUtil::serialize($this->graph->getDataset(), $format), $format);
     }
 
     private function autoAddId(string $ids): bool {

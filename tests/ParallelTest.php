@@ -26,13 +26,10 @@
 
 namespace acdhOeaw\arche\core\tests;
 
-use EasyRdf\Graph;
-use EasyRdf\Literal;
-use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use quickRdf\DatasetNode;
-use zozlak\RdfConstants as RDF;
-use acdhOeaw\arche\core\Metadata;
+use quickRdf\DataFactory as DF;
+use termTemplates\QuadTemplate as QT;
 use acdhOeaw\arche\core\Transaction;
 
 /**
@@ -79,18 +76,21 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
         // prepare large-enough metadata
-        $meta    = (new Graph())->resource($loc);
-        $meta->addLiteral('http://foo/a', str_repeat("a", 1000));
-        $meta->addLiteral('http://foo/b', str_repeat("b", 1000));
-        $meta->addLiteral('http://foo/c', str_repeat("c", 1000));
-        $meta->addLiteral('http://foo/d', str_repeat("d", 1000));
-        $meta->addLiteral('http://foo/e', str_repeat("e", 1000));
-        $meta->addLiteral('http://foo/f', str_repeat("f", 1000));
-        $meta->addLiteral('http://foo/g', str_repeat("g", 1000));
-        $meta->addLiteral('http://foo/h', str_repeat("h", 1000));
-        $meta->addLiteral('http://foo/i', str_repeat("i", 1000));
-        $meta->addLiteral('http://foo/j', str_repeat("j", 1000));
-        $body    = $meta->getGraph()->serialise('application/n-triples');
+        $r       = DF::namedNode($loc);
+        $meta    = new DatasetNode($r);
+        $meta->add([
+            DF::quad($r, DF::namedNode('http://foo/a'), DF::literal(str_repeat("a", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/b'), DF::literal(str_repeat("b", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/c'), DF::literal(str_repeat("c", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/d'), DF::literal(str_repeat("d", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/e'), DF::literal(str_repeat("e", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/f'), DF::literal(str_repeat("f", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/g'), DF::literal(str_repeat("g", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/h'), DF::literal(str_repeat("h", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/i'), DF::literal(str_repeat("i", 1000))),
+            DF::quad($r, DF::namedNode('http://foo/j'), DF::literal(str_repeat("j", 1000))),
+        ]);
+        $body    = self::$serializer->serialize($meta);
         $req     = new Request('patch', "$loc/metadata", $headers, $body);
 
         // run a query locking the transaction during handler execution
@@ -219,6 +219,7 @@ class ParallelTest extends TestBase {
         $loc1 = $this->createMetadataResource();
         $loc2 = $this->createMetadataResource();
         $prop = 'http://foo';
+        $tmpl = new QT(predicate: DF::namedNode($prop));
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -236,8 +237,8 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
-        $this->assertEquals('value1', $r1->getLiteral($prop));
-        $this->assertEquals('value2', $r2->getLiteral($prop));
+        $this->assertEquals('value1', $r1->listObjects($tmpl)->current()?->getValue());
+        $this->assertEquals('value2', $r2->listObjects($tmpl)->current()?->getValue());
     }
 
     /**
@@ -276,6 +277,7 @@ class ParallelTest extends TestBase {
         $loc2  = $this->createMetadataResource();
         $prop  = 'http://foo';
         $value = 'http://same/object';
+        $tmpl  = new QT(predicate: DF::namedNode($prop));
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -293,7 +295,7 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
-        $this->assertEquals((string) $r2->getResource($prop), (string) $r1->getResource($prop));
+        $this->assertTrue($r1->listObjects($tmpl)->current()?->equals($r2->listObjects($tmpl)->current()));
     }
 
     /**
@@ -304,28 +306,30 @@ class ParallelTest extends TestBase {
      * @group parallel
      */
     public function testParallelPostPostCycle(): void {
-        $titleProp = self::$config->schema->label;
-        $relProp   = self::$config->schema->parent;
-        $idProp    = self::$config->schema->id;
-        $txId      = $this->beginTransaction();
-        $headers   = [
+        $tmpl    = new QT(predicate: self::$schema->parent);
+        $txId    = $this->beginTransaction();
+        $headers = [
             self::$config->rest->headers->transactionId    => $txId,
             'Eppn'                                         => 'admin',
             'Content-Type'                                 => 'application/n-triples',
             'Accept'                                       => 'application/n-triples',
             self::$config->rest->headers->metadataReadMode => 'resource',
         ];
-        $meta1     = (new Graph())->resource(self::$baseUrl);
-        $meta1->addLiteral($titleProp, 'res1');
-        $meta1->addResource($idProp, 'http://res1');
-        $meta1->addResource($relProp, 'http://res2');
-        $meta2     = (new Graph())->resource(self::$baseUrl);
-        $meta2->addLiteral($titleProp, 'res2');
-        $meta2->addResource($idProp, 'http://res2');
-        $meta2->addResource($relProp, 'http://res1');
+        $meta1   = new DatasetNode(self::$baseNode);
+        $meta1->add([
+            DF::quad(self::$baseNode, self::$schema->label, DF::literal('res1')),
+            DF::quad(self::$baseNode, self::$schema->id, DF::namedNode('http://res1')),
+            DF::quad(self::$baseNode, self::$schema->parent, DF::namedNode('http://res2')),
+        ]);
+        $meta2   = new DatasetNode(self::$baseNode);
+        $meta2->add([
+            DF::quad(self::$baseNode, self::$schema->label, DF::literal('res2')),
+            DF::quad(self::$baseNode, self::$schema->id, DF::namedNode('http://res2')),
+            DF::quad(self::$baseNode, self::$schema->parent, DF::namedNode('http://res1')),
+        ]);
 
-        $req1  = new Request('post', self::$baseUrl . "metadata", $headers, $meta1->getGraph()->serialise('application/n-triples'));
-        $req2  = new Request('post', self::$baseUrl . "metadata", $headers, $meta2->getGraph()->serialise('application/n-triples'));
+        $req1  = new Request('post', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta1));
+        $req2  = new Request('post', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta2));
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $h1    = $resp1->getHeaders();
         $h2    = $resp2->getHeaders();
@@ -334,8 +338,8 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $meta1 = $this->extractResource($resp1);
         $meta2 = $this->extractResource($resp2);
-        $this->assertEquals($meta2->getUri(), (string) $meta1->getResource($relProp));
-        $this->assertEquals($meta1->getUri(), (string) $meta2->getResource($relProp));
+        $this->assertTrue($meta1->listObjects($tmpl)->current()?->equals($meta2->getNode()));
+        $this->assertTrue($meta2->listObjects($tmpl)->current()?->equals($meta1->getNode()));
     }
 
     /**
@@ -345,23 +349,21 @@ class ParallelTest extends TestBase {
      * @group parallel
      */
     public function testParallelPostPostSameId(): void {
-        $titleProp = self::$config->schema->label;
-        $idProp    = self::$config->schema->id;
-        $txId      = $this->beginTransaction();
-        $headers   = [
+        $txId    = $this->beginTransaction();
+        $headers = [
             self::$config->rest->headers->transactionId => $txId,
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $meta1     = (new Graph())->resource(self::$baseUrl);
-        $meta1->addLiteral($titleProp, 'res1');
-        $meta1->addResource($idProp, 'http://res1');
-        $meta2     = (new Graph())->resource(self::$baseUrl);
-        $meta2->addLiteral($titleProp, 'res1');
-        $meta2->addResource($idProp, 'http://res1');
+        $meta    = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad(self::$baseNode, self::$schema->label, DF::literal('res1')),
+            DF::quad(self::$baseNode, self::$schema->id, DF::namedNode('http://res1')),
+        ]);
+        $body    = self::$serializer->serialize($meta);
 
-        $req1     = new Request('post', self::$baseUrl . "metadata", $headers, $meta1->getGraph()->serialise('application/n-triples'));
-        $req2     = new Request('post', self::$baseUrl . "metadata", $headers, $meta2->getGraph()->serialise('application/n-triples'));
+        $req1     = new Request('post', self::$baseUrl . "metadata", $headers, $body);
+        $req2     = new Request('post', self::$baseUrl . "metadata", $headers, $body);
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $statuses = [$resp1->getStatusCode(), $resp2->getStatusCode()];
         $this->assertContains(201, $statuses);
@@ -396,14 +398,12 @@ class ParallelTest extends TestBase {
         $resp1   = self::$client->send($req1);
         $this->assertEquals(200, $resp1->getStatusCode());
 
-        $meta2 = (new Graph())->resource(self::$baseUrl);
-        $meta2->addResource(self::$config->schema->id, $loc1);
-        $body2 = $meta2->getGraph()->serialise('application/n-triples');
+        $meta2 = new DatasetNode(self::$baseNode);
+        $meta2->add(DF::quad(self::$baseNode, self::$schema->id, DF::namedNode($loc1)));
+        $body2 = self::$serializer->serialize($meta2);
         $req2  = new Request('post', self::$baseUrl . 'metadata', $headers, $body2);
 
-        $meta3 = (new Graph())->resource(self::$baseUrl);
-        $body3 = $meta3->getGraph()->serialise('application/n-triples');
-        $req3  = new Request('post', self::$baseUrl . 'metadata', $headers, $body3);
+        $req3 = new Request('post', self::$baseUrl . 'metadata', $headers, '');
 
         $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3,
             $req3];

@@ -29,8 +29,13 @@ namespace acdhOeaw\arche\core\tests;
 use DateTime;
 use PDO;
 use RuntimeException;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
+use quickRdf\Dataset;
+use quickRdf\DatasetNode;
+use quickRdf\NamedNode;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\NQuadsSerializer;
+use quickRdfIo\Util as RdfIoUtil;
+use termTemplates\QuadTemplate as QT;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -38,6 +43,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use acdhOeaw\arche\core\Metadata;
 use acdhOeaw\arche\lib\Config;
+use acdhOeaw\arche\core\util\Schema;
 
 /**
  * Description of TestBase
@@ -49,7 +55,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static protected string $baseUrl;
     static protected Client $client;
     static protected Config $config;
+    static protected Schema $schema;
+    static protected NamedNode $baseNode;
     static protected mixed $txCtrl;
+    static protected NQuadsSerializer $serializer;
 
     /**
      *
@@ -60,10 +69,13 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static public function setUpBeforeClass(): void {
         file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
-        self::$client  = new Client(['http_errors' => false, 'allow_redirects' => false]);
-        self::$config  = Config::fromYaml(__DIR__ . '/../config.yaml');
-        self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
-        self::$pdo     = new PDO(self::$config->dbConn->admin);
+        self::$client     = new Client(['http_errors' => false, 'allow_redirects' => false]);
+        self::$config     = Config::fromYaml(__DIR__ . '/../config.yaml');
+        self::$schema     = Schema::fromConfig(self::$config);
+        self::$baseUrl    = self::$config->rest->urlBase . self::$config->rest->pathBase;
+        self::$baseNode   = DF::namedNode(self::$baseUrl);
+        self::$serializer = new NQuadsSerializer();
+        self::$pdo        = new PDO(self::$config->dbConn->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         self::$pdo->query("SET application_name TO test_conn");
 
@@ -144,15 +156,17 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $this->assertGreaterThan(0, $tMax, "Timeout while waiting for the transaction end");
     }
 
-    protected function createMetadata(?string $uri = null): Resource {
-        $g = new Graph();
-        $r = $g->resource($uri ?? self::$baseUrl);
-        $r->addResource(self::$config->schema->id, 'https://' . rand());
-        $r->addResource('http://test/hasRelation', 'https://' . rand());
-        $r->addLiteral('http://test/hasTitle', 'title');
-        $r->addLiteral('http://test/hasDate', new DateTime());
-        $r->addLiteral('http://test/hasNumber', 123.5);
-        return $r;
+    protected function createMetadata(?string $uri = null): DatasetNode {
+        $r = DF::namedNode($uri ?? self::$baseUrl);
+        $g = new DatasetNode($r);
+        $g->add([
+            DF::quad($r, DF::namedNode(self::$config->schema->id), DF::namedNode('https://' . rand())),
+            DF::quad($r, DF::namedNode('http://test/hasRelation'), DF::namedNode('https://' . rand())),
+            DF::quad($r, DF::namedNode('http://test/hasTitle'), DF::literal('title')),
+            DF::quad($r, DF::namedNode('http://test/hasDate'), DF::literal((new DateTime())->format(DateTime::ISO8601))),
+            DF::quad($r, DF::namedNode('http://test/hasNumber'), DF::literal(123.5)),
+        ]);
+        return $g;
     }
 
     protected function createBinaryResource(?int $txId = null): string {
@@ -180,11 +194,13 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp->getHeader('Location')[0];
     }
 
-    protected function createMetadataResource(?Resource $meta = null,
+    protected function createMetadataResource(Dataset | DatasetNode | null $meta = null,
                                               ?int $txId = null): string {
-        if ($meta === null) {
-            $meta = (new Graph())->resource(self::$baseUrl);
+        $meta ??= new Dataset();
+        if ($meta instanceof DatasetNode) {
+            $meta = $meta->getDataset();
         }
+        $meta->forEach(fn($x) => $x->withSubject(DF::namedNode(self::$baseUrl)));
 
         $extTx = $txId !== null;
         if (!$extTx) {
@@ -196,7 +212,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body    = $meta->getGraph()->serialise('turtle');
+        $body    = self::$serializer->serialize($meta);
         $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
         $resp    = self::$client->send($req);
 
@@ -209,7 +225,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp->getHeader('Location')[0];
     }
 
-    protected function updateResource(Resource $meta, ?int $txId = null,
+    protected function updateResource(DatasetNode $meta, ?int $txId = null,
                                       string $mode = Metadata::SAVE_MERGE): ResponseInterface {
         $extTx = $txId !== null;
         if (!$extTx) {
@@ -222,8 +238,8 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Content-Type'                                  => 'application/n-triples',
             'Eppn'                                          => 'admin',
         ];
-        $body    = $meta->getGraph()->serialise('application/n-triples');
-        $req     = new Request('patch', $meta->getUri() . '/metadata', $headers, $body);
+        $body    = self::$serializer->serialize($meta);
+        $req     = new Request('patch', $meta->getNode()->getValue() . '/metadata', $headers, $body);
         $resp    = self::$client->send($req);
 
         if (!$extTx) {
@@ -262,27 +278,14 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     }
 
     protected function extractResource(ResponseInterface | StreamInterface | string $body,
-                                       ?string $location = null): Resource {
-        if ($body instanceof ResponseInterface) {
-            $body = $body->getBody();
-        }
-        if ($body instanceof ResponseInterface) {
-            $body = (string) $body->getBody();
-        }
-        if ($location === null) {
-            $location = substr($body, 1, strpos($body, '>') - 1); // lucky n-triples guess 
-        }
-        $graph = new Graph();
-        try {
-            $graph->parse($body, 'text/turtle');
-        } catch (\EasyRdf\Parser\Exception $e) {
-            echo "\n-----\n" . $body . "\n-----\n";
-            throw $e;
-        }
-        return $graph->resource($location);
+                                       ?string $location = null): DatasetNode {
+        $graph    = new Dataset();
+        $graph->add(RdfIoUtil::parse($body, new DF()));
+        $location = $location === null ? $graph[0]->getSubject() : DF::namedNode($location);
+        return (new DatasetNode($location))->withDataset($graph);
     }
 
-    protected function getResourceMeta(string $location): Resource {
+    protected function getResourceMeta(string $location): DatasetNode {
         $req  = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         return $this->extractResource($resp, $location);
@@ -292,22 +295,20 @@ class TestBase extends \PHPUnit\Framework\TestCase {
      * 
      * @param array<mixed> $opts
      * @param string $method
-     * @return Graph
+     * @return Dataset
      */
-    protected function runSearch(array $opts, string $method = 'get'): Graph {
-        $resp   = self::$client->request($method, self::$baseUrl . 'search', $opts);
-        $format = explode(';', $resp->getHeader('Content-Type')[0])[0];
-        $body   = (string) $resp->getBody();
-        $g      = new Graph();
-        $g->parse((string) $body, $format);
-        return $g;
+    protected function runSearch(array $opts, string $method = 'get'): Dataset {
+        $resp  = self::$client->request($method, self::$baseUrl . 'search', $opts);
+        $graph = new Dataset();
+        $graph->add(RdfIoUtil::parse($resp, new DF()));
+        return $graph;
     }
 
     /**
      * Runs given requests in parallel, keeping a given delay between sending them.
      * 
      * @param array<Request> $requests
-     * @param int|array $delayUs
+     * @param int|array<int> $delayUs
      * @return array<Response>
      */
     protected function runConcurrently(array $requests, $delayUs = 0): array {
@@ -359,12 +360,21 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             $code        = curl_getinfo($i, \CURLINFO_RESPONSE_CODE);
             fseek($outputs[$n], 0);
             $headers     = [
-                'Start-Time' => $startTimes[$n],
-                'Time'       => curl_getinfo($i, \CURLINFO_TOTAL_TIME_T),
+                'Start-Time'   => $startTimes[$n],
+                'Time'         => curl_getinfo($i, \CURLINFO_TOTAL_TIME_T),
+                'Content-Type' => curl_getinfo($i, \CURLINFO_CONTENT_TYPE),
             ];
             $responses[] = new Response($code, $headers, $outputs[$n]);
         }
         curl_multi_close($handle);
         return $responses;
+    }
+
+    protected function extractValue(DatasetNode $g,
+                                    NamedNode | string $predicate): string | null {
+        if (is_string($predicate)) {
+            $predicate = DF::namedNode($predicate);
+        }
+        return $g->listObjects(new QT(predicate: $predicate))->current()?->getValue();
     }
 }

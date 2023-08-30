@@ -61,4 +61,5 @@ class Schema {
     public NamedNode $binarySize;
     public NamedNode $hash;
     public NamedNode $searchMatch;
+    public NamedNode $searchCount;
 }

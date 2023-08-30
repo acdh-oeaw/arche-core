@@ -27,10 +27,12 @@
 namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
-use EasyRdf\Graph;
-use EasyRdf\Literal;
-use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
+use quickRdf\Dataset;
+use quickRdf\DatasetNode;
+use quickRdf\DataFactory as DF;
+use quickRdfIo\Util as RdfIoUtil;
+use termTemplates\QuadTemplate as QT;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\Metadata;
 use acdhOeaw\arche\core\BinaryPayload;
@@ -62,7 +64,8 @@ class RestTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? '';
         $this->assertNotEmpty($location);
-        $metaN1   = (new Graph())->parse((string) $resp->getBody());
+        $metaN1   = new DatasetNode(DF::namedNode($location));
+        $metaN1->add(RdfIoUtil::parse($resp, new DF()));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -72,11 +75,10 @@ class RestTest extends TestBase {
         $req    = new Request('get', $location . '/metadata', $this->getHeaders($txId));
         $resp   = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $graph  = new Graph();
-        $metaN2 = $graph->parse($resp->getBody());
-        $res    = $graph->resource($location);
-        $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), (string) $res->getLiteral(self::$config->schema->hash));
-        $this->assertEquals($metaN1, $metaN2);
+        $metaN2 = new DatasetNode(DF::namedNode($location));
+        $metaN2->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), $this->extractValue($metaN2, self::$schema->hash));
+        $this->assertTrue($metaN1->equals($metaN2));
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -101,11 +103,10 @@ class RestTest extends TestBase {
             $resp              = self::$client->send($req);
             $this->assertEquals(200, $resp->getStatusCode());
             $this->assertEquals($f, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
-            $meta              = new Graph();
-            $body              = (string) $resp->getBody();
-            $meta->parse($body, $f);
+            $meta              = new DatasetNode(DF::namedNode($location));
+            $meta->add(RdfIoUtil::parse($resp, new DF()));
             if ($prevMeta !== null) {
-                $this->assertEquals($prevMeta->countTriples(), $meta->countTriples());
+                $this->assertTrue($prevMeta->equals($meta));
             } else {
                 $prevMeta = $meta;
             }
@@ -136,9 +137,9 @@ class RestTest extends TestBase {
         $req  = new Request('delete', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $meta = new Graph();
-        $meta->parse($resp->getBody());
-        $this->assertEquals($location, (string) $meta->resource($location)->getResource(self::$config->schema->id));
+        $meta = new DatasetNode(DF::namedNode($location));
+        $meta->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals($location, $this->extractValue($meta, self::$schema->id));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -202,28 +203,25 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testDeleteRecursively(): void {
-        $relProp = 'http://relation';
-        $idProp  = self::$config->schema->id;
-        $txId    = $this->beginTransaction();
+        $txId = $this->beginTransaction();
 
         $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource($relProp, $loc1);
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
         $loc2 = $this->createMetadataResource($meta, $txId);
 
         $headers                                                       = $this->getHeaders($txId);
-        $headers[self::$config->rest->headers->metadataParentProperty] = $relProp;
+        $headers[self::$config->rest->headers->metadataParentProperty] = self::$config->schema->parent;
 
         $req     = new Request('delete', $loc1, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $meta    = new Graph();
-        $meta->parse($resp->getBody());
-        $deleted = [];
-        foreach ($meta->resourcesMatching($idProp) as $delres) {
-            $resp      = self::$client->send(new Request('get', $delres->getUri()));
+        $meta    = new Dataset();
+        $meta->add(RdfIoUtil::parse($resp, new DF()));
+        $deleted = $meta->listObjects(new QT(predicate: self::$schema->id))->getValues();
+        foreach ($deleted as $delres) {
+            $resp = self::$client->send(new Request('get', $delres));
             $this->assertEquals(410, $resp->getStatusCode());
-            $deleted[] = $delres->getUri();
         }
         $this->assertContains($loc1, $deleted);
         $this->assertContains($loc2, $deleted);
@@ -244,8 +242,8 @@ class RestTest extends TestBase {
         $headers = $this->getHeaders($txId);
 
         $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource('http://relation', $loc1);
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, df::namedNode($loc1)));
         $loc2 = $this->createMetadataResource($meta, $txId);
 
         $req  = new Request('delete', $loc1, $headers);
@@ -265,9 +263,9 @@ class RestTest extends TestBase {
         $req  = new Request('get', $loc2 . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $meta = new Graph();
-        $meta->parse($resp->getBody());
-        $this->assertNull($meta->resource($loc1)->getResource('http://relation'));
+        $meta = new DatasetNode(DF::namedNode($loc1));
+        $meta->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertFalse($meta->any(new QT(predicate: DF::namedNode('http://relation'))));
     }
 
     /**
@@ -276,8 +274,8 @@ class RestTest extends TestBase {
     public function testForeignCheckSeparateTx(): void {
         $txId = $this->beginTransaction();
         $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource('http://relation', $loc1);
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
         $this->createMetadataResource($meta, $txId);
         $this->commitTransaction($txId);
 
@@ -294,8 +292,8 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
 
         $loc1 = $this->createMetadataResource(null, $txId);
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource('http://relation', $loc1);
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
         $this->createMetadataResource($meta, $txId);
 
         $req  = new Request('delete', $loc1, $this->getHeaders($txId));
@@ -411,8 +409,8 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
 
         $meta = $this->extractResource($resp, $location);
-        $this->assertEquals('RestTest.php', (string) $meta->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('application/php', (string) $meta->getLiteral(self::$config->schema->mime));
+        $this->assertEquals('RestTest.php', $this->extractValue($meta, self::$schema->fileName));
+        $this->assertEquals('application/php', $this->extractValue($meta, self::$schema->mime));
 
         $this->rollbackTransaction($txId);
     }
@@ -421,7 +419,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testResourceCreateMetadata(): void {
-        $idProp = self::$config->schema->id;
+        $idTmpl = new QT(predicate: self::$schema->id);
 
         $txId = $this->beginTransaction();
 
@@ -429,13 +427,14 @@ class RestTest extends TestBase {
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
         $resp    = self::$client->send($req);
 
         $this->assertEquals(201, $resp->getStatusCode());
 
         $location = $resp->getHeader('Location')[0];
-        $metaN1   = (new Graph())->parse((string) $resp->getBody());
+        $metaN1   = new DatasetNode(DF::namedNode($location));
+        $metaN1->add(RdfIoUtil::parse($resp, new DF()));
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -444,21 +443,22 @@ class RestTest extends TestBase {
 
         $req     = new Request('get', $location . '/metadata', $this->getHeaders());
         $resp    = self::$client->send($req);
+        $body    = $resp->getBody();
         $this->assertEquals(200, $resp->getStatusCode());
-        $graph   = new Graph();
-        $body    = (string) $resp->getBody();
-        $metaN2  = $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
-        $this->assertEquals($metaN1, $metaN2);
-        $res     = $graph->resource($location);
-        $this->assertEquals(2, count($res->allResources($idProp)));
-        $allowed = [$location, (string) $meta->getResource($idProp)];
-        foreach ($res->allResources($idProp) as $i) {
-            $this->assertTrue(in_array((string) $i, $allowed));
-        }
-        $this->assertMatchesRegularExpression('|^' . self::$baseUrl . '[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
-        $this->assertEquals('title', (string) $res->getLiteral('http://test/hasTitle'));
-        $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test/hasDate'), 0, 10));
-        $this->assertEquals(123.5, (string) $res->getLiteral('http://test/hasNumber'));
+        $metaN2  = new DatasetNode(DF::namedNode($location));
+        $metaN2->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertTrue($metaN1->equals($metaN2));
+        $this->assertCount(2, $metaN1->copy($idTmpl));
+        $ids     = $metaN1->listObjects($idTmpl)->getValues();
+        sort($ids);
+        $allowed = array_merge([$location], $meta->listObjects($idTmpl)->getValues());
+        sort($allowed);
+        $this->assertEquals($allowed, $ids);
+
+        $this->assertMatchesRegularExpression('|^' . self::$baseUrl . '[0-9]+$|', (string) $this->extractValue($metaN1, 'http://test/hasRelation'));
+        $this->assertEquals('title', $this->extractValue($metaN1, 'http://test/hasTitle'));
+        $this->assertEquals(date('Y-m-d'), substr((string) $this->extractValue($metaN1, 'http://test/hasDate'), 0, 10));
+        $this->assertEquals(123.5, $this->extractValue($metaN1, 'http://test/hasNumber'));
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -473,25 +473,25 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataMerge(): void {
-        $location = $this->createBinaryResource();
-        $meta1    = $this->getResourceMeta($location);
+        $titleTmpl = new QT(predicate: DF::namedNode('http://test/hasTitle'));
+        $location  = $this->createBinaryResource();
+        $meta1     = $this->getResourceMeta($location);
 
-        $g     = new Graph();
-        $meta2 = $g->resource($location);
-        $meta2->addResource(self::$config->schema->id, 'https://123');
-        $meta2->addLiteral('http://test/hasTitle', 'merged title');
+        $meta2 = new DatasetNode(DF::namedNode($location));
+        $meta2->add([
+            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://123')),
+            DF::quad($meta2->getNode(), DF::namedNode('http://test/hasTitle'), DF::literal('merged title')),
+        ]);
         $resp  = $this->updateResource($meta2);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta3 = $this->extractResource($resp->getBody(), $location);
 
-        $this->assertEquals('test.ttl', (string) $meta3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals(1, count($meta3->all('http://test/hasTitle')));
-        $this->assertEquals('merged title', (string) $meta3->getLiteral('http://test/hasTitle'));
-        $this->assertEquals(2, count($meta3->all(self::$config->schema->id)));
-        $ids = array_map(function ($x) {
-            return (string) $x;
-        }, $meta3->all(self::$config->schema->id));
-        $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
+        $this->assertEquals('test.ttl', $this->extractValue($meta3, self::$schema->fileName));
+        $this->assertCount(1, $meta3->copy($titleTmpl));
+        $this->assertEquals('merged title', $this->extractValue($meta3, $titleTmpl->getPredicate()));
+        $ids = $meta3->listObjects(new QT(predicate: self::$schema->id))->getValues();
+        $this->assertCount(2, $ids);
+        $this->assertContains($this->extractValue($meta1, self::$schema->id), $ids);
         $this->assertContains('https://123', $ids);
     }
 
@@ -499,50 +499,50 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataAdd(): void {
-        $location = $this->createBinaryResource();
-        $meta1    = $this->getResourceMeta($location);
-        $meta1->addLiteral('http://test/hasTitle', 'foo bar');
+        $titleProp = DF::namedNode('http://test/hasTitle');
+        $location  = $this->createBinaryResource();
+        $meta1     = $this->getResourceMeta($location);
+        $meta1->add(DF::quad($meta1->getNode(), $titleProp, DF::literal('foo bar')));
         $this->updateResource($meta1);
 
-        $g     = new Graph();
-        $meta2 = $g->resource($location);
-        $meta2->addResource(self::$config->schema->id, 'https://123');
-        $meta2->addLiteral('http://test/hasTitle', 'merged title');
+        $meta2 = new DatasetNode(DF::namedNode($location));
+        $meta2->add([
+            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://123')),
+            DF::quad($meta2->getNode(), $titleProp, DF::literal('merged title')),
+        ]);
         $resp  = $this->updateResource($meta2, null, Metadata::SAVE_ADD);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta3 = $this->extractResource($resp->getBody(), $location);
 
-        $this->assertEquals('test.ttl', (string) $meta3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals(2, count($meta3->all('http://test/hasTitle')));
-        $titles = array_map(function ($x) {
-            return (string) $x;
-        }, $meta3->all('http://test/hasTitle'));
-        $this->assertContains('foo bar', $titles);
-        $this->assertContains('merged title', $titles);
-        $ids = array_map(function ($x) {
-            return (string) $x;
-        }, $meta3->all(self::$config->schema->id));
-        $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
+        $this->assertEquals('test.ttl', $this->extractValue($meta3, self::$schema->fileName));
+        $titles = $meta3->listObjects(new QT(predicate: $titleProp))->getValues();
+        sort($titles);
+        $this->assertEquals(['foo bar', 'merged title'], $titles);
+        $ids    = $meta3->listObjects(new QT(predicate: self::$schema->id))->getValues();
+        sort($ids);
+        $this->assertContains($this->extractValue($meta1, self::$schema->id), $ids);
         $this->assertContains('https://123', $ids);
     }
 
     public function testPatchMetadataDelProp(): void {
-        $meta1    = (new Graph())->resource(self::$baseUrl);
-        $meta1->addLiteral('https://my/prop', 'my value');
+        $prop = DF::namedNode('https://my/prop');
+
+        $meta1    = new DatasetNode(self::$baseNode);
+        $meta1->add(DF::quad($meta1->getNode(), $prop, DF::literal('my value')));
         $location = $this->createMetadataResource($meta1);
 
         $meta2 = $this->getResourceMeta($location);
-        $this->assertEquals('my value', $meta2->getLiteral('https://my/prop'));
+        $this->assertEquals('my value', $this->extractValue($meta2, $prop));
 
-        $meta2->delete('https://my/prop');
+        $meta2->delete(new QT(predicate: $prop));
         $resp  = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
         $meta3 = $this->extractResource($resp, $location);
-        $this->assertEquals('my value', $meta3->getLiteral('https://my/prop'));
+        $this->assertEquals('my value', $this->extractValue($meta3, $prop));
 
-        $meta2->addResource(self::$config->schema->delete, 'https://my/prop');
+        $meta2->add(DF::quad($meta2->getNode(), self::$schema->delete, $prop));
         $resp  = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
         $meta4 = $this->extractResource($resp, $location);
-        $this->assertNull($meta4->getLiteral('https://my/prop'));
+        $this->assertNull($this->extractValue($meta4, $prop));
     }
 
     /**
@@ -573,15 +573,15 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testDuplicatedId(): void {
-        $res1  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $res1  = $this->createMetadataResource();
         $meta1 = $this->getResourceMeta($res1);
-        $meta1->addResource(self::$config->schema->id, 'https://my.id');
+        $meta1->add(DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('https://my.id')));
         $resp  = $this->updateResource($meta1);
         $this->assertEquals(200, $resp->getStatusCode());
 
-        $res2  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $res2  = $this->createMetadataResource();
         $meta2 = $this->getResourceMeta($res2);
-        $meta2->addResource(self::$config->schema->id, 'https://my.id');
+        $meta2->add(DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://my.id')));
         $resp  = $this->updateResource($meta2);
         $this->assertEquals(409, $resp->getStatusCode());
         $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
@@ -619,9 +619,9 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
-        $this->assertNull($res->getLiteral(self::$config->schema->fileName));
-        $this->assertNull($res->getLiteral(self::$config->schema->binarySize));
-        $this->assertNull($res->getLiteral(self::$config->schema->hash));
+        $this->assertNull($this->extractValue($res, self::$schema->fileName));
+        $this->assertNull($this->extractValue($res, self::$schema->binarySize));
+        $this->assertNull($this->extractValue($res, self::$schema->hash));
     }
 
     /**
@@ -654,40 +654,46 @@ class RestTest extends TestBase {
             $this->getResourceMeta($this->createBinaryResource($txId)),
             $this->getResourceMeta($this->createBinaryResource($txId)),
         ];
-        $m[0]->addResource('https://relation', $m[1]->getUri());
+        $m[0]->add(DF::quad($m[0]->getNode(), self::$schema->parent, $m[1]->getNode()));
         $this->updateResource($m[0], $txId);
-        $m[1]->addResource('https://relation', $m[2]->getUri());
+        $m[1]->add(DF::quad($m[1]->getNode(), self::$schema->parent, $m[2]->getNode()));
         $this->updateResource($m[1], $txId);
         $this->commitTransaction($txId);
 
         $headers = [
             self::$config->rest->headers->metadataReadMode       => RRI::META_RELATIVES,
-            self::$config->rest->headers->metadataParentProperty => 'https://relation',
+            self::$config->rest->headers->metadataParentProperty => self::$schema->parent->getValue(),
         ];
-        $req     = new Request('get', $m[0]->getUri() . '/metadata', $headers);
+        $req     = new Request('get', $m[0]->getNode()->getValue() . '/metadata', $headers);
         $resp    = self::$client->send($req);
-        $g       = new Graph();
-        $g->parse((string) $resp->getBody());
         $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertGreaterThan(0, count($g->resource($m[0]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($m[1]->getUri())->propertyUris()));
-        $this->assertGreaterThan(0, count($g->resource($m[2]->getUri())->propertyUris()));
+        $g       = new Dataset();
+        $g->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertTrue($g->any(new QT($m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($m[2]->getNode())));
     }
 
     public function testMerge(): void {
-        $idProp                                                  = self::$config->schema->id;
+        $fooProp                                                 = DF::namedNode('http://foo');
+        $barProp                                                 = DF::namedNode('http://bar');
+        $bazProp                                                 = DF::namedNode('http://baz');
         $txId                                                    = $this->beginTransaction();
         $headers                                                 = $this->getHeaders($txId);
         $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
 
-        $meta1 = (new Graph())->resource(self::$baseUrl);
-        $meta1->addResource($idProp, 'http://res1');
-        $meta1->addLiteral('http://foo', '1');
-        $meta1->addLiteral('http://bar', '2');
-        $meta2 = (new Graph())->resource(self::$baseUrl);
-        $meta2->addResource($idProp, 'http://res2');
-        $meta2->addLiteral('http://bar', 'A');
-        $meta2->addLiteral('http://baz', 'B');
+        $meta1 = new DatasetNode(self::$baseNode);
+        $meta1->add([
+            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res1')),
+            DF::quad($meta1->getNode(), $fooProp, DF::literal('1')),
+            DF::quad($meta1->getNode(), $barProp, DF::literal('2')),
+        ]);
+        $meta2 = new DatasetNode(self::$baseNode);
+        $meta2->add([
+            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('http://res2')),
+            DF::quad($meta2->getNode(), $barProp, DF::literal('A')),
+            DF::quad($meta2->getNode(), $bazProp, DF::literal('B')),
+        ]);
 
         $loc1 = $this->createMetadataResource($meta1, $txId);
         $loc2 = $this->createMetadataResource($meta2, $txId);
@@ -697,28 +703,22 @@ class RestTest extends TestBase {
         $req  = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
         $resp = self::$client->send($req);
 
-        $g       = new Graph();
-        $g->parse((string) $resp->getBody());
         $this->assertEquals(200, $resp->getStatusCode());
-        $meta    = new Graph();
-        $meta->parse($resp->getBody());
-        $metaRes = $meta->resource($loc1);
+        $meta = new DatasetNode(DF::namedNode($loc1));
+        $meta->add(RdfIoUtil::parse($resp, new DF()));
         // all ids are preserved
-        $ids     = [];
-        foreach ($metaRes->allResources($idProp) as $i) {
-            $ids[] = (string) $i;
-        }
+        $ids  = $meta->listObjects(new QT(predicate: self::$schema->id))->getValues();
         $this->assertContains($loc1, $ids);
         $this->assertNotContains($loc2, $ids);
         $this->assertContains('http://res1', $ids);
         $this->assertContains('http://res2', $ids);
         // unique properties are preserved, common are kept from target
-        $this->assertCount(1, $metaRes->all('http://foo'));
-        $this->assertCount(1, $metaRes->all('http://bar'));
-        $this->assertCount(1, $metaRes->all('http://baz'));
-        $this->assertEquals('1', (string) $metaRes->get('http://foo'));
-        $this->assertEquals('2', (string) $metaRes->get('http://bar'));
-        $this->assertEquals('B', (string) $metaRes->get('http://baz'));
+        $this->assertCount(1, $meta->copy(new QT(predicate: $fooProp)));
+        $this->assertCount(1, $meta->copy(new QT(predicate: $barProp)));
+        $this->assertCount(1, $meta->copy(new QT(predicate: $bazProp)));
+        $this->assertEquals('1', $this->extractValue($meta, $fooProp));
+        $this->assertEquals('2', $this->extractValue($meta, $barProp));
+        $this->assertEquals('B', $this->extractValue($meta, $bazProp));
 
         $resp = self::$client->send(new Request('get', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
@@ -738,27 +738,29 @@ class RestTest extends TestBase {
      * @return void
      */
     public function testMergeRollback(): void {
-        $idProp = self::$config->schema->id;
-
-        $meta1 = (new Graph())->resource(self::$baseUrl);
-        $meta1->addResource($idProp, 'http://res1');
-        $meta1->addLiteral('http://bar', '1');
-        $meta2 = (new Graph())->resource(self::$baseUrl);
-        $meta2->addResource($idProp, 'http://res2');
-        $meta2->addLiteral('http://bar', 'A');
-        $loc1  = $this->createMetadataResource($meta1);
-        $loc2  = $this->createMetadataResource($meta2);
-        $id1   = substr($loc1, strlen(self::$baseUrl));
-        $id2   = substr($loc2, strlen(self::$baseUrl));
+        $barProp = DF::namedNode('http://bar');
+        $idsTmpl = new QT(predicate: self::$schema->id);
+        $meta1   = new DatasetNode(self::$baseNode);
+        $meta1->add([
+            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res1')),
+            DF::quad($meta1->getNode(), $barProp, DF::literal('1')),
+        ]);
+        $meta2   = new DatasetNode(self::$baseNode);
+        $meta2->add([
+            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res2')),
+            DF::quad($meta1->getNode(), $barProp, DF::literal('A')),
+        ]);
+        $loc1    = $this->createMetadataResource($meta1);
+        $loc2    = $this->createMetadataResource($meta2);
+        $id1     = substr($loc1, strlen(self::$baseUrl));
+        $id2     = substr($loc2, strlen(self::$baseUrl));
 
         // as the https://github.com/acdh-oeaw/arche-core/issues/28 depends on
         // the order of rows returned by the database query try different
         // resource merging order and repeat the test a few times
         foreach ([0, 1] as $order) {
             $mergeUrl = $order ? "$id2/$id1" : "$id1/$id2";
-            for ($i = 0;
-                $i < 3;
-                $i++) {
+            for ($i = 0; $i < 3; $i++) {
                 $txId                                                    = $this->beginTransaction();
                 $headers                                                 = $this->getHeaders($txId);
                 $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
@@ -775,21 +777,19 @@ class RestTest extends TestBase {
 
                 $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
                 $this->assertEquals(200, $resp->getStatusCode());
-                $g       = new Graph();
-                $g->parse((string) $resp->getBody());
-                $metaRes = $g->resource($loc1);
-                $ids     = array_map(fn($x) => (string) $x, $metaRes->allResources($idProp));
+                $metaRes = new DatasetNode(DF::namedNode($loc1));
+                $metaRes->add(RdfIoUtil::parse($resp, new DF()));
+                $ids     = $metaRes->listObjects($idsTmpl)->getValues();
                 $this->assertContains('http://res1', $ids);
-                $this->assertEquals('1', (string) $metaRes->getLiteral('http://bar'));
+                $this->assertEquals('1', $this->extractValue($metaRes, $barProp));
 
                 $resp    = self::$client->send(new Request('get', "$loc2/metadata"));
                 $this->assertEquals(200, $resp->getStatusCode());
-                $g       = new Graph();
-                $g->parse((string) $resp->getBody());
-                $metaRes = $g->resource($loc2);
-                $ids     = array_map(fn($x) => (string) $x, $metaRes->allResources($idProp));
+                $metaRes = new DatasetNode(DF::namedNode($loc2));
+                $metaRes->add(RdfIoUtil::parse($resp, new DF()));
+                $ids     = $metaRes->listObjects($idsTmpl)->getValues();
                 $this->assertContains('http://res2', $ids);
-                $this->assertEquals('A', (string) $metaRes->getLiteral('http://bar'));
+                $this->assertEquals('A', $this->extractValue($metaRes, $barProp));
             }
         }
     }
@@ -807,11 +807,11 @@ class RestTest extends TestBase {
 
     public function testSingleModDate(): void {
         $location = $this->createBinaryResource();
-        $resp     = $this->updateResource((new Graph())->resource($location));
+        $resp     = $this->updateResource(new DatasetNode(DF::namedNode($location)));
         $this->assertEquals(200, $resp->getStatusCode());
         $meta     = $this->extractResource($resp, $location);
-        $this->assertEquals(1, count($meta->all(self::$config->schema->modificationDate)));
-        $this->assertEquals(1, count($meta->all(self::$config->schema->modificationUser)));
+        $this->assertCount(1, $meta->copy(new QT(predicate: self::$schema->modificationDate)));
+        $this->assertCount(1, $meta->copy(new QT(predicate: self::$schema->modificationUser)));
     }
 
     /**
@@ -827,29 +827,31 @@ class RestTest extends TestBase {
      * @group rest
      */
     function testPseudoDuplicate(): void {
-        $txId   = $this->beginTransaction();
-        $idProp = self::$config->schema->id;
-        $prop   = 'https://bar/baz';
+        $txId = $this->beginTransaction();
+        $prop = DF::namedNode('https://bar/baz');
 
-        $meta      = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource($idProp, 'https://foo/bar1');
-        $meta->addResource($idProp, 'https://foo/bar2');
+        $meta      = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/bar1')),
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/bar2')),
+        ]);
         $location1 = $this->createMetadataResource($meta, $txId);
 
-        $meta      = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource($idProp, 'https://foo/baz');
-        $meta->addResource($prop, 'https://foo/bar1');
-        $meta->addResource($prop, 'https://foo/bar2');
+        $meta      = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/baz')),
+            DF::quad($meta->getNode(), $prop, DF::namedNode('https://foo/bar1')),
+            DF::quad($meta->getNode(), $prop, DF::namedNode('https://foo/bar2')),
+        ]);
         $location2 = $this->createMetadataResource($meta, $txId);
         $this->assertIsString($location2);
 
         $req  = new Request('get', $location2 . '/metadata');
         $resp = self::$client->send($req);
-        $g    = new Graph();
-        $g->parse((string) $resp->getBody());
-        $r    = $g->resource($location2);
-        $this->assertEquals(1, count($r->all($prop)));
-        $this->assertEquals($location1, (string) $r->get($prop));
+        $r    = new DatasetNode(DF::namedNode($location2));
+        $r->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertCount(1, $r->copy(new QT(predicate: $prop)));
+        $this->assertEquals($location1, $this->extractValue($r, $prop));
 
         $this->rollbackTransaction($txId);
     }
@@ -860,6 +862,8 @@ class RestTest extends TestBase {
     public function testAutoAddIds(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
+        $skipNode = DF::namedNode('https://skip.nmsp/123');
+        $addNode  = DF::namedNode('https://add.nmsp/123');
 
         $cfg                                                      = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['metadataManagment']['autoAddIds']['default']        = 'deny';
@@ -868,20 +872,22 @@ class RestTest extends TestBase {
         $cfg['metadataManagment']['autoAddIds']['addNamespaces']  = ['https://add.nmsp'];
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
-        $meta->addResource('https://some.property/1', 'https://skip.nmsp/123');
-        $meta->addResource('https://some.property/2', 'https://add.nmsp/123');
+        $meta->add([
+            DF::quad($meta->getNode(), DF::namedNode('https://some.property/1'), $skipNode),
+            DF::quad($meta->getNode(), DF::namedNode('https://some.property/2'), $addNode),
+        ]);
         $resp  = $this->updateResource($meta);
         $this->assertEquals(200, $resp->getStatusCode());
         $m     = $this->extractResource($resp, $location);
-        $g     = $m->getGraph();
-        $this->assertEquals(0, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://skip.nmsp/123'))));
-        $this->assertNull($m->getResource('https://some.property/1'));
-        $this->assertEquals(1, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))));
-        $added = $g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))[0];
-        $this->assertEquals($added->getUri(), (string) $m->getResource('https://some.property/2'));
+        $g     = $m->getDataset();
+        $this->assertFalse($g->any(new QT(predicate: self::$schema->id, object: $skipNode)));
+        $this->assertNull($this->extractValue($m, 'https://some.property/1'));
+        $this->assertCount(1, $g->copy(new QT(predicate: self::$schema->id, object: $addNode)));
+        $added = $g->listSubjects(new QT(predicate: self::$schema->id, object: $addNode))->getValues();
+        $this->assertEquals([$this->extractValue($m, 'https://some.property/2')], $added);
 
         // and deny
-        $meta->addResource('https://some.property/2', 'https://deny.nmsp/123');
+        $meta->add(DF::quad($meta->getNode(), DF::namedNode('https://some.property/2'), DF::namedNode('https://deny.nmsp/123')));
         $resp = $this->updateResource($meta);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
@@ -899,16 +905,16 @@ class RestTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
 
-        $res  = (new Graph())->resource(self::$baseUrl);
-        $res->addResource(self::$config->schema->id, self::$baseUrl . '0');
-        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $res  = new DatasetNode(self::$baseNode);
+        $res->add(DF::quad($res->getNode(), self::$schema->id, DF::namedNode(self::$baseUrl . '0')));
+        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertMatchesRegularExpression('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
 
-        $res  = (new Graph())->resource(self::$baseUrl);
-        $res->addLiteral(self::$config->schema->id, self::$baseUrl . '0');
-        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $res  = new DatasetNode(self::$baseNode);
+        $res->add(DF::quad($res->getNode(), self::$schema->id, DF::literal(self::$baseUrl . '0')));
+        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
@@ -918,27 +924,29 @@ class RestTest extends TestBase {
      * @group rest
      */
     function testVeryOldDate(): void {
-        $meta     = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral('https://old/date1', new Literal('-12345-01-01', null, RDF::XSD_DATE));
-        $meta->addLiteral('https://old/date2', new Literal('-4713-01-01', null, RDF::XSD_DATE));
-        $meta->addLiteral('https://old/date3', new Literal('-4714-01-01', null, RDF::XSD_DATE));
+        $meta     = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad($meta->getNode(), DF::namedNode('https://old/date1'), DF::literal('-12345-01-01', null, RDF::XSD_DATE)),
+            DF::quad($meta->getNode(), DF::namedNode('https://old/date2'), DF::literal('-4713-01-01', null, RDF::XSD_DATE)),
+            DF::quad($meta->getNode(), DF::namedNode('https://old/date3'), DF::literal('-4714-01-01', null, RDF::XSD_DATE)),
+        ]);
         $location = $this->createMetadataResource($meta);
         $req      = new Request('get', $location . '/metadata');
         $resp     = self::$client->send($req);
-        $g        = new Graph();
-        $g->parse((string) $resp->getBody());
+        $g        = new DatasetNode(DF::namedNode($location));
+        $g->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertEquals('-12345-01-01', (string) $g->resource($location)->get('https://old/date1'));
-        $this->assertEquals('-4713-01-01', (string) $g->resource($location)->get('https://old/date2'));
-        $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
+        $this->assertEquals('-12345-01-01', $this->extractValue($g, 'https://old/date1'));
+        $this->assertEquals('-4713-01-01', $this->extractValue($g, 'https://old/date2'));
+        $this->assertEquals('-4714-01-01', $this->extractValue($g, 'https://old/date3'));
     }
 
     /**
      * @group rest
      */
     function testWrongValue(): void {
-        $meta = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral('https://wrong/date', new Literal('foo', null, RDF::XSD_DATE));
+        $meta = new DatasetNode(self::$baseNode);
+        $meta->add(DF::quad($meta->getNode(), DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
         try {
             $this->createMetadataResource($meta);
             $this->assertTrue(false);
@@ -1031,14 +1039,16 @@ class RestTest extends TestBase {
         $this->assertEquals(0, $query->fetchColumn());
 
         // metadata
-        $meta     = (new Graph())->resource(self::$baseUrl);
-        $meta->addResource(self::$config->schema->id, 'https://' . rand());
-        $meta->addLiteral('http://test/hasTitle', 'title');
-        $meta->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,0 10,10 10,10 0,0 0))');
+        $meta     = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://' . rand())),
+            DF::quad($meta->getNode(), self::$schema->label, DF::literal('title')),
+            DF::quad($meta->getNode(), DF::namedNode(self::$config->spatialSearch->properties[0]), DF::literal('POLYGON((0 0,0 10,10 10,10 0,0 0))')),
+        ]);
         $headers  = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
@@ -1229,28 +1239,31 @@ class RestTest extends TestBase {
     }
 
     public function testFilterOutputProperties(): void {
-        $meta     = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral('https://foo/bar', "baz");
-        $meta->addLiteral('https://baz/bar', "foo");
+        $fooBarProp = DF::namedNode('https://foo/bar');
+        $bazBarProp = DF::namedNode('https://baz/bar');
+
+        $meta     = new DatasetNode(self::$baseNode);
+        $meta->add([
+            DF::quad($meta->getNode(), $fooBarProp, DF::literal("baz")),
+            DF::quad($meta->getNode(), $bazBarProp, DF::literal("foo")),
+        ]);
         $location = $this->createMetadataResource($meta);
 
-        $opts = ['query' => ['resourceProperties[0]' => 'https://foo/bar']];
+        $opts = ['query' => ['resourceProperties[0]' => $fooBarProp->getValue()]];
         $resp = self::$client->request('get', $location . '/metadata', $opts);
         $this->assertEquals(200, $resp->getStatusCode());
-        $g    = new Graph();
-        $g->parse((string) $resp->getBody());
-        $meta = $g->resource($location);
-        $this->assertEquals('baz', (string) $meta->getLiteral('https://foo/bar'));
-        $this->assertNull($meta->getLiteral('https://baz/bar'));
+        $g    = new DatasetNode(DF::namedNode($location));
+        $g->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals('baz', $this->extractValue($g, $fooBarProp));
+        $this->assertFalse($g->any(new QT(predicate: $bazBarProp)));
 
-        $opts = ['headers' => [self::$config->rest->headers->resourceProperties => 'https://baz/bar']];
+        $opts = ['headers' => [self::$config->rest->headers->resourceProperties => $bazBarProp->getValue()]];
         $resp = self::$client->request('get', $location . '/metadata', $opts);
         $this->assertEquals(200, $resp->getStatusCode());
-        $g    = new Graph();
-        $g->parse((string) $resp->getBody());
-        $meta = $g->resource($location);
-        $this->assertEquals('foo', (string) $meta->getLiteral('https://baz/bar'));
-        $this->assertNull($meta->getLiteral('https://foo/bar'));
+        $g    = new DatasetNode(DF::namedNode($location));
+        $g->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals('foo', $this->extractValue($g, $bazBarProp));
+        $this->assertFalse($g->any(new QT(predicate: $fooBarProp)));
     }
 
     /**
