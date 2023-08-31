@@ -369,12 +369,4 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         curl_multi_close($handle);
         return $responses;
     }
-
-    protected function extractValue(DatasetNode $g,
-                                    NamedNode | string $predicate): string | null {
-        if (is_string($predicate)) {
-            $predicate = DF::namedNode($predicate);
-        }
-        return $g->listObjects(new QT(predicate: $predicate))->current()?->getValue();
-    }
 }

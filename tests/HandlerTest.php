@@ -115,10 +115,10 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertTrue($meta->listObjects(new QT(predicate: DF::namedNode('https://text')))->current()?->equals(DF::literal('sample text', 'en')));
-        $this->assertTrue($meta->listObjects(new QT(predicate: DF::namedNode('https://other')))->current()->equals(DF::literal('own type', null, 'https://own/type')));
-        $this->assertEquals('https://rdf/type', $this->extractValue($meta, RDF::RDF_TYPE));
-        $this->assertEquals('sample value', $this->extractValue($meta, 'https://default'));
+        $this->assertTrue($meta->getObject(new QT(predicate: DF::namedNode('https://text')))?->equals(DF::literal('sample text', 'en')));
+        $this->assertTrue($meta->getObject(new QT(predicate: DF::namedNode('https://other')))->equals(DF::literal('own type', null, 'https://own/type')));
+        $this->assertEquals('https://rdf/type', $meta->getObjectValue(new QT(predicate: DF::namedNode(RDF::RDF_TYPE))));
+        $this->assertEquals('sample value', $meta->getObjectValue(new QT(predicate: DF::namedNode('https://default'))));
     }
 
     /**
@@ -138,7 +138,7 @@ class HandlerTest extends TestBase {
         $this->updateResource($this->getResourceMeta($location));
 
         $meta1 = $this->getResourceMeta($location);
-        $this->assertEquals('sample value', $meta1->listObjects($defaultTmpl)->current()?->getValue());
+        $this->assertEquals('sample value', $meta1->getObjectValue($defaultTmpl));
 
         $meta1->delete($defaultTmpl);
         $meta1->add(DF::quad($meta1->getNode(), $defaultProp, DF::literal('other value')));
@@ -146,7 +146,7 @@ class HandlerTest extends TestBase {
 
         $meta2 = $this->getResourceMeta($location);
         $this->assertCount(1, $meta2->copy($defaultTmpl));
-        $this->assertEquals('other value', $meta2->listObjects($defaultTmpl)->current()?->getValue());
+        $this->assertEquals('other value', $meta2->getObjectValue($defaultTmpl));
     }
 
     /**
@@ -196,7 +196,7 @@ class HandlerTest extends TestBase {
         $this->updateResource($meta);
 
         $newMeta = $this->getResourceMeta($location);
-        $this->assertTrue($newMeta->listObjects($tmpl)->current()?->equals(DF::literal('test', 'en')));
+        $this->assertTrue($newMeta->getObject($tmpl)?->equals(DF::literal('test', 'en')));
     }
 
     /**
@@ -212,7 +212,7 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertEquals('create rpc', $this->extractValue($meta, 'https://rpc/property'));
+        $this->assertEquals('create rpc', $meta->getObjectValue(new QT(predicate: DF::namedNode('https://rpc/property'))),);
     }
 
     /**
@@ -290,8 +290,8 @@ class HandlerTest extends TestBase {
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
         $tmpl      = new QT(predicate: DF::namedNode('https://commit/property'));
-        $this->assertEquals('commit' . $txId, $meta1->listObjects($tmpl)->current()?->getValue());
-        $this->assertEquals('commit' . $txId, $meta2->listObjects($tmpl)->current()?->getValue());
+        $this->assertEquals('commit' . $txId, $meta1->getObjectValue($tmpl));
+        $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }
 
     /**
@@ -312,8 +312,8 @@ class HandlerTest extends TestBase {
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
         $tmpl      = new QT(predicate: DF::namedNode('https://commit/property'));
-        $this->assertEquals('commit' . $txId, $meta1->listObjects($tmpl)->current()?->getValue());
-        $this->assertEquals('commit' . $txId, $meta2->listObjects($tmpl)->current()?->getValue());
+        $this->assertEquals('commit' . $txId, $meta1->getObjectValue($tmpl));
+        $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }
 
     /**
@@ -346,7 +346,7 @@ class HandlerTest extends TestBase {
         $headers                                               = $this->getHeaders($txId);
         $headers[self::$config->rest->headers->withReferences] = 1;
 
-        $loc1 = $this->createMetadataResource(null, $txId);        
+        $loc1 = $this->createMetadataResource(null, $txId);
         $meta = new Dataset();
         $meta->add([
             DF::quad(self::$baseNode, DF::namedNode(Handler::CHECKTRIGGER_PROP), DF::literal('baz')),

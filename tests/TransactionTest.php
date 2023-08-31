@@ -242,8 +242,8 @@ class TransactionTest extends TestBase {
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', $this->extractValue($res2, self::$schema->fileName));
-        $this->assertEquals('title', $this->extractValue($res2, 'http://test/hasTitle'));
+        $this->assertEquals('test.ttl', $res2->getObjectValue(new QT(predicate: self::$schema->fileName)));
+        $this->assertEquals('title', $res2->getObjectValue(new QT(predicate: DF::namedNode('http://test/hasTitle'))));
 
         $this->rollbackTransaction($txId);
 
@@ -252,8 +252,8 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', $this->extractValue($res3, self::$schema->fileName));
-        $this->assertNull($this->extractValue($res3, 'http://test/hasTitle'));
+        $this->assertEquals('test.ttl', $res3->getObjectValue(new QT(predicate: self::$schema->fileName)));
+        $this->assertNull($res3->getObjectValue(new QT(predicate: DF::namedNode('http://test/hasTitle'))));
     }
 
     /**
@@ -381,7 +381,7 @@ class TransactionTest extends TestBase {
         sleep(2);
 
         $meta3 = $this->getResourceMeta($loc3);
-        $this->assertEquals($loc1, $this->extractValue($meta3, self::$schema->parent));
+        $this->assertEquals($loc1, $meta3->getObjectValue(new QT(predicate: self::$schema->parent)));
 
         $req1  = new Request('get', "$loc1/metadata");
         $resp1 = self::$client->send($req1);
@@ -492,7 +492,7 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp->getBody(), $location);
-        $this->assertEquals('value1', $this->extractValue($res, $prop));
+        $this->assertEquals('value1', $res->getObjectValue(new QT(predicate: DF::namedNode($prop))));
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
         $resp = self::$client->send($req);

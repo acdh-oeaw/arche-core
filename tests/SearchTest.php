@@ -354,7 +354,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(1, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(1, $g->getObjectValue($countTmpl));
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
@@ -369,7 +369,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(0, $g->getObjectValue($countTmpl));
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
@@ -383,7 +383,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(1, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(1, $g->getObjectValue($countTmpl));
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
@@ -401,7 +401,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(2, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(2, $g->getObjectValue($countTmpl));
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
@@ -514,19 +514,19 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(3, $g->getObjectValue($countTmpl));
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
-        $this->assertEquals('cde', $g->listObjects(new QT($this->m[2]->getNode(), $valueProp))->current()?->getValue());
+        $this->assertEquals('cde', $g->getObjectValue(new QT($this->m[2]->getNode(), $valueProp)));
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(3, $g->getObjectValue($countTmpl));
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-        $this->assertEquals('bcd', $g->listObjects(new QT($this->m[1]->getNode(), $valueProp))->current()?->getValue());
+        $this->assertEquals('bcd', $g->getObjectValue(new QT($this->m[1]->getNode(), $valueProp)));
     }
 
     /**
@@ -546,19 +546,19 @@ class SearchTest extends TestBase {
             ],
         ];
         $g         = $this->runSearch($opts);
-        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(3, $g->getObjectValue($countTmpl));
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-        $this->assertEquals('2', $g->listObjects(new QT($this->m[1]->getNode(), $valueProp))->current()?->getValue());
+        $this->assertEquals('2', $g->getObjectValue(new QT($this->m[1]->getNode(), $valueProp)));
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->listObjects($countTmpl)->current()?->getValue());
+        $this->assertEquals(3, $g->getObjectValue($countTmpl));
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-        $this->assertEquals('10', $g->listObjects(new QT($this->m[0]->getNode(), $valueProp))->current()?->getValue());
+        $this->assertEquals('10', $g->getObjectValue(new QT($this->m[0]->getNode(), $valueProp)));
     }
 
     /**
@@ -624,9 +624,9 @@ class SearchTest extends TestBase {
         $res      = new DatasetNode($meta->getNode(), $g);
         $this->assertGreaterThan(0, count($res));
         for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
-            $value = $this->extractValue($res, $ftsValueProp . $i);
+            $value = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsValueProp . $i)));
             $value = str_replace("\n", '', $value);
-            $prop  = $this->extractValue($res, $ftsPropProp . $i);
+            $prop  = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsPropProp . $i)));
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
         }
@@ -638,10 +638,10 @@ class SearchTest extends TestBase {
         $res = new DatasetNode($meta->getNode(), $g);
         $this->assertGreaterThan(0, count($res));
         for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
-            $value = $this->extractValue($res, $ftsValueProp . $i);
+            $value = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsValueProp . $i)));
             $value = str_replace("\n", '', $value);
-            $prop  = $this->extractValue($res, $ftsPropProp . $i);
-            $query = $this->extractValue($res, $ftsQueryProp . $i);
+            $prop  = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsPropProp . $i)));
+            $query = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsQueryProp . $i)));
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
             $this->assertEquals($opts['query']['value[]'], $query);
@@ -682,15 +682,12 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
         $r            = $this->m[0]->getNode();
-        $value        = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
-        $prop         = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
-        $query        = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
-        $this->assertEquals("<b>abc</b>", $value);
-        $this->assertEquals("https://title", $prop);
-        $this->assertEquals("abc", $query);
+        $this->assertEquals("<b>abc</b>", $g->getObjectValue(new QT($r, DF::namedNode($ftsValueProp . '1'))));
+        $this->assertEquals("https://title", $g->getObjectValue(new QT($r, DF::namedNode($ftsPropProp . '1'))));
+        $this->assertEquals("abc", $g->getObjectValue(new QT($r, DF::namedNode($ftsQueryProp . '1'))));
 
         // by lang
-        $opts  = [
+        $opts = [
             'query'   => [
                 'property[]' => 'https://title',
                 'language[]' => 'pl',
@@ -701,20 +698,17 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g     = $this->runSearch($opts);
-        $r     = $this->m[1]->getNode();
+        $g    = $this->runSearch($opts);
+        $r    = $this->m[1]->getNode();
         $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-        $value = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
-        $prop  = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
-        $query = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
-        $this->assertEquals("<b>bcd</b>", $value);
-        $this->assertEquals("https://title", $prop);
-        $this->assertEquals("bcd", $query);
+        $this->assertEquals("<b>bcd</b>", $g->getObjectValue(new QT($r, DF::namedNode($ftsValueProp . '1'))));
+        $this->assertEquals("https://title", $g->getObjectValue(new QT($r, DF::namedNode($ftsPropProp . '1'))));
+        $this->assertEquals("bcd", $g->getObjectValue(new QT($r, DF::namedNode($ftsQueryProp . '1'))));
 
         // by property and lang
-        $opts  = [
+        $opts = [
             'query'   => [
                 'language[]' => 'en',
                 'value[]'    => 'abc',
@@ -724,17 +718,14 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
             ],
         ];
-        $g     = $this->runSearch($opts);
-        $r     = $this->m[0]->getNode();
+        $g    = $this->runSearch($opts);
+        $r    = $this->m[0]->getNode();
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-        $value = $g->listObjects(new QT($r, DF::namedNode($ftsValueProp . '1')))->current()?->getValue();
-        $prop  = $g->listObjects(new QT($r, DF::namedNode($ftsPropProp . '1')))->current()?->getValue();
-        $query = $g->listObjects(new QT($r, DF::namedNode($ftsQueryProp . '1')))->current()?->getValue();
-        $this->assertEquals("<b>abc</b>", $value);
-        $this->assertEquals("https://title", $prop);
-        $this->assertEquals("abc", $query);
+        $this->assertEquals("<b>abc</b>", $g->getObjectValue(new QT($r, DF::namedNode($ftsValueProp . '1'))));
+        $this->assertEquals("https://title", $g->getObjectValue(new QT($r, DF::namedNode($ftsPropProp . '1'))));
+        $this->assertEquals("abc", $g->getObjectValue(new QT($r, DF::namedNode($ftsQueryProp . '1'))));
     }
 
     public function testFullTextSearchManual(): void {
@@ -791,10 +782,10 @@ class SearchTest extends TestBase {
         $res     = new DatasetNode($meta->getNode(), $g);
         $results = [];
         for ($i = 1; $res->any(new QT(predicate: DF::namedNode($ftsValueProp . $i))); $i++) {
-            $value          = $this->extractValue($res, $ftsValueProp . $i);
+            $value          = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsValueProp . $i)));
             $value          = str_replace("\n", '', $value);
-            $prop           = $this->extractValue($res, $ftsPropProp . $i);
-            $query          = $this->extractValue($res, $ftsQueryProp . $i);
+            $prop           = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsPropProp . $i)));
+            $query          = $res->getObjectValue(new QT(predicate: DF::namedNode($ftsQueryProp . $i)));
             $results[$prop] = ['v' => $value, 'q' => $query];
         }
         $this->assertCount(3, $results);
@@ -827,12 +818,12 @@ class SearchTest extends TestBase {
         ];
         $g    = $this->runSearch($opts);
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
-        $this->assertEquals(1, $g->listObjects(new QT(self::$baseNode))->current()?->getValue());
+        $this->assertEquals(1, $g->getObjectValue(new QT(self::$baseNode)));
 
         $opts['query']['value[]'] = '"https://foo.bar/baz#bom"';
         $g                        = $this->runSearch($opts);
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
-        $this->assertEquals(1, $g->listObjects(new QT(self::$baseNode))->current()?->getValue());
+        $this->assertEquals(1, $g->getObjectValue(new QT(self::$baseNode)));
     }
 
     /**
