@@ -21,11 +21,11 @@
         "zozlak/rdf-constants": "^1",
         "php-amqplib/php-amqplib": "^3.1",
         "sweetrdf/quick-rdf-io": "^1.0.3",
-        "sweetrdf/quick-rdf": "^2.0.0-RC2",
-        "sweetrdf/simple-rdf": "^2.0.0-RC2",
+        "sweetrdf/quick-rdf": "dev-master",
+        "sweetrdf/simple-rdf": "dev-master",
         "sweetrdf/rdf-interface": "^2.0.0-RC3",
         "sweetrdf/rdf-helpers": "^1.1.0",
-        "sweetrdf/term-templates": "^1.2.0",
+        "sweetrdf/term-templates": "^2",
         "sweetrdf/rdfinterface2easyrdf": "^0.3.0"
     },
     "autoload": {
@@ -35,7 +35,7 @@
         }
     },
     "require-dev": {
-        "phpunit/phpunit": "^9",
+        "phpunit/phpunit": "^10",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
     }

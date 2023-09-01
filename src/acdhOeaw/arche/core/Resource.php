@@ -31,7 +31,7 @@ use quickRdf\Dataset;
 use quickRdf\Quad;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\Util as RdfUtil;
-use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
@@ -129,9 +129,9 @@ class Resource {
         $meta = $targetMeta->getDatasetNode();
         $node = $meta->getNode();
         foreach ($meta->listPredicates()->skip([RC::$schema->id]) as $p) {
-            $srcMeta->delete(new QT(predicate: $p));
+            $srcMeta->delete(new PT($p));
         }
-        $srcMeta->delete(new QT(predicate: RC::$schema->id, object: $srcMeta->getNode()));
+        $srcMeta->delete(new PT(RC::$schema->id, $srcMeta->getNode()));
         $meta->add($srcMeta->map(fn(Quad $x) => $x->withSubject($node))->withNode($node));
 
         RC::$log->debug("\n" . RdfUtil::serialize($meta, 'text/turtle'));
@@ -314,7 +314,7 @@ class Resource {
         $count    = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
         $metaRes  = $meta->getDatasetNode();
-        $ids      = $metaRes->listObjects(new QT(predicate: RC::$schema->id))->getValues();
+        $ids      = $metaRes->listObjects(new PT(RC::$schema->id))->getValues();
         $this->id = RC::$transaction->createResource(RC::$logId, $ids);
         try {
             $meta->setId($this->id);

@@ -29,7 +29,7 @@ namespace acdhOeaw\arche\core\tests;
 use GuzzleHttp\Psr7\Request;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
-use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use acdhOeaw\arche\core\Transaction;
 
 /**
@@ -219,7 +219,7 @@ class ParallelTest extends TestBase {
         $loc1 = $this->createMetadataResource();
         $loc2 = $this->createMetadataResource();
         $prop = 'http://foo';
-        $tmpl = new QT(predicate: $prop);
+        $tmpl = new PT($prop);
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -277,7 +277,7 @@ class ParallelTest extends TestBase {
         $loc2  = $this->createMetadataResource();
         $prop  = 'http://foo';
         $value = 'http://same/object';
-        $tmpl  = new QT(predicate: $prop);
+        $tmpl  = new PT($prop);
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -306,7 +306,7 @@ class ParallelTest extends TestBase {
      * @group parallel
      */
     public function testParallelPostPostCycle(): void {
-        $tmpl    = new QT(predicate: self::$schema->parent);
+        $tmpl    = new PT(self::$schema->parent);
         $txId    = $this->beginTransaction();
         $headers = [
             self::$config->rest->headers->transactionId    => $txId,

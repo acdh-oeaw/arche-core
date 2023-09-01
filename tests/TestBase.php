@@ -35,7 +35,6 @@ use quickRdf\NamedNode;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\NQuadsSerializer;
 use quickRdfIo\Util as RdfIoUtil;
-use termTemplates\QuadTemplate as QT;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;

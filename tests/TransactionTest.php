@@ -32,6 +32,7 @@ use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\Util as RdfIoUtil;
 use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\BinaryPayload;
 
@@ -242,8 +243,8 @@ class TransactionTest extends TestBase {
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', $res2->getObjectValue(new QT(predicate: self::$schema->fileName)));
-        $this->assertEquals('title', $res2->getObjectValue(new QT(predicate: 'http://test/hasTitle')));
+        $this->assertEquals('test.ttl', $res2->getObjectValue(new PT(self::$schema->fileName)));
+        $this->assertEquals('title', $res2->getObjectValue(new PT('http://test/hasTitle')));
 
         $this->rollbackTransaction($txId);
 
@@ -252,8 +253,8 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', $res3->getObjectValue(new QT(predicate: self::$schema->fileName)));
-        $this->assertNull($res3->getObjectValue(new QT(predicate: 'http://test/hasTitle')));
+        $this->assertEquals('test.ttl', $res3->getObjectValue(new PT(self::$schema->fileName)));
+        $this->assertNull($res3->getObjectValue(new PT('http://test/hasTitle')));
     }
 
     /**
@@ -315,13 +316,13 @@ class TransactionTest extends TestBase {
         $resp  = $this->updateResource($meta2, $txId);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta3 = $this->extractResource($resp, $loc1);
-        $ids   = $meta3->copy(new QT(predicate: self::$schema->id));
+        $ids   = $meta3->copy(new PT(self::$schema->id));
         $this->assertCount(1, $ids);
         $this->assertEquals($loc1, $ids[0]->getObject()->getValue());
 
         $loc2  = $this->createMetadataResource($meta1);
         $meta4 = $this->getResourceMeta($loc2);
-        $ids   = $meta4->copy(new QT(predicate: self::$schema->id));
+        $ids   = $meta4->copy(new PT(self::$schema->id));
         $this->assertCount(2, $ids);
         foreach ($ids->listObjects()->getValues() as $i) {
             $this->assertContains($i, [$loc2, 'https://my/id']);
@@ -381,7 +382,7 @@ class TransactionTest extends TestBase {
         sleep(2);
 
         $meta3 = $this->getResourceMeta($loc3);
-        $this->assertEquals($loc1, $meta3->getObjectValue(new QT(predicate: self::$schema->parent)));
+        $this->assertEquals($loc1, $meta3->getObjectValue(new PT(self::$schema->parent)));
 
         $req1  = new Request('get', "$loc1/metadata");
         $resp1 = self::$client->send($req1);
@@ -492,7 +493,7 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp->getBody(), $location);
-        $this->assertEquals('value1', $res->getObjectValue(new QT(predicate: $prop)));
+        $this->assertEquals('value1', $res->getObjectValue(new PT($prop)));
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
         $resp = self::$client->send($req);

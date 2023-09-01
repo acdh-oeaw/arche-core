@@ -38,6 +38,7 @@ use quickRdf\Quad;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\Util as RdfUtil;
 use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use rdfInterface2easyRdf\AsRdfInterface;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Schema;
@@ -123,7 +124,7 @@ class Metadata {
         $node = $this->graph->getNode();
         foreach ($newMeta->listPredicates() as $predicate) {
             if (!in_array($predicate->getValue(), $preserve)) {
-                $this->graph->delete(new QT(predicate: $predicate));
+                $this->graph->delete(new PT($predicate));
             }
         }
         $this->graph->add($newMeta->map(fn($x) => $x->withSubject($node))->withNode($node));
@@ -181,7 +182,7 @@ class Metadata {
                 $meta->loadFromDb(RRI::META_RESOURCE);
                 $meta = $meta->getDatasetNode();
                 foreach ($this->graph->listPredicates()->skip([RC::$schema->id]) as $predicate) {
-                    $meta->delete(new QT(predicate: $predicate));
+                    $meta->delete(new PT($predicate));
                 }
                 $meta->add($this->graph);
                 break;
@@ -220,8 +221,8 @@ class Metadata {
                 VALUES (?, ?, ?) 
                 ON CONFLICT (id, target_id, property) DO NOTHING
             ");
-            $allButIds  = $this->graph->getIterator(new QT(predicate: RC::$schema->id, negate: true));
-            $ids        = $this->graph->listObjects(new QT(predicate: RC::$schema->id))->getValues();
+            $allButIds  = $this->graph->getIterator(new PT(RC::$schema->id, negate: true));
+            $ids        = $this->graph->listObjects(new PT(RC::$schema->id))->getValues();
             foreach ($allButIds as $triple) {
                 $p = $triple->getPredicate()->getValue();
                 $v = $triple->getObject();
@@ -305,32 +306,32 @@ class Metadata {
         $schema = RC::$schema;
 
         // delete properties scheduled for removal
-        foreach ($meta->listObjects(new QT(predicate: $schema->delete)) as $i) {
-            $meta->delete(new QT(predicate: $i));
+        foreach ($meta->listObjects(new PT($schema->delete)) as $i) {
+            $meta->delete(new PT($i));
         }
-        $meta->delete(new QT(predicate: $schema->delete));
+        $meta->delete(new PT($schema->delete));
 
         // repo-id
         $meta->add(DF::quad($node, $schema->id, $node));
 
         // creation date & user
         $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
-        if ($meta->none(new QT(predicate: $schema->creationDate))) {
+        if ($meta->none(new PT($schema->creationDate))) {
             $meta->add(DF::quad($node, $schema->creationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
         }
-        if ($meta->none(new QT(predicate: $schema->creationUser))) {
+        if ($meta->none(new PT($schema->creationUser))) {
             $meta->add(DF::quad($node, $schema->creationUser, DF::literal(RC::$auth->getUserName())));
         }
         // last modification date & user
-        $meta->delete(new QT(predicate: $schema->modificationDate));
+        $meta->delete(new PT($schema->modificationDate));
         $meta->add(DF::quad($node, $schema->modificationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
-        $meta->delete(new QT(predicate: $schema->modificationUser));
+        $meta->delete(new PT($schema->modificationUser));
         $meta->add(DF::quad($node, $schema->modificationUser, DF::literal(RC::$auth->getUserName())));
 
         // check single id in the repo base url namespace which maches object's $id property
         $baseUrl    = RC::getBaseUrl();
         $baseUrlLen = strlen($baseUrl);
-        foreach ($meta->listObjects(new QT(predicate: $schema->id)) as $i) {
+        foreach ($meta->listObjects(new PT($schema->id)) as $i) {
             if (!($i instanceof NamedNode)) {
                 throw new RepoException('Non-resource identifier', 400);
             }

@@ -27,14 +27,16 @@
 namespace acdhOeaw\arche\core\tests;
 
 use DirectoryIterator;
-use PHPUnit\Runner\AfterLastTestHook;
-use PHPUnit\Runner\BeforeFirstTestHook;
+use PHPUnit\Runner\Extension\Extension;
+use PHPUnit\Event\TestRunner\ExecutionStarted;
+use PHPUnit\Event\TestRunner\ExecutionFinished;
+use PHPUnit\Event\TestRunner\ExecutionStartedSubscriber;
+use PHPUnit\Event\TestRunner\ExecutionFinishedSubscriber;
 use SebastianBergmann\CodeCoverage\CodeCoverage;
 use SebastianBergmann\CodeCoverage\Filter;
 use SebastianBergmann\CodeCoverage\RawCodeCoverageData;
 use SebastianBergmann\CodeCoverage\Report\Clover;
 use SebastianBergmann\CodeCoverage\Report\Html\Facade;
-use SebastianBergmann\CodeCoverage\Driver\Xdebug2Driver;
 use SebastianBergmann\CodeCoverage\Driver\Xdebug3Driver;
 use acdhOeaw\arche\lib\Config;
 use function \GuzzleHttp\json_decode;
@@ -44,7 +46,7 @@ use function \GuzzleHttp\json_decode;
  *
  * @author zozlak
  */
-class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
+class Bootstrap implements Extension, ExecutionStartedSubscriber, ExecutionFinishedSubscriber {
 
     private Config $config;
 
@@ -52,7 +54,7 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         $this->config = Config::fromYaml(__DIR__ . '/config.yaml');
     }
 
-    public function executeBeforeFirstTest(): void {
+    public function initialize(): void {
         $buildlogsDir = __DIR__ . '/../build/logs';
         system('rm -fR ' . escapeshellarg($buildlogsDir) . ' && mkdir ' . escapeshellarg($buildlogsDir));
 
@@ -78,10 +80,10 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         }
     }
 
-    public function executeAfterLastTest(): void {
+    public function finish(): void {
         $filter = new Filter();
         $filter->includeDirectory(__DIR__ . '/../src');
-        $driver = phpversion('xdebug') < '3' ? new Xdebug2Driver($filter) : new Xdebug3Driver($filter);
+        $driver = new Xdebug3Driver($filter);
         $cc     = new CodeCoverage($driver, $filter);
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
             if ($i->getExtension() === 'json') {
@@ -94,5 +96,19 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         $writer->process($cc, __DIR__ . '/../build/logs/clover.xml');
         $writer = new Facade();
         $writer->process($cc, __DIR__ . '/../build/logs/');
+    }
+
+    public function bootstrap(\PHPUnit\TextUI\Configuration\Configuration $configuration,
+                              \PHPUnit\Runner\Extension\Facade $facade,
+                              \PHPUnit\Runner\Extension\ParameterCollection $parameters): void {
+        $facade->registerSubscriber($this);
+    }
+
+    public function notify(ExecutionStarted | ExecutionFinished $event): void {
+        if ($event instanceof ExecutionStarted) {
+            $this->initialize();
+        } else {
+            $this->finish();
+        }
     }
 }

@@ -29,7 +29,7 @@ namespace acdhOeaw\arche\core\handler;
 use quickRdf\DataFactory as DF;
 use quickRdf\DatasetNode;
 use quickRdf\NamedNode;
-use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\util\Triple;
 
@@ -49,20 +49,20 @@ class MetadataManager {
         }
         foreach (RC::$config->metadataManager->default as $p => $vs) {
             $p = DF::namedNode($p);
-            if ($meta->none(new QT(predicate: $p))) {
+            if ($meta->none(new PT($p))) {
                 foreach ($vs as $v) {
                     self::addMetaValue($meta, $p, new Triple($v));
                 }
             }
         }
         foreach (RC::$config->metadataManager->forbidden as $p) {
-            $meta->delete(new QT(predicate: $p));
+            $meta->delete(new PT($p));
         }
         foreach (RC::$config->metadataManager->copying as $sp => $tp) {
             $sp   = DF::namedNode($sp);
             $tp   = DF::namedNode($tp);
             $node = $meta->getNode();
-            foreach ($meta->getIterator(new QT(predicate: $sp)) as $triple) {
+            foreach ($meta->getIterator(new PT($sp)) as $triple) {
                 $meta->add(DF::quad($node, $tp, $triple->getObject()));
             }
         }

@@ -30,6 +30,7 @@ use GuzzleHttp\Psr7\Request;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
 use termTemplates\QuadTemplate as QT;
+use termTemplates\PredicateTemplate as PT;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\lib\SearchTerm;
 use acdhOeaw\arche\lib\SearchConfig;
@@ -343,7 +344,7 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testByLang(): void {
-        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $countTmpl = new PT(self::$schema->searchCount);
         $opts      = [
             'query'   => [
                 'value[0]'    => 'abc',
@@ -390,7 +391,7 @@ class SearchTest extends TestBase {
     }
 
     public function testMultipleValues(): void {
-        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $countTmpl = new PT(self::$schema->searchCount);
         $opts      = [
             'query'   => [
                 'value[0][0]' => 'abc',
@@ -501,7 +502,7 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testPaging(): void {
-        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $countTmpl = new PT(self::$schema->searchCount);
         $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
         $opts      = [
             'query'   => [
@@ -533,7 +534,7 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testPagingByNumber(): void {
-        $countTmpl = new QT(predicate: self::$schema->searchCount);
+        $countTmpl = new PT(self::$schema->searchCount);
         $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
         $opts      = [
             'query'   => [
@@ -623,10 +624,10 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
         $res      = new DatasetNode($meta->getNode(), $g);
         $this->assertGreaterThan(0, count($res));
-        for ($i = 1; $res->any(new QT(predicate: $ftsValueProp . $i)); $i++) {
-            $value = $res->getObjectValue(new QT(predicate: $ftsValueProp . $i));
+        for ($i = 1; $res->any(new PT($ftsValueProp . $i)); $i++) {
+            $value = $res->getObjectValue(new PT($ftsValueProp . $i));
             $value = str_replace("\n", '', $value);
-            $prop  = $res->getObjectValue(new QT(predicate: $ftsPropProp . $i));
+            $prop  = $res->getObjectValue(new PT($ftsPropProp . $i));
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
         }
@@ -637,11 +638,11 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
         $res = new DatasetNode($meta->getNode(), $g);
         $this->assertGreaterThan(0, count($res));
-        for ($i = 1; $res->any(new QT(predicate: $ftsValueProp . $i)); $i++) {
-            $value = $res->getObjectValue(new QT(predicate: $ftsValueProp . $i));
+        for ($i = 1; $res->any(new PT($ftsValueProp . $i)); $i++) {
+            $value = $res->getObjectValue(new PT($ftsValueProp . $i));
             $value = str_replace("\n", '', $value);
-            $prop  = $res->getObjectValue(new QT(predicate: $ftsPropProp . $i));
-            $query = $res->getObjectValue(new QT(predicate: $ftsQueryProp . $i));
+            $prop  = $res->getObjectValue(new PT($ftsPropProp . $i));
+            $query = $res->getObjectValue(new PT($ftsQueryProp . $i));
             $this->assertArrayHasKey($prop, $expected);
             $this->assertEquals($expected[$prop], $value);
             $this->assertEquals($opts['query']['value[]'], $query);
@@ -781,11 +782,11 @@ class SearchTest extends TestBase {
         $this->assertTrue($g->any(new QT($meta->getNode())));
         $res     = new DatasetNode($meta->getNode(), $g);
         $results = [];
-        for ($i = 1; $res->any(new QT(predicate: $ftsValueProp . $i)); $i++) {
-            $value          = $res->getObjectValue(new QT(predicate: $ftsValueProp . $i));
+        for ($i = 1; $res->any(new PT($ftsValueProp . $i)); $i++) {
+            $value          = $res->getObjectValue(new PT($ftsValueProp . $i));
             $value          = str_replace("\n", '', $value);
-            $prop           = $res->getObjectValue(new QT(predicate: $ftsPropProp . $i));
-            $query          = $res->getObjectValue(new QT(predicate: $ftsQueryProp . $i));
+            $prop           = $res->getObjectValue(new PT($ftsPropProp . $i));
+            $query          = $res->getObjectValue(new PT($ftsQueryProp . $i));
             $results[$prop] = ['v' => $value, 'q' => $query];
         }
         $this->assertCount(3, $results);
