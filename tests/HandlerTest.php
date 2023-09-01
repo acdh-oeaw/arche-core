@@ -75,8 +75,8 @@ class HandlerTest extends TestBase {
     public function testNoHandlers(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertFalse($meta->any(new QT(predicate: DF::namedNode('https://text'))));
-        $this->assertFalse($meta->any(new QT(predicate: DF::namedNode('https://default'))));
+        $this->assertFalse($meta->any(new QT(predicate: 'https://text')));
+        $this->assertFalse($meta->any(new QT(predicate: 'https://default')));
     }
 
     /**
@@ -115,10 +115,10 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertTrue($meta->getObject(new QT(predicate: DF::namedNode('https://text')))?->equals(DF::literal('sample text', 'en')));
-        $this->assertTrue($meta->getObject(new QT(predicate: DF::namedNode('https://other')))->equals(DF::literal('own type', null, 'https://own/type')));
-        $this->assertEquals('https://rdf/type', $meta->getObjectValue(new QT(predicate: DF::namedNode(RDF::RDF_TYPE))));
-        $this->assertEquals('sample value', $meta->getObjectValue(new QT(predicate: DF::namedNode('https://default'))));
+        $this->assertTrue($meta->getObject(new QT(predicate: 'https://text')))?->equals(DF::literal('sample text', 'en'));
+        $this->assertTrue($meta->getObject(new QT(predicate: 'https://other')))->equals(DF::literal('own type', null, 'https://own/type'));
+        $this->assertEquals('https://rdf/type', $meta->getObjectValue(new QT(predicate: RDF::RDF_TYPE)));
+        $this->assertEquals('sample value', $meta->getObjectValue(new QT(predicate: 'https://default')));
     }
 
     /**
@@ -178,7 +178,7 @@ class HandlerTest extends TestBase {
      */
     public function testMetadataManagerCopying(): void {
         $fromProp = DF::namedNode('https://copy/from');
-        $tmpl     = new QT(predicate: DF::namedNode('https://copy/to'), object: new LiteralTemplate(null, LiteralTemplate::ANY));
+        $tmpl     = new QT(null, 'https://copy/to', new LiteralTemplate(null, LiteralTemplate::ANY));
 
         $this->setHandlers([
             'updateMetadata' => [
@@ -212,7 +212,7 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertEquals('create rpc', $meta->getObjectValue(new QT(predicate: DF::namedNode('https://rpc/property'))),);
+        $this->assertEquals('create rpc', $meta->getObjectValue(new QT(predicate: 'https://rpc/property')));
     }
 
     /**
@@ -247,7 +247,7 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertTrue($meta->none(new QT(predicate: DF::namedNode('https://rpc/property'))));
+        $this->assertTrue($meta->none(new QT(predicate: 'https://rpc/property')));
 
         $resp = $this->updateResource($this->getResourceMeta($location));
         $this->assertEquals(500, $resp->getStatusCode());
@@ -266,7 +266,7 @@ class HandlerTest extends TestBase {
 
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
-        $this->assertTrue($meta->none(new QT(predicate: DF::namedNode('https://rpc/property'))));
+        $this->assertTrue($meta->none(new QT(predicate: 'https://rpc/property')));
 
         $resp = $this->updateResource($this->getResourceMeta($location));
         $this->assertEquals(200, $resp->getStatusCode());
@@ -289,7 +289,7 @@ class HandlerTest extends TestBase {
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
-        $tmpl      = new QT(predicate: DF::namedNode('https://commit/property'));
+        $tmpl      = new QT(predicate: 'https://commit/property');
         $this->assertEquals('commit' . $txId, $meta1->getObjectValue($tmpl));
         $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }
@@ -311,7 +311,7 @@ class HandlerTest extends TestBase {
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
-        $tmpl      = new QT(predicate: DF::namedNode('https://commit/property'));
+        $tmpl      = new QT(predicate: 'https://commit/property');
         $this->assertEquals('commit' . $txId, $meta1->getObjectValue($tmpl));
         $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }

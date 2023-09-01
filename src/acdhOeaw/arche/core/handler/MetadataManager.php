@@ -56,7 +56,7 @@ class MetadataManager {
             }
         }
         foreach (RC::$config->metadataManager->forbidden as $p) {
-            $meta->delete(new QT(predicate: DF::namedNode($p)));
+            $meta->delete(new QT(predicate: $p));
         }
         foreach (RC::$config->metadataManager->copying as $sp => $tp) {
             $sp   = DF::namedNode($sp);

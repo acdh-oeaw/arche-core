@@ -243,7 +243,7 @@ class TransactionTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', $res2->getObjectValue(new QT(predicate: self::$schema->fileName)));
-        $this->assertEquals('title', $res2->getObjectValue(new QT(predicate: DF::namedNode('http://test/hasTitle'))));
+        $this->assertEquals('title', $res2->getObjectValue(new QT(predicate: 'http://test/hasTitle')));
 
         $this->rollbackTransaction($txId);
 
@@ -253,7 +253,7 @@ class TransactionTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', $res3->getObjectValue(new QT(predicate: self::$schema->fileName)));
-        $this->assertNull($res3->getObjectValue(new QT(predicate: DF::namedNode('http://test/hasTitle'))));
+        $this->assertNull($res3->getObjectValue(new QT(predicate: 'http://test/hasTitle')));
     }
 
     /**
@@ -492,7 +492,7 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp->getBody(), $location);
-        $this->assertEquals('value1', $res->getObjectValue(new QT(predicate: DF::namedNode($prop))));
+        $this->assertEquals('value1', $res->getObjectValue(new QT(predicate: $prop)));
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
         $resp = self::$client->send($req);

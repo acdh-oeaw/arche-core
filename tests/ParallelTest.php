@@ -219,7 +219,7 @@ class ParallelTest extends TestBase {
         $loc1 = $this->createMetadataResource();
         $loc2 = $this->createMetadataResource();
         $prop = 'http://foo';
-        $tmpl = new QT(predicate: DF::namedNode($prop));
+        $tmpl = new QT(predicate: $prop);
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -277,7 +277,7 @@ class ParallelTest extends TestBase {
         $loc2  = $this->createMetadataResource();
         $prop  = 'http://foo';
         $value = 'http://same/object';
-        $tmpl  = new QT(predicate: DF::namedNode($prop));
+        $tmpl  = new QT(predicate: $prop);
 
         $txId    = $this->beginTransaction();
         $headers = [

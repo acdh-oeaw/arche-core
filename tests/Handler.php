@@ -92,7 +92,7 @@ class Handler {
 
     static public function deleteReference(int $id, DatasetNode $meta,
                                            ?string $path): Resource {
-        if ($meta->any(new QT(predicate: DF::namedNode(self::CHECKTRIGGER_PROP))) && $meta->none(new QT(predicate: DF::namedNode(self::CHECK_PROP)))) {
+        if ($meta->any(new QT(predicate: self::CHECKTRIGGER_PROP)) && $meta->none(new QT(predicate: self::CHECK_PROP))) {
             throw new RepoException(self::CHECK_PROP . " is missing");
         }
         return $meta;

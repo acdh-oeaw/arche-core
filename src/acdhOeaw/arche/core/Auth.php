@@ -162,13 +162,13 @@ class Auth implements AuthInterface {
 
         $role = $this->getUserName();
         foreach ($c->create->creatorRights as $i) {
-            $graph->add(DF::Quad($node, DF::namedNode($c->schema->$i), DF::literal($role)));
+            $graph->add(DF::quad($node, DF::namedNode($c->schema->$i), DF::literal($role)));
         }
 
         foreach ($c->create->assignRoles as $privilege => $roles) {
             foreach ($roles as $role) {
                 $prop = $c->schema->$privilege;
-                $graph->add(DF::Quad($node, DF::namedNode($prop), DF::literal($role)));
+                $graph->add(DF::quad($node, DF::namedNode($prop), DF::literal($role)));
             }
         }
 

@@ -183,26 +183,26 @@ class BinaryPayload {
 
         $node  = DF::blankNode();
         $graph = new DatasetNode($node);
-        $graph->add(DF::Quad($node, RC::$schema->mime, DF::literal($contentType)));
+        $graph->add(DF::quad($node, RC::$schema->mime, DF::literal($contentType)));
         if (!empty($fileName)) {
-            $graph->add(DF::Quad($node, RC::$schema->fileName, DF::literal($fileName)));
+            $graph->add(DF::quad($node, RC::$schema->fileName, DF::literal($fileName)));
         } else {
-            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->fileName));
+            $graph->add(DF::quad($node, RC::$schema->delete, RC::$schema->fileName));
         }
         if ($this->size > 0) {
-            $graph->add(DF::Quad($node, RC::$schema->binarySize, DF::literal($this->size)));
+            $graph->add(DF::quad($node, RC::$schema->binarySize, DF::literal($this->size)));
         } else {
-            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->binarySize));
+            $graph->add(DF::quad($node, RC::$schema->delete, RC::$schema->binarySize));
         }
         if ($this->size > 0) {
-            $graph->add(DF::Quad($node, RC::$schema->hash, DF::literal($this->hash)));
+            $graph->add(DF::quad($node, RC::$schema->hash, DF::literal($this->hash)));
         } else {
-            $graph->add(DF::Quad($node, RC::$schema->delete, RC::$schema->hash));
+            $graph->add(DF::quad($node, RC::$schema->delete, RC::$schema->hash));
         }
         // Last modification date & user
         $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
-        $graph->add(DF::Quad($node, RC::$schema->binaryModificationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
-        $graph->add(DF::Quad($node, RC::$schema->binaryModificationUser, DF::literal(RC::$auth->getUserName())));
+        $graph->add(DF::quad($node, RC::$schema->binaryModificationDate, DF::literal($date, null, RDF::XSD_DATE_TIME)));
+        $graph->add(DF::quad($node, RC::$schema->binaryModificationUser, DF::literal(RC::$auth->getUserName())));
         return $graph;
     }
 
