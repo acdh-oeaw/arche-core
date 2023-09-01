@@ -111,10 +111,10 @@ TMPL;
         $baseUrl      = RC::getBaseUrl();
         $this->res    = $resId;
         $this->nmsp   = RC::$config->schema->namespaces ?? [];
-        $matchProp    = RC::$config->schema->searchMatch;
-        $idProp       = RC::$config->schema->id;
-        $titleProp    = RC::$config->schema->label;
-        $parentProp   = RC::$config->schema->parent;
+        $matchProp    = RC::$schema->searchMatch->getValue();
+        $idProp       = RC::$schema->id->getValue();
+        $titleProp    = RC::$schema->label->getValue();
+        $parentProp   = RC::$schema->parent->getValue();
 
         if ($resId > 0) {
             $matchFunc = function (Triple $t) use ($resId): bool {
@@ -185,9 +185,9 @@ TMPL;
 
     public function output(): void {
         $baseUrl    = RC::getBaseUrl();
-        $idProp     = RC::$config->schema->id;
-        $titleProp  = RC::$config->schema->label;
-        $parentProp = RC::$config->schema->parent;
+        $idProp     = RC::$schema->id->getValue();
+        $titleProp  = RC::$schema->label->getValue();
+        $parentProp = RC::$schema->parent->getValue();
         $skipProps  = [$idProp, $titleProp, $parentProp, self::CHILD_PROP];
 
         $title  = "$baseUrl$this->res";

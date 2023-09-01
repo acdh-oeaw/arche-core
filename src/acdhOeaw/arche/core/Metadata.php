@@ -39,7 +39,6 @@ use quickRdf\DataFactory as DF;
 use quickRdfIo\Util as RdfUtil;
 use termTemplates\QuadTemplate as QT;
 use termTemplates\PredicateTemplate as PT;
-use rdfInterface2easyRdf\AsRdfInterface;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\RepoDb;
@@ -163,8 +162,7 @@ class Metadata {
         $repo        = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
         $res         = new RepoResourceDb((string) $this->id, $repo);
         $res->loadMetadata(true, $mode, $property);
-        $this->graph = new DatasetNode(DF::namedNode($res->getUri()));
-        $this->graph->add(AsRdfInterface::asRdfInterface($res->getGraph()->getGraph(), new DF()));
+        $this->graph = $res->getGraph();
     }
 
     public function merge(string $mode): DatasetNode {
