@@ -11,6 +11,7 @@ composer.lock
 /build/logs
 /tika
 /.phpunit.result.cache
+/.phpunit.cache
 /.phpdoc
 /supervisord.log
 /supervisord.pid

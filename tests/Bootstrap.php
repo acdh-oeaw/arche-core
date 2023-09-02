@@ -28,16 +28,19 @@ namespace acdhOeaw\arche\core\tests;
 
 use DirectoryIterator;
 use PHPUnit\Runner\Extension\Extension;
+use PHPUnit\Runner\Extension\Facade;
+use PHPUnit\Runner\Extension\ParameterCollection;
+use PHPUnit\TextUI\Configuration\Configuration;
 use PHPUnit\Event\TestRunner\ExecutionStarted;
 use PHPUnit\Event\TestRunner\ExecutionFinished;
 use PHPUnit\Event\TestRunner\ExecutionStartedSubscriber;
 use PHPUnit\Event\TestRunner\ExecutionFinishedSubscriber;
 use SebastianBergmann\CodeCoverage\CodeCoverage;
 use SebastianBergmann\CodeCoverage\Filter;
-use SebastianBergmann\CodeCoverage\RawCodeCoverageData;
+use SebastianBergmann\CodeCoverage\Data\RawCodeCoverageData;
 use SebastianBergmann\CodeCoverage\Report\Clover;
-use SebastianBergmann\CodeCoverage\Report\Html\Facade;
-use SebastianBergmann\CodeCoverage\Driver\Xdebug3Driver;
+use SebastianBergmann\CodeCoverage\Report\Html\Facade as HtmlFacade;
+use SebastianBergmann\CodeCoverage\Driver\XdebugDriver;
 use acdhOeaw\arche\lib\Config;
 use function \GuzzleHttp\json_decode;
 
@@ -46,7 +49,17 @@ use function \GuzzleHttp\json_decode;
  *
  * @author zozlak
  */
-class Bootstrap implements Extension, ExecutionStartedSubscriber, ExecutionFinishedSubscriber {
+class Bootstrap implements Extension {
+
+    public function bootstrap(Configuration $configuration, Facade $facade,
+                              ParameterCollection $parameters): void {
+
+        $facade->registerSubscriber(new Init());
+        $facade->registerSubscriber(new Coverage());
+    }
+}
+
+class Init implements ExecutionStartedSubscriber {
 
     private Config $config;
 
@@ -54,7 +67,7 @@ class Bootstrap implements Extension, ExecutionStartedSubscriber, ExecutionFinis
         $this->config = Config::fromYaml(__DIR__ . '/config.yaml');
     }
 
-    public function initialize(): void {
+    public function notify(ExecutionStarted $event): void {
         $buildlogsDir = __DIR__ . '/../build/logs';
         system('rm -fR ' . escapeshellarg($buildlogsDir) . ' && mkdir ' . escapeshellarg($buildlogsDir));
 
@@ -79,36 +92,26 @@ class Bootstrap implements Extension, ExecutionStartedSubscriber, ExecutionFinis
             system('mkdir -p ' . dirname($this->config->rest->logging->file));
         }
     }
+}
 
-    public function finish(): void {
+class Coverage implements ExecutionFinishedSubscriber {
+
+    public function notify(ExecutionFinished $event): void {
         $filter = new Filter();
         $filter->includeDirectory(__DIR__ . '/../src');
-        $driver = new Xdebug3Driver($filter);
+        $driver = new XdebugDriver($filter);
         $cc     = new CodeCoverage($driver, $filter);
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
             if ($i->getExtension() === 'json') {
                 $data = (array) json_decode((string) file_get_contents($i->getPathname()), true);
+
                 $data = RawCodeCoverageData::fromXdebugWithoutPathCoverage($data);
                 $cc->append($data, '');
             }
         }
         $writer = new Clover();
         $writer->process($cc, __DIR__ . '/../build/logs/clover.xml');
-        $writer = new Facade();
+        $writer = new HtmlFacade();
         $writer->process($cc, __DIR__ . '/../build/logs/');
-    }
-
-    public function bootstrap(\PHPUnit\TextUI\Configuration\Configuration $configuration,
-                              \PHPUnit\Runner\Extension\Facade $facade,
-                              \PHPUnit\Runner\Extension\ParameterCollection $parameters): void {
-        $facade->registerSubscriber($this);
-    }
-
-    public function notify(ExecutionStarted | ExecutionFinished $event): void {
-        if ($event instanceof ExecutionStarted) {
-            $this->initialize();
-        } else {
-            $this->finish();
-        }
     }
 }

@@ -55,8 +55,8 @@ jobs:
       run: |
         mkdir -p tika
         if [ ! -f tika/tika-server.jar ] ; then
-          wget -nv https://archive.apache.org/dist/tika/2.4.1/tika-server-standard-2.4.1.jar -O tika/tika-server.jar
-          wget -nv https://archive.apache.org/dist/tika/2.4.1/tika-app-2.4.1.jar -O tika/tika-app.jar
+          wget -nv https://archive.apache.org/dist/tika/2.9.0/tika-server-standard-2.9.0.jar -O tika/tika-server.jar
+          wget -nv https://archive.apache.org/dist/tika/2.9.0/tika-app-2.9.0.jar -O tika/tika-app.jar
         fi
         nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
         sleep 1
@@ -70,7 +70,7 @@ jobs:
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
     - name: test
       run: |
-        XDEBUG_MODE=coverage vendor/bin/phpunit --filter RestTest::testHttpRangeRequest
+        XDEBUG_MODE=coverage vendor/bin/phpunit
     - name: coveralls
       run: |
         export COVERALLS_RUN_LOCALLY=1
