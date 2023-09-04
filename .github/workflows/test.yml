@@ -27,7 +27,7 @@ jobs:
       with:
         java-version: 17
         java-package: jre
-        architecture: x64
+        distribution: oracle
     - uses: mxschmitt/action-tmate@v3
     - name: composer update
       run: |
