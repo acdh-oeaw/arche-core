@@ -26,7 +26,7 @@ jobs:
         mkdir log
         docker run --name arche-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d arche-dev
         sleep 10
-    - uses: mxschmitt/action-tmate@v3
+    #- uses: mxschmitt/action-tmate@v3
     - name: test-mod_php
       run: |
         docker exec -t -e XDEBUG_MODE=coverage -u www-data arche-dev vendor/bin/phpunit
@@ -35,7 +35,7 @@ jobs:
         docker exec arche-dev a2dissite mod_php
         docker exec arche-dev a2ensite php_fpm
         docker exec -w /root arche-dev supervisorctl restart apache2
-        docker exec -t -e XDEBUG_MODE=coverage arche-dev -u www-data vendor/bin/phpunit
+        docker exec -t -e XDEBUG_MODE=coverage -u www-data arche-dev vendor/bin/phpunit
     - name: coveralls
       run: |
         export COVERALLS_RUN_LOCALLY=1
