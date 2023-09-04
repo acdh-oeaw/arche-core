@@ -54,6 +54,7 @@ jobs:
         echo "---------- apache access log"
         docker exec arche-dev cat /var/log/apache2/access.log
         echo "---------- txlog:"
-        ocker exec arche-dev cat /tmp/arche-core/log/txlog
+        docker exec arche-dev cat /tmp/arche-core/log/txlog
         echo "---------- restlog:"
-        ocker exec -u root arche-dev cat /tmp/arche-core/log/restlog
+        docker exec arche-dev cat /tmp/arche-core/log/restlog
+        
