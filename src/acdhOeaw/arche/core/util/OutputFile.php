@@ -89,6 +89,7 @@ class OutputFile {
             } else {
                 $boundary = "--" . $this->ranges[0]['boundary'];
                 $length   = $size + count($this->ranges) * (2 + strlen($contentType) + 2 + strlen($boundary) + 2) + 2;
+#print_r([$size, count($this->ranges),  strlen($contentType), strlen($boundary)]);
                 foreach ($this->ranges as &$i) {
                     $i['Content-Range'] = "Content-Range: bytes " . $i['from'] . "-" . $i['to'] . "/$size";
                     $length             += strlen($i['Content-Range']) + 2;

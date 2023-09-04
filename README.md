@@ -54,6 +54,24 @@ An environment allowing you to edit code in your host system and run all the tes
   XDEBUG_MODE=coverage vendor/bin/phpunit
   ```
 
+Remarks:
+
+* By default the development environment runs with PHP configured 
+  as an Apache [mod_php](https://www.php.net/manual/en/install.unix.apache2.php) module
+  but it is also prepared to run PHP as the [FPM](https://www.php.net/manual/en/install.fpm.php).
+  To adjust the config run (in the host system)
+  ```bash
+  docker exec arche-dev a2dissite mod_php
+  docker exec arche-dev a2ensite php_fpm
+  docker exec -w /root arche-dev supervisorctl restart apache2
+  ```
+  Similarly to get back to the mod_php config:
+  ```bash
+  docker exec arche-dev a2dissite php_fpm
+  docker exec arche-dev a2ensite mod_php
+  docker exec -w /root arche-dev supervisorctl restart apache2
+  ```
+
 ## REST API documentation
 
 * https://app.swaggerhub.com/apis/zozlak/arche (Swagger/OpenAPI)

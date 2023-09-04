@@ -6,17 +6,6 @@ jobs:
   phpunit:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgis/postgis:14-master
-        env:
-          POSTGRES_PASSWORD: CmPUpKTW2e
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-        - 5432:5432
       rabbitmq:
         image: rabbitmq
         ports:
@@ -32,45 +21,21 @@ jobs:
     - name: composer update
       run: |
         composer update
-    - name: apache
+    - name: environment
       run: |
-        sudo apt update
-        #sudo apt upgrade -y
-        sudo apt install -y apache2 libapache2-mod-fcgid
-        sudo a2enmod rewrite fcgid proxy_fcgi
-        sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
-        sudo sed -i -e "s@</VirtualHost>@<Directory `pwd`>Options All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n<FilesMatch \\.php$>\\nSetHandler 'proxy:unix:/var/run/php/php-fpm.sock|fcgi://localhost'\\n</FilesMatch>\\n</VirtualHost>@" /etc/apache2/sites-available/000-default.conf
-        echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/*/fpm/conf.d/20-xdebug.ini /etc/php/*/cli/conf.d/20-xdebug.ini
-        sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/*/fpm/pool.d/www.conf
-        sudo service apache2 restart
-        sudo /etc/init.d/php8.1-fpm restart
-        chmod +x /home/runner /home/runner/work
-    - name: tika-cache
-      uses: actions/cache@v2
-      with:
-        path: tika
-        key: tika-2.4.1
-        restore-keys: tika-2.4.1
-    - name: tika
+        docker build -t arche-dev build/docker
+        mkdir log
+        docker run --name arche-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d arche-dev
+        sleep 10
+    - name: test-mod_php
       run: |
-        mkdir -p tika
-        if [ ! -f tika/tika-server.jar ] ; then
-          wget -nv https://archive.apache.org/dist/tika/2.9.0/tika-server-standard-2.9.0.jar -O tika/tika-server.jar
-          wget -nv https://archive.apache.org/dist/tika/2.9.0/tika-app-2.9.0.jar -O tika/tika-app.jar
-        fi
-        nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
-        sleep 1
-        cat tika/tika.log
-    - name: config
+        docker exec -t -e XDEBUG_MODE=coverage arche-dev vendor/bin/phpunit
+    - name: test-php_fpm
       run: |
-        echo "localhost:5432:postgres:postgres:CmPUpKTW2e" > ~/.pgpass
-        chmod 600 ~/.pgpass
-        psql -h localhost -U postgres -f build/db_schema.sql
-        sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
-        vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
-    - name: test
-      run: |
-        XDEBUG_MODE=coverage vendor/bin/phpunit
+        docker exec arche-dev a2dissite mod_php
+        docker exec arche-dev a2ensite php_fpm
+        docker exec -w /root arche-dev supervisorctl restart apache2
+        docker exec -t -e XDEBUG_MODE=coverage arche-dev vendor/bin/phpunit
     - name: coveralls
       run: |
         export COVERALLS_RUN_LOCALLY=1
@@ -83,12 +48,12 @@ jobs:
         echo "---------- config.yaml:"
         cat tests/config.yaml
         echo "---------- apache.conf:"
-        sudo cat /etc/apache2/sites-available/000-default.conf
+        docker exec arche-dev cat /etc/apache2/sites-available/000-default.conf
         echo "---------- apache error log"
-        sudo cat /var/log/apache2/error.log
+        docker exec arche-dev cat /var/log/apache2/error.log
         echo "---------- apache access log"
-        sudo cat /var/log/apache2/access.log
+        docker exec arche-dev cat /var/log/apache2/access.log
         echo "---------- txlog:"
-        cat txlog
+        ocker exec arche-dev cat /tmp/arche-core/log/txlog
         echo "---------- restlog:"
-        cat restlog
+        ocker exec -u root arche-dev cat /tmp/arche-core/log/restlog
