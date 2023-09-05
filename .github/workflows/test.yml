@@ -36,6 +36,7 @@ jobs:
         docker exec arche-dev a2ensite php_fpm
         docker exec -w /root arche-dev supervisorctl restart apache2
         docker exec -t -e XDEBUG_MODE=coverage -u www-data arche-dev vendor/bin/phpunit
+    - uses: mxschmitt/action-tmate@v3
     - name: coveralls
       run: |
         export COVERALLS_RUN_LOCALLY=1
