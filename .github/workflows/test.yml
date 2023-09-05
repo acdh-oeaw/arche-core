@@ -41,8 +41,8 @@ jobs:
         export COVERALLS_RUN_LOCALLY=1
         export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}
         composer require -W php-coveralls/php-coveralls
-        rm -fR /var/www/html
-        ln -s "`pwd`" /var/www/html
+        sudo rm -fR /var/www/html
+        sudo ln -s "`pwd`" /var/www/html
         vendor/bin/php-coveralls -v
     - name: debug
       if: ${{ always() }}
