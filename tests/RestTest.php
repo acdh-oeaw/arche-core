@@ -1152,7 +1152,8 @@ class RestTest extends TestBase {
         $resp     = self::$client->send(new Request('get', $location, $headers));
         $data     = (string) $resp->getBody();
 
-        $headers['Range'] = "bytes=50-99,75-99,25-83";
+        $ranges           = [[50, 99], [75, 99], [25, 83]];
+        $headers['Range'] = "bytes=" . implode(',', array_map(fn($x) => "$x[0]-$x[1]", $ranges));
         $resp             = self::$client->send(new Request('get', $location, $headers));
         $body             = (string) $resp->getBody();
         $this->assertEquals(206, $resp->getStatusCode());
@@ -1160,11 +1161,9 @@ class RestTest extends TestBase {
         $this->assertEquals(strlen($body), $resp->getHeader('Content-Length')[0] ?? -1);
         $boundary         = (string) preg_replace('/^.*boundary=/', '', trim($resp->getHeader('Content-Type')[0] ?? ''));
         $body             = explode("--$boundary", $body);
-        $this->assertCount(5, $body);
-        $ranges           = [[], [50, 99], [75, 99], [25, 83]];
-        for ($i = 1;
-            $i < 4;
-            $i++) {
+        $this->assertCount(count($ranges) + 2, $body);
+        array_shift($body);
+        for ($i = 0; $i < count($ranges); $i++) {
             $tmp = explode("\r\n", $body[$i]);
             $this->assertEquals('', $tmp[0]);
             $this->assertEquals('Content-Type: text/turtle', $tmp[1]);
@@ -1172,7 +1171,7 @@ class RestTest extends TestBase {
             $this->assertEquals('', $tmp[3]);
             $this->assertEquals(substr($data, $ranges[$i][0], $ranges[$i][1] - $ranges[$i][0] + 1), $tmp[4]);
         }
-        $this->assertEquals("--\r\n", $body[4]);
+        $this->assertEquals("--\r\n", $body[$i]);
     }
 
     public function testHttpBadRangeRequest(): void {

@@ -88,11 +88,10 @@ class OutputFile {
                 header("Content-Length: " . ($this->ranges[0]['to'] - $this->ranges[0]['from'] + 1));
             } else {
                 $boundary = "--" . $this->ranges[0]['boundary'];
-                $length   = $size + count($this->ranges) * (2 + strlen($contentType) + 2 + strlen($boundary) + 2) + 2;
-#print_r([$size, count($this->ranges),  strlen($contentType), strlen($boundary)]);
+                $length   = count($this->ranges) * (strlen($boundary) + strlen($contentType) + 10) + strlen($boundary) + 4;
                 foreach ($this->ranges as &$i) {
                     $i['Content-Range'] = "Content-Range: bytes " . $i['from'] . "-" . $i['to'] . "/$size";
-                    $length             += strlen($i['Content-Range']) + 2;
+                    $length             += strlen($i['Content-Range']) + $i['to'] - $i['from'] + 1;
                 }
                 unset($i);
                 header("Content-Type: multipart/byteranges; boundary=" . $this->ranges[0]['boundary']);
