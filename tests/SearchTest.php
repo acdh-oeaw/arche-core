@@ -147,9 +147,11 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testRelationsImplicit(): void {
+        $relProp = 'https://relation';
+
         $opts = [
             'query'   => [
-                'property[0]' => 'https://relation',
+                'property[0]' => $relProp,
                 'value[0]'    => $this->m[2]->getNode()->getValue(),
             ],
             'headers' => [
@@ -158,6 +160,31 @@ class SearchTest extends TestBase {
         ];
         $g    = $this->runSearch($opts);
         $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+
+        $opts = [
+            'query'   => ['property[]' => $relProp],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+
+        $opts = [
+            'query'   => [
+                'property[]' => $relProp,
+                'language[]' => 'en'
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
@@ -962,53 +989,6 @@ class SearchTest extends TestBase {
         $resp = self::$client->request('get', self::$baseUrl . 'search', $opts);
         $this->assertEquals(204, $resp->getStatusCode());
         $this->assertEmpty((string) $resp->getBody());
-    }
-
-    /**
-     * 
-     * @group search
-     */
-    public function testSearchObjectPropertyOnly(): void {
-        $relProp = DF::namedNode('https://relation');
-
-        $opts = [
-            'query'   => ['property[]' => $relProp->getValue()],
-            'headers' => [
-                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
-            ],
-        ];
-        $g    = $this->runSearch($opts);
-        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
-        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
-        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
-
-        $opts = [
-            'query'   => [
-                'property[]' => $relProp->getValue(),
-                'lang[]'     => 'en'
-            ],
-            'headers' => [
-                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
-            ],
-        ];
-        $g    = $this->runSearch($opts);
-        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
-        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
-        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
-
-        $opts = [
-            'query'   => [
-                'property[]' => $relProp->getValue(),
-                'value[]'    => $this->m[1]->getNode()->getValue()
-            ],
-            'headers' => [
-                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
-            ],
-        ];
-        $g    = $this->runSearch($opts);
-        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
-        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
-        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
     /**
