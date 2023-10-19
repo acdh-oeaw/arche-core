@@ -965,6 +965,39 @@ class SearchTest extends TestBase {
     }
 
     /**
+     * 
+     * @group search
+     */
+    public function testSearchObjectPropertyOnly(): void {
+        $relProp = DF::namedNode('https://relation');
+
+        $opts = [
+            'query'   => ['property[]' => $relProp->getValue()],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertTrue($g->any(new QT($this->m[0]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode())));
+        $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
+
+        $opts = [
+            'query'   => [
+                'property[]' => $relProp->getValue(),
+                'lang[]'     => 'en'
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertFalse($g->any(new QT($this->m[0]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[1]->getNode())));
+        $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
+    }
+
+    /**
      * @group search
      */
     public function testWrongHttpMethod(): void {
