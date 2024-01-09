@@ -44,6 +44,7 @@ class UserApiTest extends TestBase {
     static private string $createGroup;
     static private string $adminAuth;
     static private string $publicGroup;
+    static private string $cfgBak;
 
     static public function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
@@ -58,10 +59,21 @@ class UserApiTest extends TestBase {
         self::$createGroup = $cfg->create->allowedRoles[0];
         self::$publicGroup = $cfg->publicRole;
         self::$adminAuth   = 'Basic ' . base64_encode(self::$admin . ':strongPassword');
+
+        self::$cfgBak                        = file_get_contents(__DIR__ . '/../config.yaml');
+        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['accessControl']['authMethods'] = [
+            [
+                'class'      => '\zozlak\auth\authMethod\HttpBasic',
+                'parameters' => ['repo'],
+            ]
+        ];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
     }
 
     static public function tearDownAfterClass(): void {
         self::$pdo->query('DELETE FROM users');
+        file_put_contents(__DIR__ . '/../config.yaml', self::$cfgBak);
 
         parent::tearDownAfterClass();
     }
@@ -108,6 +120,11 @@ class UserApiTest extends TestBase {
         $this->assertEquals(1, count($data->groups));
         $this->assertContains(self::$publicGroup, $data->groups);
 
+        // no authorization
+        $req  = new Request('put', self::$baseUrl . 'user/foobar', [], $body);
+        $resp = self::$client->send($req);
+        $this->assertEquals(401, $resp->getStatusCode());
+
         // lack of priviledges
         $headers['Authorization'] = 'Basic ' . base64_encode('foo:' . self::PSWD);
         $req                      = new Request('put', self::$baseUrl . 'user/foobar', $headers, $body);
@@ -120,6 +137,11 @@ class UserApiTest extends TestBase {
      * @group userApi
      */
     public function testUserGet(): void {
+        // no authorization
+        $req  = new Request('get', self::$baseUrl . 'user');
+        $resp = self::$client->send($req);
+        $this->assertEquals(401, $resp->getStatusCode());
+
         // as root
         $headers = ['Authorization' => self::$adminAuth];
         $req     = new Request('get', self::$baseUrl . 'user', $headers);
@@ -205,20 +227,20 @@ class UserApiTest extends TestBase {
         $this->assertFalse(isset($data->other));
 
         // as user
-        $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
-        $body    = json_encode([
+        $headers        = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
+        $body           = json_encode([
             'groups'   => [],
             'other'    => 'value',
             'password' => self::PSWD,
         ]);
-        $req     = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
-        $resp    = self::$client->send($req);
+        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $resp           = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $headers = ['Authorization' => 'Basic ' . base64_encode('foo:newPass')];
-        $req     = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
-        $resp    = self::$client->send($req);
+        $headers        = ['Authorization' => 'Basic ' . base64_encode('foo:newPass')];
+        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $resp           = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $data    = json_decode($resp->getBody());
+        $data           = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
         // user can't change his/her own groups list as it would allow priviledges escalation
         $this->assertEquals(3, count($data->groups));
@@ -230,7 +252,7 @@ class UserApiTest extends TestBase {
     }
 
     /**
-     * 
+     * @depends testUserCreate
      * @group userApi
      */
     public function testUserDelete(): void {

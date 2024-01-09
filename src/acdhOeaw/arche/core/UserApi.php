@@ -53,9 +53,9 @@ class UserApi {
 
     public function put(string $user): void {
         if (!RC::$auth->isAdmin()) {
-            throw new RepoException('Forbidden', 403);
+            RC::$auth->denyAccess([$user]);
         }
-
+        
         try {
             $this->db->getUser($user);
             throw new RepoException('User already exists', 400);
@@ -68,7 +68,7 @@ class UserApi {
 
     public function get(string $user): void {
         if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
-            throw new RepoException('Forbidden', 403);
+            RC::$auth->denyAccess([$user]);
         }
 
         if (empty($user)) {
@@ -90,7 +90,7 @@ class UserApi {
     public function patch(string $user): void {
         $admin = RC::$auth->isAdmin();
         if (!$admin && RC::$auth->getUserName() !== $user) {
-            throw new RepoException('Forbidden', 403);
+            RC::$auth->denyAccess([$user]);
         }
         $this->checkUserExists($user);
 
@@ -121,7 +121,7 @@ class UserApi {
 
     public function delete(string $user): void {
         if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
-            throw new RepoException('Forbidden', 403);
+            RC::$auth->denyAccess([$user]);
         }
         $this->checkUserExists($user);
 

@@ -45,35 +45,17 @@ class Auth implements AuthInterface {
     const DEFAULT_ALLOW = 'allow';
     const DEFAULT_DENY  = 'deny';
 
-    /**
-     * 
-     * @var AuthController
-     */
-    private $controller;
-
-    /**
-     * 
-     * @var string
-     */
-    private $userName;
+    private AuthController $controller;
+    private string $userName;
+    private bool $isAdmin;
+    private bool $isCreator;
+    private bool $authenticated;
 
     /**
      * 
      * @var array<string>
      */
-    private $userRoles;
-
-    /**
-     * 
-     * @var bool
-     */
-    private $isAdmin;
-
-    /**
-     * 
-     * @var bool
-     */
-    private $isCreator;
+    private array $userRoles;
 
     public function __construct() {
         $cfg              = RC::$config->accessControl;
@@ -83,19 +65,20 @@ class Auth implements AuthInterface {
         foreach (RC::$config->accessControl->authMethods as $i) {
             $class  = $i->class;
             $method = new $class(...$i->parameters);
-            $this->controller->addMethod($method);
+            $this->controller->addMethod($method, AuthController::ADVERTISE_ONCE);
         }
 
-        $this->controller->authenticate();
+        $this->authenticated = $this->controller->authenticate();
 
-        $this->userName = $this->controller->getUserName();
-
-        $this->userRoles = array_merge(
-            [$this->userName],
-            $this->controller->getUserData()->groups ?? []
-        );
-        if (isset($cfg->publicRole)) {
-            $this->userRoles[] = $cfg->publicRole;
+        if ($this->authenticated) {
+            $this->userName  = $this->controller->getUserName();
+            $this->userRoles = array_merge(
+                [$this->userName, $cfg->publicRole],
+                $this->controller->getUserData()->groups ?? []
+            );
+        } else {
+            $this->userName  = $cfg->publicRole;
+            $this->userRoles = [$this->userName];
         }
 
         $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
@@ -103,10 +86,8 @@ class Auth implements AuthInterface {
     }
 
     public function checkCreateRights(): void {
-        $c = RC::$config->accessControl;
         if (!$this->isAdmin && !$this->isCreator) {
-            RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $c->create->allowedRoles]));
-            throw new RepoException('Resource creation denied', 403);
+            $this->denyAccess(RC::$config->accessControl->create->allowedRoles);
         }
     }
 
@@ -122,8 +103,7 @@ class Auth implements AuthInterface {
         $allowed = json_decode($allowed) ?? [];
         $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
         if (count(array_intersect($this->userRoles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
-            RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
-            throw new RepoException('Forbidden', 403);
+            $this->denyAccess($allowed);
         }
     }
 
@@ -206,5 +186,13 @@ class Auth implements AuthInterface {
 
     public function isAdmin(): bool {
         return $this->isAdmin;
+    }
+
+    public function denyAccess(array $allowed): void {
+        RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
+        if (!$this->authenticated && $this->controller->advertise()) {
+            throw new RepoException('Unauthorized', 401);
+        }
+        throw new RepoException('Forbidden', 403);
     }
 }

@@ -39,12 +39,34 @@ use zozlak\auth\authMethod\HttpBasic;
  */
 class AuthTest extends TestBase {
 
+    private string $cfgBak;
+
+    public function setUp(): void {
+        parent::setUp();
+        $this->cfgBak = file_get_contents(__DIR__ . '/../config.yaml');
+    }
+
+    public function tearDown(): void {
+        parent::tearDown();
+        file_put_contents(__DIR__ . '/../config.yaml', $this->cfgBak);
+    }
+
     /**
      * 
      * @group auth
      */
-    public function testHeader(): void {
+    public function testHeader(): void {        
         $location = $this->createBinaryResource();
+        
+        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['accessControl']['authMethods'] = [
+            [
+                'class'      => '\zozlak\auth\authMethod\TrustedHeader',
+                'parameters' => ['HTTP_FOO'],
+            ]
+        ];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        
         $txId     = $this->beginTransaction();
         $headers  = [self::$config->rest->headers->transactionId => $txId];
 
@@ -52,15 +74,9 @@ class AuthTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
-        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $cfg['accessControl']['authMethods'] = array_merge(
-            [[
-                'class'      => '\zozlak\auth\authMethod\TrustedHeader',
-                'parameters' => ['HTTP_FOO'],
-                ]],
-            $cfg['accessControl']['authMethods']
-        );
-        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        $req  = new Request('delete', $location, array_merge($headers, ['foo' => 'badUser']));
+        $resp = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
 
         $req  = new Request('delete', $location, array_merge($headers, ['foo' => 'admin']));
         $resp = self::$client->send($req);
@@ -74,6 +90,15 @@ class AuthTest extends TestBase {
      * @group auth
      */
     public function testHttpBasic(): void {
+        $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['accessControl']['authMethods'] = [
+            [
+                'class'      => '\zozlak\auth\authMethod\HttpBasic',
+                'parameters' => ['repo'],
+            ]
+        ];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        
         $cfg  = self::$config->accessControl;
         $db   = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         $user = $cfg->create->allowedRoles[0];
@@ -87,8 +112,15 @@ class AuthTest extends TestBase {
             'Content-Type'                              => 'text/turtle',
         ];
         $body    = (string) file_get_contents(__DIR__ . '/data/test.ttl');
-        $req     = new Request('post', self::$baseUrl, $headers, $body);
-        $resp    = self::$client->send($req);
+
+        $req  = new Request('post', self::$baseUrl, $headers, $body);
+        $resp = self::$client->send($req);
+        $this->assertEquals(401, $resp->getStatusCode());
+        $this->assertEquals(['Basic realm="repo"'], $resp->getHeader('WWW-Authenticate'));
+
+        $headers['Authorization'] = 'Basic ' . base64_encode("$user:_wrong_password_");
+        $req                      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:$pswd");
@@ -128,7 +160,7 @@ class AuthTest extends TestBase {
      */
     public function testAssignOnCreate(): void {
         $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $cfg['accessControl']['create']['assignRoles']['read'] = ['public'];
+        $cfg['accessControl']['create']['assignRoles']['read'] = ['publicRole'];
         $cfg['accessControl']['enforceOnMetadata']             = true;
         $cfg['accessControl']['defaultAction']['read']         = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
@@ -148,7 +180,7 @@ class AuthTest extends TestBase {
         $relProp = 'http://relation';
         $txId    = $this->beginTransaction();
 
-        $cfg['accessControl']['create']['assignRoles']['write'] = ['public'];
+        $cfg['accessControl']['create']['assignRoles']['write'] = ['publicRole'];
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         $loc1                                                   = $this->createMetadataResource(null, $txId);
 

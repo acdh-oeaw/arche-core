@@ -36,12 +36,6 @@ accessControl:
         - class: \zozlak\auth\authMethod\TrustedHeader
           parameters:
             - HTTP_EPPN
-        - class: \zozlak\auth\authMethod\HttpBasic
-          parameters:
-            - repo
-        - class: \zozlak\auth\authMethod\Guest
-          parameters:
-            - public
 metadataManagment:
     nonRelationProperties:
         - http://www.w3.org/1999/02/22-rdf-syntax-ns#type
