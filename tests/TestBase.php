@@ -92,7 +92,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
 
     static public function tearDownAfterClass(): void {
         proc_terminate(self::$txCtrl, 15);
-        while (proc_get_status(self::$txCtrl)['running'] ?? false) {
+        while (proc_get_status(self::$txCtrl)['running']) {
             usleep(100000);
         }
         proc_close(self::$txCtrl);
@@ -105,6 +105,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         usleep(100000);
     }
 
+    /**
+     * 
+     * @param array<string, string> $handlers
+     * @return void
+     */
     static protected function setHandler(array $handlers): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         foreach ($handlers as $method => $function) {
@@ -129,7 +134,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     protected function beginTransaction(): int {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
-        return (int) $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? throw new RuntimeException("Failed to begin a transaction");
+        return (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? throw new RuntimeException("Failed to begin a transaction"));
     }
 
     protected function commitTransaction(int $txId): int {

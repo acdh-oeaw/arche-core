@@ -47,6 +47,13 @@ class ParallelTest extends TestBase {
         return $meta;
     }
 
+    /**
+     * 
+     * @param string $method
+     * @param int $txId
+     * @param array<int> $resourceIds
+     * @return void
+     */
     static public function sleepTx(string $method, int $txId, array $resourceIds): void {
         usleep(100000); // sleep 100 ms
     }
@@ -118,7 +125,7 @@ class ParallelTest extends TestBase {
     public function testParallelCommitRollback(): void {
         $txId    = $this->beginTransaction();
         $headers = [
-            self::$config->rest->headers->transactionId => $txId,
+            self::$config->rest->headers->transactionId => (string) $txId,
         ];
         $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
         $req2    = new Request('delete', self::$baseUrl . 'transaction', $headers);
@@ -137,7 +144,7 @@ class ParallelTest extends TestBase {
     public function testParallelCommitTxGet(): void {
         $txId     = $this->beginTransaction();
         $headers  = [
-            self::$config->rest->headers->transactionId => $txId,
+            self::$config->rest->headers->transactionId => (string) $txId,
         ];
         $requests = [new Request('put', self::$baseUrl . 'transaction', $headers)];
         while (count($requests) < 10) {
@@ -234,7 +241,7 @@ class ParallelTest extends TestBase {
         $h2      = $resp2->getHeaders();
         $this->assertEquals(200, $resp1->getStatusCode());
         $this->assertEquals(200, $resp2->getStatusCode());
-        $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
+        $this->assertLessThan(min((float) $h1['Time'][0], (float) $h2['Time'][0]) / 2, abs((float) $h1['Start-Time'][0] - (float) $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
         $this->assertEquals('value1', $r1->getObject($tmpl)?->getValue());
@@ -292,7 +299,7 @@ class ParallelTest extends TestBase {
         $h2      = $resp2->getHeaders();
         $this->assertEquals(200, $resp1->getStatusCode());
         $this->assertEquals(200, $resp2->getStatusCode());
-        $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
+        $this->assertLessThan(min((float) $h1['Time'][0], (float) $h2['Time'][0]) / 2, abs((float) $h1['Start-Time'][0] - (float) $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
         $this->assertTrue($r1->getObject($tmpl)?->equals($r2->getObject($tmpl)));
@@ -335,7 +342,7 @@ class ParallelTest extends TestBase {
         $h2    = $resp2->getHeaders();
         $this->assertEquals(201, $resp1->getStatusCode());
         $this->assertEquals(201, $resp2->getStatusCode());
-        $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
+        $this->assertLessThan(min((float) $h1['Time'][0], (float) $h2['Time'][0]) / 2, abs((float) $h1['Start-Time'][0] - (float) $h2['Start-Time'][0])); // make sure they were executed in parallel
         $meta1 = $this->extractResource($resp1);
         $meta2 = $this->extractResource($resp2);
         $this->assertTrue($meta1->getObject($tmpl)?->equals($meta2->getNode()));

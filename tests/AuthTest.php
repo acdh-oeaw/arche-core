@@ -55,9 +55,9 @@ class AuthTest extends TestBase {
      * 
      * @group auth
      */
-    public function testHeader(): void {        
+    public function testHeader(): void {
         $location = $this->createBinaryResource();
-        
+
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['authMethods'] = [
             [
@@ -66,9 +66,9 @@ class AuthTest extends TestBase {
             ]
         ];
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        
-        $txId     = $this->beginTransaction();
-        $headers  = [self::$config->rest->headers->transactionId => $txId];
+
+        $txId    = $this->beginTransaction();
+        $headers = [self::$config->rest->headers->transactionId => (string) $txId];
 
         $req  = new Request('delete', $location, $headers);
         $resp = self::$client->send($req);
@@ -98,7 +98,7 @@ class AuthTest extends TestBase {
             ]
         ];
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        
+
         $cfg  = self::$config->accessControl;
         $db   = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         $user = $cfg->create->allowedRoles[0];
@@ -191,7 +191,7 @@ class AuthTest extends TestBase {
         $loc2                                                   = $this->createMetadataResource($meta, $txId);
 
         $headers = [
-            self::$config->rest->headers->transactionId          => $txId,
+            self::$config->rest->headers->transactionId          => (string) $txId,
             self::$config->rest->headers->metadataParentProperty => $relProp,
         ];
         $req     = new Request('delete', $loc1, $headers);
@@ -199,7 +199,7 @@ class AuthTest extends TestBase {
         $this->assertEquals(403, $resp->getStatusCode());
 
         $headers = [
-            self::$config->rest->headers->transactionId  => $txId,
+            self::$config->rest->headers->transactionId  => (string) $txId,
             self::$config->rest->headers->withReferences => 1,
         ];
         $req     = new Request('delete', $loc1, $headers);

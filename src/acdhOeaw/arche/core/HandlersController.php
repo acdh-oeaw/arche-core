@@ -30,6 +30,7 @@ use Composer\Autoload\ClassLoader;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
+use rdfInterface\DatasetNodeInterface;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
@@ -69,7 +70,7 @@ class HandlersController {
 
     /**
      *
-     * @var array<string, array<Config>>
+     * @var array<string, array<object>>
      */
     private $handlers = [];
 
@@ -104,11 +105,9 @@ class HandlersController {
             $clbck            = [$this, 'callback'];
             $this->rmqChannel->basic_consume($this->rmqQueue, '', false, true, false, false, $clbck);
         }
-        $this->handlers = array_map(function ($x) {
-            return $x ?? [];
-        }, (array) $cfg->methods);
+        $this->handlers = array_map(fn(array | null $x) => $x ?? [], (array) $cfg->methods);
 
-        foreach ((array) $cfg->classLoader ?? [] as $nmsp => $path) {
+        foreach ((array) ($cfg->classLoader ?? []) as $nmsp => $path) {
             $nmsp = preg_replace('|\$|', '', $nmsp) . "\\";
             $loader->addPsr4($nmsp, $path);
         }
@@ -133,8 +132,8 @@ class HandlersController {
         return isset($this->handlers[$method]);
     }
 
-    public function handleResource(string $method, int $id, DatasetNode $res,
-                                   ?string $path): DatasetNode {
+    public function handleResource(string $method, int $id,
+                                   DatasetNodeInterface $res, ?string $path): DatasetNodeInterface {
         if (!isset($this->handlers[$method])) {
             return $res;
         }

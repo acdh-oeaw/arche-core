@@ -28,9 +28,9 @@ namespace acdhOeaw\arche\core;
 
 use DateTime;
 use PDOException;
-use EasyRdf\Format;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
+use rdfInterface\DatasetNodeInterface;
 use quickRdf\DatasetNode;
 use quickRdf\NamedNode;
 use quickRdf\Literal;
@@ -72,7 +72,21 @@ class Metadata {
     }
 
     static public function getAcceptedFormats(): string {
-        return Format::getHttpAcceptHeader();
+        return implode(', ', [
+            'application/n-triples;q=1',
+            'application/json;q=0.5',
+            'application/ld+json;q=0.5',
+            'application/rdf+n3;q=0.5',
+            'application/trig;q=0.5',
+            'application/turtle;q=0.5',
+            'application/n-quads;q=0.5',
+            'application/rdf+xml;q=0.5',
+            'application/xml;q=0.5',
+            'text/n3;q=0.5',
+            'text/rdf;q=0.5',
+            'text/rdf+n3;q=0.5',
+            'text/turtle;q=0.5',
+        ]);
     }
 
     static public function negotiateFormat(): string {
@@ -87,7 +101,7 @@ class Metadata {
     }
 
     private int $id;
-    private DatasetNode $graph;
+    private DatasetNodeInterface $graph;
 
     public function __construct(?int $id = null) {
         if ($id !== null) {
@@ -109,7 +123,7 @@ class Metadata {
         return isset($this->id) ? self::idAsUri($this->id) : RC::getBaseUrl();
     }
 
-    public function getDatasetNode(): DatasetNode {
+    public function getDatasetNode(): DatasetNodeInterface {
         return $this->graph;
     }
 
@@ -151,7 +165,7 @@ class Metadata {
         return count($this->graph);
     }
 
-    public function loadFromResource(DatasetNode $res): void {
+    public function loadFromResource(DatasetNodeInterface $res): void {
         $this->graph = $res;
     }
 
@@ -165,7 +179,7 @@ class Metadata {
         $this->graph = $res->getGraph();
     }
 
-    public function merge(string $mode): DatasetNode {
+    public function merge(string $mode): DatasetNodeInterface {
         switch ($mode) {
             case self::SAVE_ADD:
                 RC::$log->debug("\tadding metadata");
@@ -299,7 +313,7 @@ class Metadata {
      * Updates system-managed metadata, e.g. who and when lastly modified a resource
      * @return void
      */
-    private function manageSystemMetadata(DatasetNode $meta): void {
+    private function manageSystemMetadata(DatasetNodeInterface $meta): void {
         $node   = $this->graph->getNode();
         $schema = RC::$schema;
 

@@ -30,6 +30,7 @@ use PDO;
 use RuntimeException;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Channel\AMQPChannel;
 use simpleRdf\DataFactory as DF;
 use quickRdf\DatasetNode;
 use quickRdfIo\NQuadsParser;
@@ -91,7 +92,7 @@ class Handler {
     }
 
     static public function deleteReference(int $id, DatasetNode $meta,
-                                           ?string $path): Resource {
+                                           ?string $path): DatasetNode {
         if ($meta->any(new QT(predicate: self::CHECKTRIGGER_PROP)) && $meta->none(new QT(predicate: self::CHECK_PROP))) {
             throw new RepoException(self::CHECK_PROP . " is missing");
         }
@@ -99,27 +100,13 @@ class Handler {
     }
 
     static public function throwException(int $id, DatasetNode $meta,
-                                          ?string $path): Resource {
+                                          ?string $path): DatasetNode {
         throw new RepoException("Just throw an exception", 400);
     }
 
-    /**
-     *
-     * @var \PhpAmqpLib\Connection\AMQPStreamConnection
-     */
-    private $rmqConn;
-
-    /**
-     *
-     * @var \PhpAmqpLib\Channel\AMQPChannel
-     */
-    private $rmqChannel;
-
-    /**
-     *
-     * @var \zozlak\logging\Log
-     */
-    private $log;
+    private AMQPStreamConnection $rmqConn;
+    private AMQPChannel $rmqChannel;
+    private Log $log;
 
     public function __construct(string $configFile) {
         $cfg       = Config::fromYaml($configFile);
@@ -127,12 +114,13 @@ class Handler {
         $cfg       = $cfg->rest->handlers;
         $rCfg      = $cfg->rabbitMq ?: throw new RuntimeException("Bad config");
 
-        $this->rmqConn    = new AMQPStreamConnection($rCfg->host, (string) $rCfg->port, $rCfg->user, $rCfg->password);
+        $this->rmqConn    = new AMQPStreamConnection($rCfg->host, (int) $rCfg->port, $rCfg->user, $rCfg->password);
         $this->rmqChannel = $this->rmqConn->channel();
         $this->rmqChannel->basic_qos(0, 1, false);
 
         foreach ($cfg->methods as $method) {
-            foreach ($method ?? [] as $h) {
+            foreach ($method as $h) {
+                /** @var object $h */
                 if ($h->type === 'rpc') {
                     $this->rmqChannel->queue_declare($h->queue, false, false, false, false);
                     $clbck = [$this, $h->queue];
@@ -225,8 +213,8 @@ class Handler {
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
-    private function parse(string $msg): Config {
-        $data       = new Config(json_decode($msg));
+    private function parse(string $msg): object {
+        $data       = json_decode($msg);
         $parser     = new NQuadsParser(new DF(), false, NQuadsParser::MODE_TRIPLES);
         $data->meta = new DatasetNode(DF::namedNode($data->uri));
         $data->meta->add($parser->parse($data->metadata));

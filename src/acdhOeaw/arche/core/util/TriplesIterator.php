@@ -70,7 +70,7 @@ class TriplesIterator implements QuadIteratorInterface {
         return $this->triple ?? null;
     }
 
-    public function key(): mixed {
+    public function key(): int | null {
         return isset($this->triple) ? $this->n : null;
     }
 

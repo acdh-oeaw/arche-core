@@ -1278,7 +1278,7 @@ class RestTest extends TestBase {
     public function testPutErrors1(): void {
         // create meta-only resource
         $location   = $this->createMetadataResource();
-        $id         = preg_replace('`^.*/`', '', $location);
+        $id         = (int) preg_replace('`^.*/`', '', $location);
         $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
         $req        = new Request('get', $location, $this->getHeaders());
         $resp       = self::$client->send($req);
@@ -1331,7 +1331,7 @@ class RestTest extends TestBase {
     public function testPutErrors2(): void {
         // create meta-only resource
         $location   = $this->createBinaryResource();
-        $id         = preg_replace('`^.*/`', '', $location);
+        $id         = (int) preg_replace('`^.*/`', '', $location);
         $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
         $req        = new Request('get', $location, $this->getHeaders());
         $resp       = self::$client->send($req);

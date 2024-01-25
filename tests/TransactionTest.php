@@ -50,6 +50,13 @@ class TransactionTest extends TestBase {
         return $meta;
     }
 
+    /**
+     * 
+     * @param string $method
+     * @param int $txId
+     * @param array<int> $resourceIds
+     * @return void
+     */
     static public function sleepTx(string $method, int $txId, array $resourceIds): void {
         $c = RC::$config->transactionController;
         usleep(($c->timeout << 20) + ($c->checkInterval << 10));
@@ -62,7 +69,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
+        $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -133,7 +140,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
+        $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -148,7 +155,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
+        $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));

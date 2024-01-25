@@ -591,10 +591,11 @@ class SearchTest extends TestBase {
 
     /**
      * @group search
+     * @param array<string, string> $expected
      */
     public function testFullTextSearch1(?array $expected = null): void {
         $expected ??= [
-            self::$config->schema->id => '<b>verbunden</b>',
+            (string) self::$config->schema->id => '<b>verbunden</b>',
             SearchConfig::FTS_BINARY  => "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht",
             'http://another/match'    => '<b>verbunden</b>',
         ];
@@ -795,7 +796,7 @@ class SearchTest extends TestBase {
                 'ftsProperty[1][1]'       => 'http://another/match',
                 'ftsStartSel[1]'          => '%',
                 'ftsStopSel[1]'           => '^',
-                'ftsFragmentDelimiter[0]' => '#',
+                'ftsFragmentDelimiter[1]' => '#',
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,

@@ -188,6 +188,12 @@ class Auth implements AuthInterface {
         return $this->isAdmin;
     }
 
+    /**
+     * 
+     * @param array<string> $allowed
+     * @return void
+     * @throws RepoException
+     */
     public function denyAccess(array $allowed): void {
         RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
         if (!$this->authenticated && $this->controller->advertise()) {

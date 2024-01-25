@@ -231,7 +231,7 @@ class RestController {
                     self::$resource->$methodOptions(405);
                 }
             } else if ($method === 'Put' && preg_match('>^merge/([0-9]+)/([0-9]+)/?$>', $path, $matches)) {
-                self::$resource = new Resource($matches[2]);
+                self::$resource = new Resource((int) $matches[2]);
                 self::$resource->merge((int) $matches[1]);
             } else {
                 throw new RepoException('Not Found', 404);
@@ -392,21 +392,20 @@ class RestController {
         if (trim($ranges[0]) !== 'bytes' || count($ranges) !== 2) {
             throw new RepoException('Range Not Satisfiable ', 416);
         }
-        $ranges = explode(',', $ranges[1]);
-        foreach ($ranges as &$i) {
+        $processed = [];
+        foreach (explode(',', $ranges[1]) as $i) {
             $i = array_map(fn($x) => (int) trim($x), explode('-', $i));
             if (count($i) !== 2 || $i[0] < 0 || $i[0] > $i[1]) {
                 throw new RepoException('Range Not Satisfiable ', 416);
             }
-            $i = ['from' => $i[0], 'to' => $i[1], 'boundary' => $boundary];
+            $processed[] = ['from' => $i[0], 'to' => $i[1], 'boundary' => $boundary];
         }
-        unset($i);
 
-        if (count($ranges) > 1) {
+        if (count($processed) > 1) {
             unset(self::$headers['content-type']);
             unset(self::$headers['content-length']);
         }
-        return $ranges;
+        return $processed;
     }
 
     static private function sendOutput(): void {
