@@ -151,8 +151,11 @@ class BinaryPayload {
         $data  = $query->fetchObject();
         if ($data === false) {
             $data = (object) [
-                    'filename' => '', 'mime'     => '', 'size'     => '',
-                    'moddate'  => '', 'hash'     => ''
+                    'filename' => '',
+                    'mime'     => '',
+                    'size'     => '',
+                    'moddate'  => '',
+                    'hash'     => ''
             ];
         }
         $path = $this->getPath();

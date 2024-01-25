@@ -140,7 +140,7 @@ class HandlerTest extends TestBase {
         $this->assertEquals('sample value', $meta1->getObjectValue($defaultTmpl));
 
         $meta1->delete($defaultTmpl);
-        $meta1->add(DF::quad($meta1->getNode(), $defaultProp, DF::literal('other value')));
+        $meta1->add(DF::quadNoSubject($defaultProp, DF::literal('other value')));
         $this->updateResource($meta1);
 
         $meta2 = $this->getResourceMeta($location);

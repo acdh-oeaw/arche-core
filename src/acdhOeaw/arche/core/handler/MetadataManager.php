@@ -72,10 +72,10 @@ class MetadataManager {
     static private function addMetaValue(DatasetNode $meta, NamedNode $p,
                                          Triple $v): void {
         if (isset($v->uri)) {
-            $meta->add(DF::quad($meta->getNode(), $p, DF::namedNode($v->uri)));
+            $meta->add(DF::quadNoSubject($p, DF::namedNode($v->uri)));
         } else {
             $literal = DF::literal((string) $v->value, $v->lang ?? null, $v->type ?? null);
-            $meta->add(DF::quad($meta->getNode(), $p, $literal));
+            $meta->add(DF::quadNoSubject($p, $literal));
         }
     }
 }

@@ -163,7 +163,7 @@ class Handler {
         $this->log->debug("\t\t\tfor " . $data->uri);
 
         usleep(300000);
-        $data->meta->add(DF::quad($data->meta->getNode(), DF::namedNode('https://rpc/property'), DF::literal('update rpc')));
+        $data->meta->add(DF::quadNoSubject(DF::namedNode('https://rpc/property'), DF::literal('update rpc')));
 
         $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 0, 'metadata' => $rdf]);
@@ -178,7 +178,7 @@ class Handler {
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
 
-        $data->meta->add(DF::quad($data->meta->getNode(), DF::namedNode('https://rpc/property'), DF::literal('create rpc')));
+        $data->meta->add(DF::quadNoSubject(DF::namedNode('https://rpc/property'), DF::literal('create rpc')));
 
         $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 0, 'metadata' => $rdf]);
@@ -193,7 +193,6 @@ class Handler {
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
 
-        $rdf  = $this->serialize($data->meta);
         $body = json_encode(['status' => 400, 'message' => 'metadata is always wrong']);
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($body, $opts);

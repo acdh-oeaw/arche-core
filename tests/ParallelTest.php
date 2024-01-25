@@ -237,8 +237,8 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
-        $this->assertEquals('value1', $r1->listObjects($tmpl)->current()?->getValue());
-        $this->assertEquals('value2', $r2->listObjects($tmpl)->current()?->getValue());
+        $this->assertEquals('value1', $r1->getObject($tmpl)?->getValue());
+        $this->assertEquals('value2', $r2->getObject($tmpl)?->getValue());
     }
 
     /**
@@ -295,7 +295,7 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $r1      = $this->extractResource($resp1->getBody(), $loc1);
         $r2      = $this->extractResource($resp2->getBody(), $loc2);
-        $this->assertTrue($r1->listObjects($tmpl)->current()?->equals($r2->listObjects($tmpl)->current()));
+        $this->assertTrue($r1->getObject($tmpl)?->equals($r2->getObject($tmpl)));
     }
 
     /**
@@ -338,8 +338,8 @@ class ParallelTest extends TestBase {
         $this->assertLessThan(min($h1['Time'][0], $h2['Time'][0]) / 2, abs($h1['Start-Time'][0] - $h2['Start-Time'][0])); // make sure they were executed in parallel
         $meta1 = $this->extractResource($resp1);
         $meta2 = $this->extractResource($resp2);
-        $this->assertTrue($meta1->listObjects($tmpl)->current()?->equals($meta2->getNode()));
-        $this->assertTrue($meta2->listObjects($tmpl)->current()?->equals($meta1->getNode()));
+        $this->assertTrue($meta1->getObject($tmpl)?->equals($meta2->getNode()));
+        $this->assertTrue($meta2->getObject($tmpl)?->equals($meta1->getNode()));
     }
 
     /**

@@ -208,7 +208,7 @@ class RestTest extends TestBase {
 
         $loc1 = $this->createMetadataResource(null, $txId);
         $meta = new DatasetNode(self::$baseNode);
-        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
+        $meta->add(DF::quadNoSubject(self::$schema->parent, DF::namedNode($loc1)));
         $loc2 = $this->createMetadataResource($meta, $txId);
 
         $headers                                                       = $this->getHeaders($txId);
@@ -244,7 +244,7 @@ class RestTest extends TestBase {
 
         $loc1 = $this->createMetadataResource(null, $txId);
         $meta = new DatasetNode(self::$baseNode);
-        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, df::namedNode($loc1)));
+        $meta->add(DF::quadNoSubject(self::$schema->parent, df::namedNode($loc1)));
         $loc2 = $this->createMetadataResource($meta, $txId);
 
         $req  = new Request('delete', $loc1, $headers);
@@ -276,7 +276,7 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
         $loc1 = $this->createMetadataResource(null, $txId);
         $meta = new DatasetNode(self::$baseNode);
-        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
+        $meta->add(DF::quadNoSubject(self::$schema->parent, DF::namedNode($loc1)));
         $this->createMetadataResource($meta, $txId);
         $this->commitTransaction($txId);
 
@@ -294,7 +294,7 @@ class RestTest extends TestBase {
 
         $loc1 = $this->createMetadataResource(null, $txId);
         $meta = new DatasetNode(self::$baseNode);
-        $meta->add(DF::quad($meta->getNode(), self::$schema->parent, DF::namedNode($loc1)));
+        $meta->add(DF::quadNoSubject(self::$schema->parent, DF::namedNode($loc1)));
         $this->createMetadataResource($meta, $txId);
 
         $req  = new Request('delete', $loc1, $this->getHeaders($txId));
@@ -481,8 +481,8 @@ class RestTest extends TestBase {
 
         $meta2 = new DatasetNode(DF::namedNode($location));
         $meta2->add([
-            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://123')),
-            DF::quad($meta2->getNode(), DF::namedNode('http://test/hasTitle'), DF::literal('merged title')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://123')),
+            DF::quadNoSubject(DF::namedNode('http://test/hasTitle'), DF::literal('merged title')),
         ]);
         $resp  = $this->updateResource($meta2);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -504,13 +504,13 @@ class RestTest extends TestBase {
         $idTmpl    = new PT(self::$schema->id);
         $location  = $this->createBinaryResource();
         $meta1     = $this->getResourceMeta($location);
-        $meta1->add(DF::quad($meta1->getNode(), $titleProp, DF::literal('foo bar')));
+        $meta1->add(DF::quadNoSubject($titleProp, DF::literal('foo bar')));
         $this->updateResource($meta1);
 
         $meta2 = new DatasetNode(DF::namedNode($location));
         $meta2->add([
-            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://123')),
-            DF::quad($meta2->getNode(), $titleProp, DF::literal('merged title')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://123')),
+            DF::quadNoSubject($titleProp, DF::literal('merged title')),
         ]);
         $resp  = $this->updateResource($meta2, null, Metadata::SAVE_ADD);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -531,7 +531,7 @@ class RestTest extends TestBase {
         $propTmpl = new PT($prop);
 
         $meta1    = new DatasetNode(self::$baseNode);
-        $meta1->add(DF::quad($meta1->getNode(), $prop, DF::literal('my value')));
+        $meta1->add(DF::quadNoSubject($prop, DF::literal('my value')));
         $location = $this->createMetadataResource($meta1);
 
         $meta2 = $this->getResourceMeta($location);
@@ -542,7 +542,7 @@ class RestTest extends TestBase {
         $meta3 = $this->extractResource($resp, $location);
         $this->assertEquals('my value', $meta3->getObjectValue($propTmpl));
 
-        $meta2->add(DF::quad($meta2->getNode(), self::$schema->delete, $prop));
+        $meta2->add(DF::quadNoSubject(self::$schema->delete, $prop));
         $resp  = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
         $meta4 = $this->extractResource($resp, $location);
         $this->assertNull($meta4->getObjectValue($propTmpl));
@@ -578,13 +578,13 @@ class RestTest extends TestBase {
     public function testDuplicatedId(): void {
         $res1  = $this->createMetadataResource();
         $meta1 = $this->getResourceMeta($res1);
-        $meta1->add(DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('https://my.id')));
+        $meta1->add(DF::quadNoSubject(self::$schema->id, DF::namedNode('https://my.id')));
         $resp  = $this->updateResource($meta1);
         $this->assertEquals(200, $resp->getStatusCode());
 
         $res2  = $this->createMetadataResource();
         $meta2 = $this->getResourceMeta($res2);
-        $meta2->add(DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('https://my.id')));
+        $meta2->add(DF::quadNoSubject(self::$schema->id, DF::namedNode('https://my.id')));
         $resp  = $this->updateResource($meta2);
         $this->assertEquals(409, $resp->getStatusCode());
         $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
@@ -657,9 +657,9 @@ class RestTest extends TestBase {
             $this->getResourceMeta($this->createBinaryResource($txId)),
             $this->getResourceMeta($this->createBinaryResource($txId)),
         ];
-        $m[0]->add(DF::quad($m[0]->getNode(), self::$schema->parent, $m[1]->getNode()));
+        $m[0]->add(DF::quadNoSubject(self::$schema->parent, $m[1]->getNode()));
         $this->updateResource($m[0], $txId);
-        $m[1]->add(DF::quad($m[1]->getNode(), self::$schema->parent, $m[2]->getNode()));
+        $m[1]->add(DF::quadNoSubject(self::$schema->parent, $m[2]->getNode()));
         $this->updateResource($m[1], $txId);
         $this->commitTransaction($txId);
 
@@ -690,15 +690,15 @@ class RestTest extends TestBase {
 
         $meta1 = new DatasetNode(self::$baseNode);
         $meta1->add([
-            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res1')),
-            DF::quad($meta1->getNode(), $fooProp, DF::literal('1')),
-            DF::quad($meta1->getNode(), $barProp, DF::literal('2')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://res1')),
+            DF::quadNoSubject($fooProp, DF::literal('1')),
+            DF::quadNoSubject($barProp, DF::literal('2')),
         ]);
         $meta2 = new DatasetNode(self::$baseNode);
         $meta2->add([
-            DF::quad($meta2->getNode(), self::$schema->id, DF::namedNode('http://res2')),
-            DF::quad($meta2->getNode(), $barProp, DF::literal('A')),
-            DF::quad($meta2->getNode(), $bazProp, DF::literal('B')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://res2')),
+            DF::quadNoSubject($barProp, DF::literal('A')),
+            DF::quadNoSubject($bazProp, DF::literal('B')),
         ]);
 
         $loc1 = $this->createMetadataResource($meta1, $txId);
@@ -746,13 +746,13 @@ class RestTest extends TestBase {
         $idsTmpl = new PT(self::$schema->id);
         $meta1   = new DatasetNode(self::$baseNode);
         $meta1->add([
-            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res1')),
-            DF::quad($meta1->getNode(), $barProp, DF::literal('1')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://res1')),
+            DF::quadNoSubject($barProp, DF::literal('1')),
         ]);
         $meta2   = new DatasetNode(self::$baseNode);
         $meta2->add([
-            DF::quad($meta1->getNode(), self::$schema->id, DF::namedNode('http://res2')),
-            DF::quad($meta1->getNode(), $barProp, DF::literal('A')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://res2')),
+            DF::quadNoSubject($barProp, DF::literal('A')),
         ]);
         $loc1    = $this->createMetadataResource($meta1);
         $loc2    = $this->createMetadataResource($meta2);
@@ -836,16 +836,16 @@ class RestTest extends TestBase {
 
         $meta      = new DatasetNode(self::$baseNode);
         $meta->add([
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/bar1')),
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/bar2')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://foo/bar1')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://foo/bar2')),
         ]);
         $location1 = $this->createMetadataResource($meta, $txId);
 
         $meta      = new DatasetNode(self::$baseNode);
         $meta->add([
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://foo/baz')),
-            DF::quad($meta->getNode(), $prop, DF::namedNode('https://foo/bar1')),
-            DF::quad($meta->getNode(), $prop, DF::namedNode('https://foo/bar2')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://foo/baz')),
+            DF::quadNoSubject($prop, DF::namedNode('https://foo/bar1')),
+            DF::quadNoSubject($prop, DF::namedNode('https://foo/bar2')),
         ]);
         $location2 = $this->createMetadataResource($meta, $txId);
         $this->assertIsString($location2);
@@ -876,8 +876,8 @@ class RestTest extends TestBase {
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
         $meta->add([
-            DF::quad($meta->getNode(), DF::namedNode('https://some.property/1'), $skipNode),
-            DF::quad($meta->getNode(), DF::namedNode('https://some.property/2'), $addNode),
+            DF::quadNoSubject(DF::namedNode('https://some.property/1'), $skipNode),
+            DF::quadNoSubject(DF::namedNode('https://some.property/2'), $addNode),
         ]);
         $resp  = $this->updateResource($meta);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -890,7 +890,7 @@ class RestTest extends TestBase {
         $this->assertEquals($added, $m->listObjects(new PT('https://some.property/2'))->getValues());
 
         // and deny
-        $meta->add(DF::quad($meta->getNode(), DF::namedNode('https://some.property/2'), DF::namedNode('https://deny.nmsp/123')));
+        $meta->add(DF::quadNoSubject(DF::namedNode('https://some.property/2'), DF::namedNode('https://deny.nmsp/123')));
         $resp = $this->updateResource($meta);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
@@ -909,14 +909,14 @@ class RestTest extends TestBase {
         ];
 
         $res  = new DatasetNode(self::$baseNode);
-        $res->add(DF::quad($res->getNode(), self::$schema->id, DF::namedNode(self::$baseUrl . '0')));
+        $res->add(DF::quadNoSubject(self::$schema->id, DF::namedNode(self::$baseUrl . '0')));
         $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertMatchesRegularExpression('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
 
         $res  = new DatasetNode(self::$baseNode);
-        $res->add(DF::quad($res->getNode(), self::$schema->id, DF::literal(self::$baseUrl . '0')));
+        $res->add(DF::quadNoSubject(self::$schema->id, DF::literal(self::$baseUrl . '0')));
         $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
@@ -929,9 +929,9 @@ class RestTest extends TestBase {
     function testVeryOldDate(): void {
         $meta     = new DatasetNode(self::$baseNode);
         $meta->add([
-            DF::quad($meta->getNode(), DF::namedNode('https://old/date1'), DF::literal('-12345-01-01', null, RDF::XSD_DATE)),
-            DF::quad($meta->getNode(), DF::namedNode('https://old/date2'), DF::literal('-4713-01-01', null, RDF::XSD_DATE)),
-            DF::quad($meta->getNode(), DF::namedNode('https://old/date3'), DF::literal('-4714-01-01', null, RDF::XSD_DATE)),
+            DF::quadNoSubject(DF::namedNode('https://old/date1'), DF::literal('-12345-01-01', null, RDF::XSD_DATE)),
+            DF::quadNoSubject(DF::namedNode('https://old/date2'), DF::literal('-4713-01-01', null, RDF::XSD_DATE)),
+            DF::quadNoSubject(DF::namedNode('https://old/date3'), DF::literal('-4714-01-01', null, RDF::XSD_DATE)),
         ]);
         $location = $this->createMetadataResource($meta);
         $req      = new Request('get', $location . '/metadata');
@@ -949,7 +949,7 @@ class RestTest extends TestBase {
      */
     function testWrongValue(): void {
         $meta = new DatasetNode(self::$baseNode);
-        $meta->add(DF::quad($meta->getNode(), DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
+        $meta->add(DF::quadNoSubject(DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
         try {
             $this->createMetadataResource($meta);
             $this->assertTrue(false);
@@ -1044,9 +1044,9 @@ class RestTest extends TestBase {
         // metadata
         $meta     = new DatasetNode(self::$baseNode);
         $meta->add([
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('https://' . rand())),
-            DF::quad($meta->getNode(), self::$schema->label, DF::literal('title')),
-            DF::quad($meta->getNode(), DF::namedNode(self::$config->spatialSearch->properties[0]), DF::literal('POLYGON((0 0,0 10,10 10,10 0,0 0))')),
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('https://' . rand())),
+            DF::quadNoSubject(self::$schema->label, DF::literal('title')),
+            DF::quadNoSubject(DF::namedNode(self::$config->spatialSearch->properties[0]), DF::literal('POLYGON((0 0,0 10,10 10,10 0,0 0))')),
         ]);
         $headers  = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
@@ -1248,8 +1248,8 @@ class RestTest extends TestBase {
 
         $meta     = new DatasetNode(self::$baseNode);
         $meta->add([
-            DF::quad($meta->getNode(), $fooBarProp, DF::literal("baz")),
-            DF::quad($meta->getNode(), $bazBarProp, DF::literal("foo")),
+            DF::quadNoSubject($fooBarProp, DF::literal("baz")),
+            DF::quadNoSubject($bazBarProp, DF::literal("foo")),
         ]);
         $location = $this->createMetadataResource($meta);
 
