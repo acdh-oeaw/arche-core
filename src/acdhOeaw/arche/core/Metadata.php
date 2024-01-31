@@ -31,6 +31,8 @@ use PDOException;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
 use rdfInterface\DatasetNodeInterface;
+use rdfInterface\LiteralInterface;
+use rdfInterface\NamedNodeInterface;
 use quickRdf\DatasetNode;
 use quickRdf\NamedNode;
 use quickRdf\Literal;
@@ -238,11 +240,11 @@ class Metadata {
             foreach ($allButIds as $triple) {
                 $p = $triple->getPredicate()->getValue();
                 $v = $triple->getObject();
-                if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
+                if (!$v instanceof LiteralInterface && in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
                     $v = DF::literal($triple->getObject()->getValue(), null, self::TYPE_URI);
                 }
 
-                if ($v instanceof NamedNode) {
+                if ($v instanceof NamedNodeInterface) {
                     $v = $v->getValue();
                     RC::$log->debug("\tadding relation " . $p . " " . $v);
                     // $v may not exist in identifiers table yet, thus special handling
@@ -257,7 +259,7 @@ class Metadata {
                             }
                         }
                     }
-                } elseif ($v instanceof Literal) {
+                } elseif ($v instanceof LiteralInterface) {
                     $vv = $v->getValue();
                     if (in_array($p, $spatialProps)) {
                         $v = $v->withDatatype(self::TYPE_GEOM);
@@ -344,7 +346,7 @@ class Metadata {
         $baseUrl    = RC::getBaseUrl();
         $baseUrlLen = strlen($baseUrl);
         foreach ($meta->listObjects(new PT($schema->id)) as $i) {
-            if (!($i instanceof NamedNode)) {
+            if (!($i instanceof NamedNodeInterface)) {
                 throw new RepoException('Non-resource identifier', 400);
             }
             $i = $i->getValue();
