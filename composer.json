@@ -13,17 +13,15 @@
     "require": {
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7",
-        "acdh-oeaw/arche-lib": "dev-rdfInterface",
+        "acdh-oeaw/arche-lib": "^6.0.0-RC1",
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": "^1",
         "zozlak/rdf-constants": "^1",
         "php-amqplib/php-amqplib": "^3.1",
-        "sweetrdf/quick-rdf-io": "dev-master",
-        "sweetrdf/quick-rdf": "dev-master",
-        "sweetrdf/simple-rdf": "dev-master",
-        "sweetrdf/rdf-interface": "dev-master",
-        "sweetrdf/rdf-helpers": "dev-dev",
-        "sweetrdf/term-templates": "dev-dev"
+        "sweetrdf/quick-rdf": "^2.0.0-RC7",
+        "sweetrdf/simple-rdf": "^2.0.0-RC7",
+        "sweetrdf/rdf-interface": "^2.0.0-RC7",
+        "sweetrdf/rdf-helpers": "^2.0.0-RC1"
     },
     "autoload": {
         "psr-4": {
