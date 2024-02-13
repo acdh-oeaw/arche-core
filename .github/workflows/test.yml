@@ -40,7 +40,8 @@ jobs:
       run: |
         export COVERALLS_RUN_LOCALLY=1
         export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}
-        composer require -W php-coveralls/php-coveralls
+        rm -fR composer.json composer.lock vendor
+        composer require php-coveralls/php-coveralls
         sudo rm -fR /var/www/html
         sudo ln -s "`pwd`" /var/www/html
         vendor/bin/php-coveralls -v
