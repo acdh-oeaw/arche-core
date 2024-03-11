@@ -109,13 +109,14 @@ foreach (iterateDir($cfg->storage->dir, 0, $cfg->storage->levels) as $file) {
         $size        = filesize($file) / 1024 / 1024;
         $missing++;
         $sizeMissing += $size;
-        if (time() - filemtime($file) > $params['ageToDelete']) {
-            printf("deleting %s (%d MB, %d s old)\n", $file, $size, time() - filemtime($file));
+        $age = time() - filemtime($file);
+        if ($age > $params['ageToDelete']) {
+            printf("deleting %s (%d MB, %d s old)\n", $file, $size, $age);
             unlink($file);
             $deleted++;
             $sizeDeleted += $size;
         } else {
-            printf("missing %s (%d MB)\n", $file, $size);
+            printf("missing %s (%d MB, %d s old)\n", $file, $size, $age);
         }
     }
 }
