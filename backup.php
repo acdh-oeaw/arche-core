@@ -188,7 +188,7 @@ try {
     $snapshot = $pdo->query("SELECT pg_export_snapshot()")->fetchColumn();
 
     // DATABASE
-    $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions -T raw --snapshot $snapshot -f $targetFileSql";
+    $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions --snapshot $snapshot -f $targetFileSql";
     $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearch' ? ' -T full_text_search -T spatial_search' : '';
     $dbDumpCmd .= ($params['include'] ?? '') == 'skipHistory' ? ' -T metadata_history' : '';
     $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearchHistory' ? ' -T full_text_search -T metadata_history' : '';
