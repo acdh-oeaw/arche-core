@@ -98,7 +98,11 @@ class Coverage implements ExecutionFinishedSubscriber {
 
     public function notify(ExecutionFinished $event): void {
         $filter = new Filter();
-        $filter->includeDirectory(__DIR__ . '/../src');
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(__DIR__ . '/../src')) as $f) {
+            if ($f->getExtension() === 'php') {
+                $filter->includeFile($f->getRealPath());
+            }
+        }
         $driver = new XdebugDriver($filter);
         $cc     = new CodeCoverage($driver, $filter);
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {

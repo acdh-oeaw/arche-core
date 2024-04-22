@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
@@ -47,7 +48,7 @@ use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 class RestTest extends TestBase {
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testResourceCreate(): void {
         $txId = $this->beginTransaction();
@@ -127,7 +128,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testResourceDelete(): void {
         $location = $this->createBinaryResource();
@@ -154,7 +155,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testTombstoneDelete(): void {
         $location = $this->createBinaryResource();
@@ -185,7 +186,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testTombstoneDeleteActive(): void {
         $location = $this->createBinaryResource();
@@ -201,7 +202,7 @@ class RestTest extends TestBase {
 
     /**
      * 
-     * @group rest
+     * #[Group('rest')]
      */
     public function testDeleteRecursively(): void {
         $txId = $this->beginTransaction();
@@ -236,7 +237,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testDeleteWithReferences(): void {
         $txId    = $this->beginTransaction();
@@ -270,7 +271,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testForeignCheckSeparateTx(): void {
         $txId = $this->beginTransaction();
@@ -287,7 +288,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testForeignCheckSameTx(): void {
         $txId = $this->beginTransaction();
@@ -303,7 +304,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testHead(): void {
         $location = $this->createBinaryResource();
@@ -329,7 +330,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl));
@@ -349,7 +350,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testPut(): void {
         // create a resource and make sure it's there
@@ -387,7 +388,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testPutReturnMeta(): void {
         // create a resource and make sure it's there
@@ -417,7 +418,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testResourceCreateMetadata(): void {
         $idTmpl = new PT(self::$schema->id);
@@ -471,7 +472,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testPatchMetadataMerge(): void {
         $titleTmpl = new PT('http://test/hasTitle');
@@ -497,7 +498,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testPatchMetadataAdd(): void {
         $titleProp = DF::namedNode('http://test/hasTitle');
@@ -549,7 +550,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testPatchMetadataWrongMode(): void {
         $location = $this->createBinaryResource();
@@ -573,7 +574,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testDuplicatedId(): void {
         $res1  = $this->createMetadataResource();
@@ -591,7 +592,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testUnbinaryResource(): void {
         $location = $this->createBinaryResource();
@@ -628,7 +629,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testEmptyMeta(): void {
         $location = $this->createBinaryResource();
@@ -819,7 +820,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testMethodNotAllowed(): void {
         $req  = new Request('put', self::$baseUrl);
@@ -828,7 +829,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     function testPseudoDuplicate(): void {
         $txId = $this->beginTransaction();
@@ -860,7 +861,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testAutoAddIds(): void {
         $location = $this->createBinaryResource();
@@ -897,7 +898,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testWrongIds(): void {
         $txId    = $this->beginTransaction();
@@ -924,7 +925,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     function testVeryOldDate(): void {
         $meta     = new DatasetNode(self::$baseNode);
@@ -945,7 +946,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     function testWrongValue(): void {
         $meta = new DatasetNode(self::$baseNode);
@@ -959,7 +960,7 @@ class RestTest extends TestBase {
     }
 
     /**
-     * @group rest
+     * #[Group('rest')]
      */
     public function testSpatial(): void {
         $txId    = $this->beginTransaction();
@@ -1071,7 +1072,7 @@ class RestTest extends TestBase {
      * Another request trying to use the same transaction in parallel should gracefully
      * return HTTP 409.
      * 
-     * @group rest
+     * #[Group('rest')]
      */
     public function testParallelRequests(): void {
         $location = $this->createMetadataResource();

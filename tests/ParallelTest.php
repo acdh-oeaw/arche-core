@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
 use termTemplates\PredicateTemplate as PT;
@@ -120,7 +121,7 @@ class ParallelTest extends TestBase {
      * - The tx commit should succeed
      * - The tx rollback should fail with HTTP 409
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelCommitRollback(): void {
         $txId    = $this->beginTransaction();
@@ -139,7 +140,7 @@ class ParallelTest extends TestBase {
      * - The tx commit should succeed
      * - The tx get should succeed
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelCommitTxGet(): void {
         $txId     = $this->beginTransaction();
@@ -173,7 +174,7 @@ class ParallelTest extends TestBase {
      * - The patch should pass
      * - The tx commit should fail with 409 because of the patch
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPatchAndCommit(): void {
         $location = $this->createMetadataResource();
@@ -197,7 +198,7 @@ class ParallelTest extends TestBase {
      * - The tx commit should pass
      * - The patch should fail with 409 because of the commit
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelCommitAndPatch(): void {
         $location = $this->createMetadataResource();
@@ -220,7 +221,7 @@ class ParallelTest extends TestBase {
      * patch + patch on separate resources
      * Both should pass
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPatchPatchOther(): void {
         $loc1 = $this->createMetadataResource();
@@ -252,7 +253,7 @@ class ParallelTest extends TestBase {
      * patch + patch to the same resource
      * The first patch should succeed, the second one should fail with 409
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPatchPatchSame(): void {
         $location = $this->createMetadataResource();
@@ -277,7 +278,7 @@ class ParallelTest extends TestBase {
      * resource
      * Both should pass
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPatchPatchAddId(): void {
         $loc1  = $this->createMetadataResource();
@@ -310,7 +311,7 @@ class ParallelTest extends TestBase {
      * Both should pass (if lockTimeout is long enought)
      * or one should throw 409 (if lockTimeout is too short)
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPostPostCycle(): void {
         $tmpl    = new PT(self::$schema->parent);
@@ -353,7 +354,7 @@ class ParallelTest extends TestBase {
      * post + post with same id
      * One should pass, second one should throw 400
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelPostPostSameId(): void {
         $txId    = $this->beginTransaction();
@@ -387,7 +388,7 @@ class ParallelTest extends TestBase {
      * and finally they should start throwing 400 - no such transaction. At that
      * point the first resource should not exist any more.
      * 
-     * @group parallel
+     * #[Group('parallel')]
      */
     public function testParallelAtomicTransaction(): void {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');

@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
@@ -63,7 +64,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testGet(): void {
         $req  = new Request('post', self::$baseUrl . 'transaction');
@@ -81,7 +82,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testProlong(): void {
         $txId = $this->beginTransaction();
@@ -105,7 +106,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testExpires(): void {
         $txId = $this->beginTransaction();
@@ -133,7 +134,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testEmpty(): void {
         // commit
@@ -168,7 +169,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testCreateRollback(): void {
         $txId = $this->beginTransaction();
@@ -189,7 +190,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testDeleteRollback(): void {
         // create a resource and make sure it's there
@@ -228,7 +229,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testPatchMetadataRollback(): void {
         // set up and remember an initial state
@@ -265,7 +266,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testForeignCheckLoop(): void {
         $relProp = DF::namedNode('http://relation');
@@ -288,7 +289,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testTransactionConflict(): void {
         $location = $this->createBinaryResource();
@@ -309,7 +310,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testPassIdWithinTransaction(): void {
         $meta1 = new DatasetNode(self::$baseNode);
@@ -339,7 +340,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testCompletenessAbort(): void {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -374,7 +375,7 @@ class TransactionTest extends TestBase {
      * res 1 should stay because it's referenced by res3 while res2 should be 
      * deleted by the transaction controller
      * 
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testParallelCommonResourceRollbackCommit(): void {
         $tx1   = $this->beginTransaction();
@@ -458,7 +459,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
@@ -466,7 +467,7 @@ class TransactionTest extends TestBase {
     }
 
     /**
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('patch', self::$baseUrl . 'transaction'));
@@ -478,7 +479,7 @@ class TransactionTest extends TestBase {
      * timeout. If the transaction is rolled back by the TransactionController,
      * the transaction/resource locking system doesn't work well.
      * 
-     * @group transactions
+     * #[Group('transactions')]
      */
     public function testLongProcessing(): void {
         TestBase::setHandler([

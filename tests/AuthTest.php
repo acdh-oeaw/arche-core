@@ -26,9 +26,10 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DataFactory as DF;
 use quickRdf\DatasetNode;
-use GuzzleHttp\Psr7\Request;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
 
@@ -53,7 +54,7 @@ class AuthTest extends TestBase {
 
     /**
      * 
-     * @group auth
+     * #[Group('auth')]
      */
     public function testHeader(): void {
         $location = $this->createBinaryResource();
@@ -87,7 +88,7 @@ class AuthTest extends TestBase {
 
     /**
      * 
-     * @group auth
+     * #[Group('auth')]
      */
     public function testHttpBasic(): void {
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -131,7 +132,7 @@ class AuthTest extends TestBase {
 
     /**
      * 
-     * @group auth
+     * #[Group('auth')]
      */
     public function testEnforceOnMeta(): void {
         $location = $this->createBinaryResource();
@@ -156,7 +157,7 @@ class AuthTest extends TestBase {
 
     /**
      * 
-     * @group auth
+     * #[Group('auth')]
      */
     public function testAssignOnCreate(): void {
         $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -173,7 +174,7 @@ class AuthTest extends TestBase {
 
     /**
      * 
-     * @group auth
+     * #[Group('auth')]
      */
     public function testAuthDeleteRecursively(): void {
         $cfg     = yaml_parse_file(__DIR__ . '/../config.yaml');

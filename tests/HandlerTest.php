@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DataFactory as DF;
 use quickRdf\Dataset;
 use zozlak\RdfConstants as RDF;
@@ -69,7 +70,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testNoHandlers(): void {
         $location = $this->createBinaryResource();
@@ -79,7 +80,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testWrongHandler(): void {
         $this->setHandlers([
@@ -102,7 +103,7 @@ class HandlerTest extends TestBase {
 
     /**
      * 
-     * @group handler
+     * #[Group('handler')]
      */
     public function testMetadataManagerBasic(): void {
         $this->setHandlers([
@@ -121,7 +122,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testMetadataManagerDefault(): void {
         $defaultProp = DF::namedNode('https://default');
@@ -149,7 +150,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testMetadataManagerForbidden(): void {
         $predicate = DF::namedNode('https://forbidden');
@@ -173,7 +174,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testMetadataManagerCopying(): void {
         $fromProp = DF::namedNode('https://copy/from');
@@ -199,7 +200,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testRpcBasic(): void {
         $this->setHandlers([
@@ -215,7 +216,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testRpcError(): void {
         $this->setHandlers([
@@ -234,7 +235,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testRpcTimeoutException(): void {
         $this->setHandlers([
@@ -253,7 +254,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testRpcTimeoutNoException(): void {
         $this->setHandlers([
@@ -272,7 +273,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testTxCommitFunction(): void {
         $this->setHandlers([
@@ -294,7 +295,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testTxCommitRpc(): void {
         $this->setHandlers([
@@ -316,7 +317,7 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
+     * #[Group('handler')]
      */
     public function testFunctionHandler(): void {
         $this->setHandlers([
@@ -331,7 +332,8 @@ class HandlerTest extends TestBase {
 
     /**
      * Tests if a on-metadata-edit handler can prevent deletion with references removal
-     * @group handler
+     * 
+     * #[Group('handler')]
      */
     public function testDeleteWithReferencesHandler(): void {
         $this->setHandlers([
@@ -364,7 +366,7 @@ class HandlerTest extends TestBase {
      * Tests if resource creation refused by the post-creation handler doesn't
      * leave any trash in the database.
      * 
-     * @group handler
+     * #[Group('handler')]
      */
     public function testRefusedCreation(): void {
         $this->setHandlers([
@@ -396,9 +398,9 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * @group handler
-     * 
      * REMARK - HAS TO BE THE SECOND LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
+     * 
+     * #[Group('handler')]
      */
     public function testBrokenHandler(): void {
         $this->setHandlers([
@@ -432,7 +434,7 @@ class HandlerTest extends TestBase {
      * 
      * REMARK - HAS TO BE THE LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
      * 
-     * @group handler
+     * #[Group('handler')]
      */
     public function testWrongSetup(): void {
         $cfg                                         = yaml_parse_file(__DIR__ . '/../config.yaml');

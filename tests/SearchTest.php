@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
 use termTemplates\QuadTemplate as QT;
@@ -88,7 +89,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testSimple(): void {
         $opts = [
@@ -109,7 +110,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testRelationsExplicit(): void {
         $opts = [
@@ -144,7 +145,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testRelationsImplicit(): void {
         $relProp = 'https://relation';
@@ -190,7 +191,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testLiteralUri(): void {
         $opts = [
@@ -230,7 +231,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testByDateImplicit(): void {
         $opts = [
@@ -250,7 +251,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testByDateExplicit(): void {
         $opts = [
@@ -271,7 +272,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testRegex(): void {
         $opts = [
@@ -291,7 +292,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testMetaReadCustomMode(): void {
         $opts = [
@@ -313,7 +314,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testMetaReadRelatives(): void {
         $opts = [
@@ -336,7 +337,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testMetaFilterOutputProperties(): void {
         $opts  = [
@@ -368,7 +369,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testByLang(): void {
         $countTmpl = new PT(self::$schema->searchCount);
@@ -453,7 +454,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testExceptions(): void {
         $opts = ['query' => [
@@ -508,7 +509,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testSql(): void {
         $opts = [
@@ -526,7 +527,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testPaging(): void {
         $countTmpl = new PT(self::$schema->searchCount);
@@ -558,7 +559,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testPagingByNumber(): void {
         $countTmpl = new PT(self::$schema->searchCount);
@@ -590,7 +591,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      * @param array<string, string> $expected
      */
     public function testFullTextSearch1(?array $expected = null): void {
@@ -856,7 +857,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
@@ -864,7 +865,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testVeryOldDate(): void {
         $meta = new DatasetNode(self::$baseNode);
@@ -922,7 +923,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testSpatial(): void {
         // m[0]: POLYGON((0 0,10 0,10 10,0 10,0 0))
@@ -973,7 +974,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testReadNone(): void {
         $opts = [
@@ -993,7 +994,7 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * @group search
+     * #[Group('search')]
      */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('put', self::$baseUrl . 'search'));

@@ -27,6 +27,8 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Group;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
 use function \GuzzleHttp\json_encode;
@@ -80,7 +82,7 @@ class UserApiTest extends TestBase {
 
     /**
      * 
-     * @group userApi
+     * #[Group('userApi')]
      */
     public function testUserCreate(): void {
         // QUERY
@@ -133,8 +135,8 @@ class UserApiTest extends TestBase {
     }
 
     /**
-     * @depends testUserCreate
-     * @group userApi
+     * #[Depends('testUserCreate')]
+     * #[Group('userApi')]
      */
     public function testUserGet(): void {
         // no authorization
@@ -203,8 +205,8 @@ class UserApiTest extends TestBase {
     }
 
     /**
-     * @depends testUserCreate
-     * @group userApi
+     * #[Depends('testUserCreate')]
+     * #[Group('userApi')]
      */
     public function testUserPatch(): void {
         // as root
@@ -252,8 +254,8 @@ class UserApiTest extends TestBase {
     }
 
     /**
-     * @depends testUserCreate
-     * @group userApi
+     * #[Depends('testUserCreate')]
+     * #[Group('userApi')]
      */
     public function testUserDelete(): void {
         // as user
@@ -276,7 +278,7 @@ class UserApiTest extends TestBase {
     }
 
     /**
-     * @group userApi
+     * #[Group('userApi')]
      */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('post', self::$baseUrl . 'user'));
