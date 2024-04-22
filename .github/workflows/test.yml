@@ -10,6 +10,9 @@ jobs:
         image: rabbitmq
         ports:
         - 5672:5672
+    strategy:
+      matrix:
+        php: [8.1, 8.2, 8.3]
     steps:
     - uses: actions/checkout@v3
     - uses: actions/setup-java@v3
@@ -17,6 +20,13 @@ jobs:
         java-version: 17
         java-package: jdk
         distribution: oracle
+    - uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php }}
+        extensions: 'gd'
+        coverage: xdebug
+      env:
+        fail-fast: true
     - name: composer update
       run: |
         composer update

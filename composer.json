@@ -11,6 +11,7 @@
         }
     ],
     "require": {
+        "ext-gd": "*",
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/arche-lib": "^6",
@@ -27,7 +28,7 @@
         }
     },
     "require-dev": {
-        "phpunit/phpunit": "^10",
+        "phpunit/phpunit": "*",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
     }
