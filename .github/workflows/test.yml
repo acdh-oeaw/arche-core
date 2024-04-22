@@ -38,7 +38,7 @@ jobs:
         mkdir log
         docker run --name arche-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d arche-dev
         sleep 10
-    - uses: mxschmitt/action-tmate@v3
+    #- uses: mxschmitt/action-tmate@v3
     - name: test-mod_php
       run: |
         docker exec -t -e XDEBUG_MODE=coverage -u www-data arche-dev vendor/bin/phpunit
