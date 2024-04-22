@@ -23,7 +23,7 @@ jobs:
     - uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php }}
-        extensions: 'gd'
+        extensions: gd,json,mbstring,pcre,xmlreader,yaml
         coverage: xdebug
       env:
         fail-fast: true
