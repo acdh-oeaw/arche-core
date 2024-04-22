@@ -6,7 +6,7 @@ RUN apt update && \
 ENV LANG=en_US.UTF-8 LANGUAGE=en_US:en
 RUN locale-gen en_US.UTF-8 && \
     apt update && \
-    apt install -y supervisor git apache2 curl vim locales libapache2-mod-php php-fpm php-cli php-pgsql php-zip php-iconv php-readline php-curl php-intl php-mbstring php-yaml php-bcmath php-dom php-opcache php-gd php-xml php-xdebug openjdk-17-jre-headless postgresql authbind pv sqlite3 postgresql-16-postgis-3 rabbitmq-server && \
+    apt install -y supervisor git apache2 curl vim locales libapache2-mod-php php-fpm php-cli php-pgsql php-zip php-iconv php-readline php-curl php-intl php-mbstring php-yaml php-bcmath php-dom php-opcache php-gd php-xml php-xdebug openjdk-21-jre-headless postgresql authbind pv sqlite3 postgresql-16-postgis-3 rabbitmq-server && \
     a2enmod rewrite proxy_fcgi setenvif && \
     a2dissite 000-default && \
     echo 'zend_extension=xdebug.so\nxdebug.mode=coverage' | tee /etc/php/*/*/conf.d/20-xdebug.ini && \
