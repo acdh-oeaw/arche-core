@@ -42,14 +42,20 @@ use function \GuzzleHttp\json_encode;
  */
 class Auth implements AuthInterface {
 
-    const DEFAULT_ALLOW = 'allow';
-    const DEFAULT_DENY  = 'deny';
+    const DEFAULT_ALLOW  = 'allow';
+    const DEFAULT_DENY   = 'deny';
+    const DICT_ADVERTISE = [
+        'none'   => AuthController::ADVERTISE_NONE,
+        'once'   => AuthController::ADVERTISE_ONCE,
+        'always' => AuthController::ADVERTISE_ALWAYS,
+    ];
 
     private AuthController $controller;
     private string $userName;
     private bool $isAdmin;
     private bool $isCreator;
     private bool $authenticated;
+    private bool $isPublic;
 
     /**
      * 
@@ -65,7 +71,7 @@ class Auth implements AuthInterface {
         foreach (RC::$config->accessControl->authMethods as $i) {
             $class  = $i->class;
             $method = new $class(...$i->parameters);
-            $this->controller->addMethod($method, AuthController::ADVERTISE_ONCE);
+            $this->controller->addMethod($method, self::DICT_ADVERTISE[$i->advertise ?? 'once']);
         }
 
         $this->authenticated = $this->controller->authenticate();
@@ -83,6 +89,7 @@ class Auth implements AuthInterface {
 
         $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
+        $this->isPublic  = $this->userName === $cfg->publicRole;
     }
 
     public function checkCreateRights(): void {
@@ -188,6 +195,10 @@ class Auth implements AuthInterface {
         return $this->isAdmin;
     }
 
+    public function isPublic(): bool {
+        return $this->isPublic;
+    }
+
     /**
      * 
      * @param array<string> $allowed
@@ -196,7 +207,7 @@ class Auth implements AuthInterface {
      */
     public function denyAccess(array $allowed): void {
         RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
-        if (!$this->authenticated && $this->controller->advertise()) {
+        if ($this->isPublic() && $this->controller->advertise()) {
             throw new RepoException('Unauthorized', 401);
         }
         throw new RepoException('Forbidden', 403);

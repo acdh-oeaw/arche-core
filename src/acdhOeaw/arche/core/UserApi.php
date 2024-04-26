@@ -89,7 +89,7 @@ class UserApi {
 
     public function patch(string $user): void {
         $admin = RC::$auth->isAdmin();
-        if (!$admin && RC::$auth->getUserName() !== $user) {
+        if (!$admin && (RC::$auth->getUserName() !== $user || RC::$auth->isPublic())) {
             RC::$auth->denyAccess([$user]);
         }
         $this->checkUserExists($user);
