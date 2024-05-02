@@ -331,7 +331,7 @@ class BinaryPayload {
     private function updateSpatialSearch(SpatialInterface $spatial): void {
         $query   = sprintf(
             "INSERT INTO spatial_search (id, geom) 
-            SELECT ?::bigint, st_transform(geom, 4326)::geography
+            SELECT ?::bigint, st_transform(st_envelope(geom), 4326)::geography
             FROM (%s) t
             WHERE geom IS NOT NULL",
             $spatial->getSqlQuery()
