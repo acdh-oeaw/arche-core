@@ -223,3 +223,5 @@ schema:
     binaryModificationUser: http://binModUser
     creationDate: http://fedora.info/definitions/v4/repository#created
     creationUser: http://fedora.info/definitions/v4/repository#createdBy
+    imagePxWidth: http://width
+    imagePxHeight: http://height

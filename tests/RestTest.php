@@ -28,7 +28,6 @@ namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
@@ -47,9 +46,6 @@ use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
  */
 class RestTest extends TestBase {
 
-    /**
-     * #[Group('rest')]
-     */
     public function testResourceCreate(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -127,9 +123,6 @@ class RestTest extends TestBase {
         $this->assertEquals(204, $this->rollbackTransaction($txId));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testResourceDelete(): void {
         $location = $this->createBinaryResource();
 
@@ -154,9 +147,6 @@ class RestTest extends TestBase {
         $this->assertEquals(410, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testTombstoneDelete(): void {
         $location = $this->createBinaryResource();
         $this->deleteResource($location);
@@ -185,9 +175,6 @@ class RestTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testTombstoneDeleteActive(): void {
         $location = $this->createBinaryResource();
 
@@ -200,10 +187,6 @@ class RestTest extends TestBase {
         $this->rollbackTransaction($txId);
     }
 
-    /**
-     * 
-     * #[Group('rest')]
-     */
     public function testDeleteRecursively(): void {
         $txId = $this->beginTransaction();
 
@@ -236,9 +219,6 @@ class RestTest extends TestBase {
         }
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testDeleteWithReferences(): void {
         $txId    = $this->beginTransaction();
         $headers = $this->getHeaders($txId);
@@ -270,9 +250,6 @@ class RestTest extends TestBase {
         $this->assertFalse($meta->any(new PT('http://relation')));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testForeignCheckSeparateTx(): void {
         $txId = $this->beginTransaction();
         $loc1 = $this->createMetadataResource(null, $txId);
@@ -287,9 +264,6 @@ class RestTest extends TestBase {
         $this->assertEquals(409, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testForeignCheckSameTx(): void {
         $txId = $this->beginTransaction();
 
@@ -303,9 +277,6 @@ class RestTest extends TestBase {
         $this->assertEquals(409, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testHead(): void {
         $location = $this->createBinaryResource();
 
@@ -329,9 +300,6 @@ class RestTest extends TestBase {
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
@@ -349,9 +317,6 @@ class RestTest extends TestBase {
         $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testPut(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
@@ -387,9 +352,6 @@ class RestTest extends TestBase {
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testPutReturnMeta(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
@@ -417,9 +379,6 @@ class RestTest extends TestBase {
         $this->rollbackTransaction($txId);
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testResourceCreateMetadata(): void {
         $idTmpl = new PT(self::$schema->id);
 
@@ -471,9 +430,6 @@ class RestTest extends TestBase {
         $this->assertEquals((string) $body, (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testPatchMetadataMerge(): void {
         $titleTmpl = new PT('http://test/hasTitle');
         $idTmpl    = new PT(self::$schema->id);
@@ -497,9 +453,6 @@ class RestTest extends TestBase {
         $this->assertContains('https://123', $ids);
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testPatchMetadataAdd(): void {
         $titleProp = DF::namedNode('http://test/hasTitle');
         $idTmpl    = new PT(self::$schema->id);
@@ -549,9 +502,6 @@ class RestTest extends TestBase {
         $this->assertNull($meta4->getObjectValue($propTmpl));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testPatchMetadataWrongMode(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
@@ -573,9 +523,6 @@ class RestTest extends TestBase {
         $this->assertEquals('Begin transaction first', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testDuplicatedId(): void {
         $res1  = $this->createMetadataResource();
         $meta1 = $this->getResourceMeta($res1);
@@ -591,9 +538,6 @@ class RestTest extends TestBase {
         $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testUnbinaryResource(): void {
         $location = $this->createBinaryResource();
         $txHeader = self::$config->rest->headers->transactionId;
@@ -628,9 +572,6 @@ class RestTest extends TestBase {
         $this->assertFalse($res->any(new PT(self::$schema->hash)));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testEmptyMeta(): void {
         $location = $this->createBinaryResource();
 
@@ -819,18 +760,12 @@ class RestTest extends TestBase {
         $this->assertCount(1, $meta->copy(new PT(self::$schema->modificationUser)));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testMethodNotAllowed(): void {
         $req  = new Request('put', self::$baseUrl);
         $resp = self::$client->send($req);
         $this->assertEquals(405, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     function testPseudoDuplicate(): void {
         $txId = $this->beginTransaction();
         $prop = DF::namedNode('https://bar/baz');
@@ -860,9 +795,6 @@ class RestTest extends TestBase {
         $this->rollbackTransaction($txId);
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testAutoAddIds(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
@@ -897,9 +829,6 @@ class RestTest extends TestBase {
         $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testWrongIds(): void {
         $txId    = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -924,9 +853,6 @@ class RestTest extends TestBase {
         $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('rest')]
-     */
     function testVeryOldDate(): void {
         $meta     = new DatasetNode(self::$baseNode);
         $meta->add([
@@ -945,9 +871,6 @@ class RestTest extends TestBase {
         $this->assertEquals('-4714-01-01', $g->getObjectValue(new PT('https://old/date3')));
     }
 
-    /**
-     * #[Group('rest')]
-     */
     function testWrongValue(): void {
         $meta = new DatasetNode(self::$baseNode);
         $meta->add(DF::quadNoSubject(DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
@@ -959,9 +882,6 @@ class RestTest extends TestBase {
         }
     }
 
-    /**
-     * #[Group('rest')]
-     */
     public function testSpatial(): void {
         $txId    = $this->beginTransaction();
         $headers = [
@@ -1071,8 +991,6 @@ class RestTest extends TestBase {
      * In the current implementation only a single request can use a given transaction.
      * Another request trying to use the same transaction in parallel should gracefully
      * return HTTP 409.
-     * 
-     * #[Group('rest')]
      */
     public function testParallelRequests(): void {
         $location = $this->createMetadataResource();
@@ -1269,6 +1187,38 @@ class RestTest extends TestBase {
         $g->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertEquals('foo', $g->getObjectValue($bazBarTmpl));
         $this->assertFalse($g->any($fooBarTmpl));
+    }
+
+    public function testImageDimensions(): void {
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+            'Content-Disposition'                       => 'attachment; filename="raster.tif"',
+        ];
+
+        // ordinary tif - shouldn't rise an error
+        $body     = (string) file_get_contents(__DIR__ . '/data/raster.tif');
+        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp     = self::$client->send($req);
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0];
+        $g        = new DatasetNode(DF::namedNode($location));
+        $g->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals(366, $g->getObjectValue(new PT(self::$config->schema->imagePxHeight)));
+        $this->assertEquals(668, $g->getObjectValue(new PT(self::$config->schema->imagePxWidth)));
+        
+        // geoTIFF
+        $body                           = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0];
+        $g        = new DatasetNode(DF::namedNode($location));
+        $g->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals(366, $g->getObjectValue(new PT(self::$config->schema->imagePxHeight)));
+        $this->assertEquals(668, $g->getObjectValue(new PT(self::$config->schema->imagePxWidth)));
+        
+        $this->rollbackTransaction($txId);
     }
 
     /**

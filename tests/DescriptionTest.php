@@ -28,7 +28,6 @@ namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use acdhOeaw\arche\lib\Config;
 
 /**
@@ -48,9 +47,6 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
     }
 
-    /**
-     * #[Group('describe')]
-     */
     public function testYaml(): void {
         $resp = self::$client->send(new Request('get', self::$baseUrl . 'describe'));
         $this->assertEquals(200, $resp->getStatusCode());
@@ -73,9 +69,6 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
         $this->assertArrayHasKey('schema', $cfg);        
     }
 
-    /**
-     * #[Group('describe')]
-     */
     public function testJson(): void {
         $headers = ['Accept' => 'application/json'];
         $resp    = self::$client->send(new Request('get', self::$baseUrl . 'describe', $headers));
@@ -91,9 +84,6 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
         $this->assertArrayHasKey('schema', $cfg);
     }
 
-    /**
-     * #[Group('describe')]
-     */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('put', self::$baseUrl . 'describe'));
         $this->assertEquals(405, $resp->getStatusCode());

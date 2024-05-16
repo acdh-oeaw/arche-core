@@ -55,6 +55,8 @@ class BinaryPayload {
     private int $id;
     private ?string $hash;
     private int $size;
+    private int $imagePxHeight;
+    private int $imagePxWidth;
     private string $tmpPath;
 
     public function __construct(int $id) {
@@ -115,6 +117,10 @@ class BinaryPayload {
             $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
             RC::$log->debug("\tskipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+        }
+        // image dimensions
+        if (str_starts_with($mimeType, 'image/')) {
+            $this->readImageDimensions();
         }
 
         $targetPath = $this->getPath(true);
@@ -201,6 +207,12 @@ class BinaryPayload {
             $graph->add(DF::quad($node, RC::$schema->hash, DF::literal($this->hash)));
         } else {
             $graph->add(DF::quad($node, RC::$schema->delete, RC::$schema->hash));
+        }
+        if (isset($this->imagePxHeight)) {
+            $graph->add(DF::quad($node, RC::$schema->imagePxHeight, DF::literal($this->imagePxHeight)));
+        }
+        if (isset($this->imagePxWidth)) {
+            $graph->add(DF::quad($node, RC::$schema->imagePxWidth, DF::literal($this->imagePxWidth)));
         }
         // Last modification date & user
         $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
@@ -345,6 +357,14 @@ class BinaryPayload {
             $content = substr($content, 3);
         }
         $query->execute([$this->id, $content]);
+    }
+
+    private function readImageDimensions(): void {
+        $ret = getimagesize($this->tmpPath);
+        if (is_array($ret)) {
+            $this->imagePxHeight = $ret[1];
+            $this->imagePxWidth  = $ret[0];
+        }
     }
 
     private function toBytes(string $number): int {

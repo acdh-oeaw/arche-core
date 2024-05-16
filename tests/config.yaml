@@ -173,3 +173,5 @@ schema:
     binaryModificationUser: http://binModUser
     creationDate: http://createDate
     creationUser: http://createUser
+    imagePxWidth: http://width
+    imagePxHeight: http://height

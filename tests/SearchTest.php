@@ -27,7 +27,6 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
 use termTemplates\QuadTemplate as QT;
@@ -88,9 +87,6 @@ class SearchTest extends TestBase {
         $this->commitTransaction($txId);
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testSimple(): void {
         $opts = [
             'query'   => [
@@ -109,9 +105,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testRelationsExplicit(): void {
         $opts = [
             'query'   => [
@@ -144,9 +137,6 @@ class SearchTest extends TestBase {
         $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testRelationsImplicit(): void {
         $relProp = 'https://relation';
 
@@ -190,9 +180,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testLiteralUri(): void {
         $opts = [
             'headers' => [
@@ -230,9 +217,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testByDateImplicit(): void {
         $opts = [
             'query'   => [
@@ -250,9 +234,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testByDateExplicit(): void {
         $opts = [
             'query'   => [
@@ -271,9 +252,6 @@ class SearchTest extends TestBase {
         $this->assertTrue($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testRegex(): void {
         $opts = [
             'query'   => [
@@ -291,9 +269,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testMetaReadCustomMode(): void {
         $opts = [
             'query'   => [
@@ -313,9 +288,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode(), self::$schema->searchMatch)));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testMetaReadRelatives(): void {
         $opts = [
             'query'   => [
@@ -336,9 +308,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode(), self::$schema->searchMatch)));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testMetaFilterOutputProperties(): void {
         $opts  = [
             'query'   => [
@@ -368,9 +337,6 @@ class SearchTest extends TestBase {
         $this->assertEquals(['http://createUser', 'https://relation', 'https://size'], $props);
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testByLang(): void {
         $countTmpl = new PT(self::$schema->searchCount);
         $opts      = [
@@ -453,9 +419,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testExceptions(): void {
         $opts = ['query' => [
                 'value[0]'    => 'abc',
@@ -508,9 +471,6 @@ class SearchTest extends TestBase {
         $this->assertEquals('Bad metadata mode 1_0_0_5', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testSql(): void {
         $opts = [
             'query'   => [
@@ -526,9 +486,6 @@ class SearchTest extends TestBase {
         $this->assertFalse($g->any(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testPaging(): void {
         $countTmpl = new PT(self::$schema->searchCount);
         $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
@@ -558,9 +515,6 @@ class SearchTest extends TestBase {
         $this->assertEquals('bcd', $g->getObjectValue(new QT($this->m[1]->getNode(), $valueProp)));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testPagingByNumber(): void {
         $countTmpl = new PT(self::$schema->searchCount);
         $valueProp = df::namedNode(self::$config->schema->searchOrderValue . '1');
@@ -591,14 +545,13 @@ class SearchTest extends TestBase {
     }
 
     /**
-     * #[Group('search')]
      * @param array<string, string> $expected
      */
     public function testFullTextSearch1(?array $expected = null): void {
         $expected ??= [
             (string) self::$config->schema->id => '<b>verbunden</b>',
-            SearchConfig::FTS_BINARY  => "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht",
-            'http://another/match'    => '<b>verbunden</b>',
+            SearchConfig::FTS_BINARY           => "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht",
+            'http://another/match'             => '<b>verbunden</b>',
         ];
 
         $ftsValueProp = self::$config->schema->searchFts;
@@ -856,17 +809,11 @@ class SearchTest extends TestBase {
         $this->assertEquals(1, $g->getObjectValue(new QT(self::$baseNode)));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
         $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testVeryOldDate(): void {
         $meta = new DatasetNode(self::$baseNode);
         $meta->add(DF::quad(self::$baseNode, DF::namedNode('https://date'), DF::literal('-12345-01-01', null, RDF::XSD_DATE)));
@@ -922,9 +869,6 @@ class SearchTest extends TestBase {
         $this->assertCount(0, $g->copy(new QT($uri)));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testSpatial(): void {
         // m[0]: POLYGON((0 0,10 0,10 10,0 10,0 0))
         // m[1]: POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))
@@ -973,9 +917,6 @@ class SearchTest extends TestBase {
         $this->assertCount(0, $g->copy(new QT($this->m[2]->getNode())));
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testReadNone(): void {
         $opts = [
             'query'   => [
@@ -993,9 +934,6 @@ class SearchTest extends TestBase {
         $this->assertEmpty((string) $resp->getBody());
     }
 
-    /**
-     * #[Group('search')]
-     */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('put', self::$baseUrl . 'search'));
         $this->assertEquals(405, $resp->getStatusCode());

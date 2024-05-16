@@ -28,7 +28,6 @@ namespace acdhOeaw\arche\core\tests;
 
 use RuntimeException;
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DataFactory as DF;
 use quickRdf\Dataset;
 use zozlak\RdfConstants as RDF;
@@ -69,9 +68,6 @@ class HandlerTest extends TestBase {
         }
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testNoHandlers(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
@@ -79,9 +75,6 @@ class HandlerTest extends TestBase {
         $this->assertFalse($meta->any(new PT('https://default')));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testWrongHandler(): void {
         $this->setHandlers([
             'create'   => ['type' => 'foo'],
@@ -101,10 +94,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('Unknown handler type: bar', (string) $resp->getBody());
     }
 
-    /**
-     * 
-     * #[Group('handler')]
-     */
     public function testMetadataManagerBasic(): void {
         $this->setHandlers([
             'create' => [
@@ -121,9 +110,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('sample value', $meta->getObjectValue(new PT('https://default')));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testMetadataManagerDefault(): void {
         $defaultProp = DF::namedNode('https://default');
         $defaultTmpl = new PT($defaultProp);
@@ -149,9 +135,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('other value', $meta2->getObjectValue($defaultTmpl));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testMetadataManagerForbidden(): void {
         $predicate = DF::namedNode('https://forbidden');
         $this->setHandlers([
@@ -173,9 +156,6 @@ class HandlerTest extends TestBase {
         $this->assertCount(0, $newMeta->copy(new PT($predicate)));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testMetadataManagerCopying(): void {
         $fromProp = DF::namedNode('https://copy/from');
         $tmpl     = new PT('https://copy/to', new LiteralTemplate(null, LiteralTemplate::ANY));
@@ -199,9 +179,6 @@ class HandlerTest extends TestBase {
         $this->assertTrue($newMeta->getObject($tmpl)?->equals(DF::literal('test', 'en')));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testRpcBasic(): void {
         $this->setHandlers([
             'create' => [
@@ -215,9 +192,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('create rpc', $meta->getObjectValue(new PT('https://rpc/property')));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testRpcError(): void {
         $this->setHandlers([
             'updateMetadata' => [
@@ -234,9 +208,6 @@ class HandlerTest extends TestBase {
         $this->assertStringContainsString('metadata is always wrong', (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testRpcTimeoutException(): void {
         $this->setHandlers([
             'updateMetadata' => [
@@ -253,9 +224,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testRpcTimeoutNoException(): void {
         $this->setHandlers([
             'updateMetadata' => [
@@ -272,9 +240,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testTxCommitFunction(): void {
         $this->setHandlers([
             'txCommit' => [
@@ -294,9 +259,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testTxCommitRpc(): void {
         $this->setHandlers([
             'txCommit' => [
@@ -316,9 +278,6 @@ class HandlerTest extends TestBase {
         $this->assertEquals('commit' . $txId, $meta2->getObjectValue($tmpl));
     }
 
-    /**
-     * #[Group('handler')]
-     */
     public function testFunctionHandler(): void {
         $this->setHandlers([
             'txCommit' => [
@@ -332,8 +291,6 @@ class HandlerTest extends TestBase {
 
     /**
      * Tests if a on-metadata-edit handler can prevent deletion with references removal
-     * 
-     * #[Group('handler')]
      */
     public function testDeleteWithReferencesHandler(): void {
         $this->setHandlers([
@@ -365,8 +322,6 @@ class HandlerTest extends TestBase {
     /**
      * Tests if resource creation refused by the post-creation handler doesn't
      * leave any trash in the database.
-     * 
-     * #[Group('handler')]
      */
     public function testRefusedCreation(): void {
         $this->setHandlers([
@@ -399,8 +354,6 @@ class HandlerTest extends TestBase {
 
     /**
      * REMARK - HAS TO BE THE SECOND LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
-     * 
-     * #[Group('handler')]
      */
     public function testBrokenHandler(): void {
         $this->setHandlers([
@@ -433,8 +386,6 @@ class HandlerTest extends TestBase {
      * information about the error is leaked.
      * 
      * REMARK - HAS TO BE THE LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
-     * 
-     * #[Group('handler')]
      */
     public function testWrongSetup(): void {
         $cfg                                         = yaml_parse_file(__DIR__ . '/../config.yaml');

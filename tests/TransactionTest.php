@@ -27,7 +27,6 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use quickRdf\Dataset;
 use quickRdf\DatasetNode;
 use quickRdf\DataFactory as DF;
@@ -63,9 +62,6 @@ class TransactionTest extends TestBase {
         usleep(($c->timeout << 20) + ($c->checkInterval << 10));
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testGet(): void {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
@@ -81,9 +77,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals('active', $data->state);
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testProlong(): void {
         $txId = $this->beginTransaction();
         $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -105,9 +98,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals('active', $data->state);
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testExpires(): void {
         $txId = $this->beginTransaction();
         sleep(self::$config->transactionController->timeout * 2);
@@ -133,9 +123,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testEmpty(): void {
         // commit
         $req  = new Request('post', self::$baseUrl . 'transaction');
@@ -168,9 +155,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(400, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testCreateRollback(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -189,9 +173,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testDeleteRollback(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
@@ -228,9 +209,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testPatchMetadataRollback(): void {
         // set up and remember an initial state
         $location = $this->createBinaryResource();
@@ -265,9 +243,6 @@ class TransactionTest extends TestBase {
         $this->assertNull($res3->getObjectValue(new PT('http://test/hasTitle')));
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testForeignCheckLoop(): void {
         $relProp = DF::namedNode('http://relation');
         $txId    = $this->beginTransaction();
@@ -288,9 +263,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testTransactionConflict(): void {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
@@ -309,9 +281,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(204, $this->commitTransaction($txId2));
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testPassIdWithinTransaction(): void {
         $meta1 = new DatasetNode(self::$baseNode);
         $meta1->add(DF::quad(self::$baseNode, self::$schema->id, DF::namedNode('https://my/id')));
@@ -339,9 +308,6 @@ class TransactionTest extends TestBase {
         $this->assertEquals(204, $this->commitTransaction($txId));
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testCompletenessAbort(): void {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['transactionController']['enforceCompleteness'] = true;
@@ -374,8 +340,6 @@ class TransactionTest extends TestBase {
      * - tx2 is commited
      * res 1 should stay because it's referenced by res3 while res2 should be 
      * deleted by the transaction controller
-     * 
-     * #[Group('transactions')]
      */
     public function testParallelCommonResourceRollbackCommit(): void {
         $tx1   = $this->beginTransaction();
@@ -458,17 +422,11 @@ class TransactionTest extends TestBase {
         $this->assertEquals($prevContent, (string) $resp->getBody());
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
         $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
-    /**
-     * #[Group('transactions')]
-     */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('patch', self::$baseUrl . 'transaction'));
         $this->assertEquals(405, $resp->getStatusCode());
@@ -478,8 +436,6 @@ class TransactionTest extends TestBase {
      * Tests scenarios when request processing takes more then TransactionController
      * timeout. If the transaction is rolled back by the TransactionController,
      * the transaction/resource locking system doesn't work well.
-     * 
-     * #[Group('transactions')]
      */
     public function testLongProcessing(): void {
         TestBase::setHandler([

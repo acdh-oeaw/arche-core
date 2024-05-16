@@ -62,4 +62,6 @@ class Schema {
     public NamedNode $hash;
     public NamedNode $searchMatch;
     public NamedNode $searchCount;
+    public NamedNode $imagePxWidth;
+    public NamedNode $imagePxHeight;
 }

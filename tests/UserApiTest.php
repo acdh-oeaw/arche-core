@@ -28,7 +28,6 @@ namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\Attributes\Depends;
-use PHPUnit\Framework\Attributes\Group;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
 use function \GuzzleHttp\json_encode;
@@ -80,10 +79,6 @@ class UserApiTest extends TestBase {
         parent::tearDownAfterClass();
     }
 
-    /**
-     * 
-     * #[Group('userApi')]
-     */
     public function testUserCreate(): void {
         // QUERY
         $headers = ['Authorization' => self::$adminAuth];
@@ -134,10 +129,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(403, $resp->getStatusCode());
     }
 
-    /**
-     * #[Depends('testUserCreate')]
-     * #[Group('userApi')]
-     */
+    #[Depends('testUserCreate')]
     public function testUserGet(): void {
         // no authorization
         $req  = new Request('get', self::$baseUrl . 'user');
@@ -204,10 +196,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    /**
-     * #[Depends('testUserCreate')]
-     * #[Group('userApi')]
-     */
+    #[Depends('testUserCreate')]
     public function testUserPatch(): void {
         // as root
         $headers        = ['Authorization' => self::$adminAuth, 'Content-Type' => 'application/json'];
@@ -253,10 +242,7 @@ class UserApiTest extends TestBase {
         $this->assertFalse(isset($data->other));
     }
 
-    /**
-     * #[Depends('testUserCreate')]
-     * #[Group('userApi')]
-     */
+    #[Depends('testUserCreate')]
     public function testUserDelete(): void {
         // as user
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
@@ -277,9 +263,6 @@ class UserApiTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
-    /**
-     * #[Group('userApi')]
-     */
     public function testWrongHttpMethod(): void {
         $resp = self::$client->send(new Request('post', self::$baseUrl . 'user'));
         $this->assertEquals(405, $resp->getStatusCode());

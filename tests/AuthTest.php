@@ -27,7 +27,6 @@
 namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
-use PHPUnit\Framework\Attributes\Group;
 use quickRdf\DataFactory as DF;
 use quickRdf\DatasetNode;
 use zozlak\auth\usersDb\PdoDb;
@@ -52,10 +51,6 @@ class AuthTest extends TestBase {
         file_put_contents(__DIR__ . '/../config.yaml', $this->cfgBak);
     }
 
-    /**
-     * 
-     * #[Group('auth')]
-     */
     public function testHeader(): void {
         $location = $this->createBinaryResource();
 
@@ -86,10 +81,6 @@ class AuthTest extends TestBase {
         $this->rollbackTransaction($txId);
     }
 
-    /**
-     * 
-     * #[Group('auth')]
-     */
     public function testHttpBasic(): void {
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['authMethods'] = [
@@ -130,10 +121,6 @@ class AuthTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
     }
 
-    /**
-     * 
-     * #[Group('auth')]
-     */
     public function testEnforceOnMeta(): void {
         $location = $this->createBinaryResource();
         $req      = new Request('get', $location . '/metadata');
@@ -155,10 +142,6 @@ class AuthTest extends TestBase {
         $this->assertEquals(403, $resp->getStatusCode());
     }
 
-    /**
-     * 
-     * #[Group('auth')]
-     */
     public function testAssignOnCreate(): void {
         $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['create']['assignRoles']['read'] = ['publicRole'];
@@ -172,10 +155,6 @@ class AuthTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
     }
 
-    /**
-     * 
-     * #[Group('auth')]
-     */
     public function testAuthDeleteRecursively(): void {
         $cfg     = yaml_parse_file(__DIR__ . '/../config.yaml');
         $relProp = 'http://relation';
