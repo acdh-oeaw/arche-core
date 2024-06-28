@@ -143,7 +143,7 @@ class ParallelTest extends TestBase {
             self::$config->rest->headers->transactionId => (string) $txId,
         ];
         $requests = [new Request('put', self::$baseUrl . 'transaction', $headers)];
-        while (count($requests) < 10) {
+        while (count($requests) < 15) {
             $requests[] = new Request('get', self::$baseUrl . 'transaction', $headers);
         }
         $resp = $this->runConcurrently($requests, 75000);
