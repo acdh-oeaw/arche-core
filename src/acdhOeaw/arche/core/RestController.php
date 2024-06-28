@@ -247,16 +247,17 @@ class RestController {
                 self::$output->lazyLoadFromDb();
             }
         } catch (BadRequestException $ex) {
-            $statusCode = $ex->getCode();
-            echo $ex->getMessage();
+            $statusCode   = $ex->getCode();
+            self::$output = $ex->getMessage();
         } catch (RepoLibException $ex) {
-            $statusCode = $ex->getCode() >= 100 ? $ex->getCode() : 500;
-            echo $ex->getMessage();
+            $statusCode   = $ex->getCode() >= 100 ? $ex->getCode() : 500;
+            self::$output = $ex->getMessage();
         } catch (PDOException $ex) {
-            $statusCode = $ex->getCode() === Transaction::PG_LOCK_FAILURE ? 409 : 500;
-            echo $ex->getMessage();
+            $statusCode   = $ex->getCode() === Transaction::PG_LOCK_FAILURE ? 409 : 500;
+            self::$output = $ex->getMessage();
         } catch (Throwable $ex) {
             $statusCode = 500;
+            self::$output = '';
         } finally {
             if (isset($ex)) {
                 if (self::$pdo->inTransaction()) {
@@ -275,7 +276,6 @@ class RestController {
                         }
                     }
                 }
-                self::$output  = '';
                 self::$headers = [];
             }
             if (isset($statusCode)) {

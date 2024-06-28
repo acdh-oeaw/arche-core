@@ -353,6 +353,21 @@ class HandlerTest extends TestBase {
     }
 
     /**
+     * Tests if the error thrown by a handler and affecting the response status code
+     * is handled properly (does not affect the response status code)
+     */
+    public function testLongExceptionMessage(): void {
+        $this->setHandlers([
+            'txCommit' => [
+                'type'     => 'function',
+                'function' => '\acdhOeaw\arche\core\tests\Handler::longError'
+            ]
+        ]);
+        $txId = $this->beginTransaction();
+        $this->assertEquals(400, $this->commitTransaction($txId));
+    }
+
+    /**
      * REMARK - HAS TO BE THE SECOND LAST TEST IN THIS CLASS AS IT BREAKS THE CONFIG
      */
     public function testBrokenHandler(): void {

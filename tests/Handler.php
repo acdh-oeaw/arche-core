@@ -68,8 +68,6 @@ class Handler {
 
     /**
      * 
-     * @param string $method
-     * @param int $txId
      * @param array<int> $resourceIds
      * @return void
      */
@@ -104,6 +102,16 @@ class Handler {
         throw new RepoException("Just throw an exception", 400);
     }
 
+    /**
+     * 
+     * @param array<int> $resourceIds
+     * @return void
+     */
+    static public function longError(string $method, int $txId,
+                                      array $resourceIds): void {
+        throw new RepoException(str_repeat('0123456789', 10000), 400);
+    }
+    
     private AMQPStreamConnection $rmqConn;
     private AMQPChannel $rmqChannel;
     private Log $log;
