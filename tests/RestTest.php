@@ -285,7 +285,10 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('attachment; filename="test.ttl"', $resp->getHeader('Content-Disposition')[0] ?? '');
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
-        $this->assertEquals(541, $resp->getHeader('Content-Length')[0] ?? '');
+        // In HTTP/1.1 and newer server may respond with transfer-encoding: chuncked which does not contain the content-length header
+        if (count($resp->getHeader('Content-Length')) > 0) {
+            $this->assertEquals(541, $resp->getHeader('Content-Length')[0] ?? '');
+        }
 
         $headers = array_merge($this->getHeaders(), ['Accept' => 'application/n-triples']);
         $req     = new Request('head', $location . '/metadata', $headers);
@@ -1040,29 +1043,31 @@ class RestTest extends TestBase {
     public function testHttpRangeRequest(): void {
         $location = $this->createBinaryResource();
         $headers  = ['Eppn' => 'admin'];
-        $resp     = self::$client->send(new Request('head', $location, $headers));
+        $resp     = self::$client->send(new Request('get', $location, $headers));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('bytes', $resp->getHeader('Accept-Ranges')[0] ?? '');
-        $length   = (int) $resp->getHeader('Content-Length')[0];
+        $refData  = (string) $resp->getBody();
+        $length   = strlen($refData);
+        // In HTTP/1.1 and newer server may respond with transfer-encoding: chuncked which does not contain the content-length header
+        if (count($resp->getHeader('Content-Length')) > 0) {
+            $this->assertEquals(541, $resp->getHeader('Content-Length')[0]);
+        }
 
         $chunkSize = 100;
         $data      = '';
-        for ($i = 0;
-            $i < $length;
-            $i += $chunkSize) {
+        for ($i = 0; $i < $length; $i += $chunkSize) {
             $upperRange       = min($length - 1, $i + $chunkSize - 1);
             $headers['Range'] = "bytes=$i-$upperRange";
             $resp             = self::$client->send(new Request('get', $location, $headers));
             $this->assertEquals(206, $resp->getStatusCode());
             $chunk            = (string) $resp->getBody();
             $this->assertEquals($upperRange - $i + 1, strlen($chunk));
-            $this->assertEquals($upperRange - $i + 1, $resp->getHeader('Content-Length')[0] ?? '');
-            $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
-            $data             .= $chunk;
+            if (count($resp->getHeader('Content-Length')) > 0) {
+                $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
+            }
+            $data .= $chunk;
         }
-        unset($headers['Range']);
-        $resp = self::$client->send(new Request('get', $location, $headers));
-        $this->assertEquals((string) $resp->getBody(), $data);
+        $this->assertEquals($refData, $data);
     }
 
     public function testHttpMultiRangeRequest(): void {
@@ -1077,9 +1082,12 @@ class RestTest extends TestBase {
         $body             = (string) $resp->getBody();
         $this->assertEquals(206, $resp->getStatusCode());
         $this->assertStringStartsWith('multipart/byteranges; boundary=', $resp->getHeader('Content-Type')[0] ?? '');
-        $this->assertEquals(strlen($body), $resp->getHeader('Content-Length')[0] ?? -1);
-        $boundary         = (string) preg_replace('/^.*boundary=/', '', trim($resp->getHeader('Content-Type')[0] ?? ''));
-        $body             = explode("--$boundary", $body);
+        // In HTTP/1.1 and newer server may respond with transfer-encoding: chuncked which does not contain the content-length header
+        if (count($resp->getHeader('Content-Length')) > 0) {
+            $this->assertEquals(strlen($body), $resp->getHeader('Content-Length')[0] ?? -1);
+        }
+        $boundary = (string) preg_replace('/^.*boundary=/', '', trim($resp->getHeader('Content-Type')[0] ?? ''));
+        $body     = explode("--$boundary", $body);
         $this->assertCount(count($ranges) + 2, $body);
         array_shift($body);
         for ($i = 0; $i < count($ranges); $i++) {
@@ -1207,17 +1215,17 @@ class RestTest extends TestBase {
         $g->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertEquals(366, $g->getObjectValue(new PT(self::$config->schema->imagePxHeight)));
         $this->assertEquals(668, $g->getObjectValue(new PT(self::$config->schema->imagePxWidth)));
-        
+
         // geoTIFF
-        $body                           = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $body     = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
+        $resp     = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
         $g        = new DatasetNode(DF::namedNode($location));
         $g->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertEquals(366, $g->getObjectValue(new PT(self::$config->schema->imagePxHeight)));
         $this->assertEquals(668, $g->getObjectValue(new PT(self::$config->schema->imagePxWidth)));
-        
+
         $this->rollbackTransaction($txId);
     }
 
