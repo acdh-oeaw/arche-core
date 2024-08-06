@@ -938,4 +938,49 @@ class SearchTest extends TestBase {
         $resp = self::$client->send(new Request('put', self::$baseUrl . 'search'));
         $this->assertEquals(405, $resp->getStatusCode());
     }
+
+    public function testSkipTombstone(): void {
+        $txId = $this->beginTransaction();
+        $r1   = $this->createMetadataResource(null, $txId);
+        $r2   = $this->createMetadataResource(null, $txId);
+        $this->commitTransaction($txId);
+
+        $opts      = [
+            'query'   => [
+                'sql'         => "SELECT id FROM identifiers WHERE ids IN (?, ?)",
+                'sqlParam[0]' => $r1,
+                'sqlParam[1]' => $r2,
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+        $matchTmpl = new PT(self::$schema->searchMatch);
+
+        $g       = $this->runSearch($opts);
+        $matches = $g->listSubjects($matchTmpl)->getValues();
+        $this->assertCount(2, $matches);
+        $this->assertContains($r1, $matches);
+        $this->assertContains($r2, $matches);
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+        ];
+        $resp    = self::$client->send(new Request('delete', $r1, $headers));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $resp    = self::$client->send(new Request('get', $r1));
+        $this->assertEquals(410, $resp->getStatusCode());
+        $g       = $this->runSearch($opts);
+        $matches = $g->listSubjects($matchTmpl)->getValues();
+        $this->assertEquals([$r2], $matches);
+        $this->commitTransaction($txId);
+
+        $resp    = self::$client->send(new Request('get', $r1));
+        $this->assertEquals(410, $resp->getStatusCode());
+        $g       = $this->runSearch($opts);
+        $matches = $g->listSubjects($matchTmpl)->getValues();
+        $this->assertEquals([$r2], $matches);
+    }
 }
