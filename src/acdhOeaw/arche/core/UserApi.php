@@ -67,12 +67,20 @@ class UserApi {
     }
 
     public function get(string $user): void {
-        if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
+        if (RC::$auth->isPublic() || !RC::$auth->isAdmin() && !empty($user) && $user !== RC::$auth->getUserName()) {
             RC::$auth->denyAccess([$user]);
         }
-
+        
         if (empty($user)) {
-            $query = RC::$pdo->query("SELECT user_id FROM users ORDER BY user_id") ?: throw new RepoException("Query failed");
+            $where = '';
+            $param = [];
+            if (!RC::$auth->isAdmin()) {
+                $where = "WHERE user_id = ?";
+                $param = [RC::$auth->getUserName()];
+            }
+
+            $query = RC::$pdo->prepare("SELECT user_id FROM users $where ORDER BY user_id");
+            $query->execute($param);
             $users = $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
             $data  = [];
             foreach ($users as $user) {

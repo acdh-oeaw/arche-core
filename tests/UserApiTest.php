@@ -182,15 +182,26 @@ class UserApiTest extends TestBase {
         $this->assertFalse(isset($data->pswd));
         $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
 
+        // /user by a non-admin user
+        $req     = new Request('get', self::$baseUrl . 'user', $headers);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data    = json_decode($resp->getBody());
+        $this->assertIsArray($data);
+        $this->assertCount(1, $data);
+        $data = $data[0];
+        $this->assertEquals('bar', $data->userId);
+        $this->assertEquals(1, count($data->groups));
+        $this->assertContains(self::$publicGroup, $data->groups);
+        $this->assertFalse(isset($data->password));
+        $this->assertFalse(isset($data->pswd));
+        $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
+        
         // lack of priviledges
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
         $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $req     = new Request('get', self::$baseUrl . 'user/', $headers);
-        $resp    = self::$client->send($req);
-        $this->assertEquals(403, $resp->getStatusCode());
-        $this->assertEquals(['archeLogin=foo; path=/'], $resp->getHeader('Set-Cookie'));
 
         // wrong password
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:xxx')];
