@@ -19,6 +19,7 @@ storage:
     hashAlgorithm: sha1
 accessControl:
     publicRole: public
+    loggedInRole: academic
     adminRoles:
         - admin
     create:

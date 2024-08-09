@@ -65,6 +65,10 @@ class UserApiTest extends TestBase {
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['authMethods'] = [
             [
+                'class'      => '\zozlak\auth\authMethod\TrustedHeader',
+                'parameters' => ['HTTP_EPPN', 'HTTP_EPPN'],
+            ],
+            [
                 'class'      => '\zozlak\auth\authMethod\HttpBasic',
                 'parameters' => ['repo'],
             ]
@@ -205,6 +209,18 @@ class UserApiTest extends TestBase {
         $resp    = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+
+        // sso user out of local database
+        $req  = new Request('get', self::$baseUrl . 'user/ssouser', ['EPPN' => 'ssouser']);
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data = json_decode($resp->getBody());
+        $this->assertEquals('ssouser', $data->userId);
+        $this->assertEquals(1, count($data->groups));
+        $this->assertContains(self::$publicGroup, $data->groups);
+        $this->assertFalse(isset($data->password));
+        $this->assertFalse(isset($data->pswd));
+        $this->assertEquals(['archeLogin=ssouser; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
@@ -220,7 +236,7 @@ class UserApiTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Location'));
-        $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]

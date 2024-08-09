@@ -79,7 +79,7 @@ class Auth implements AuthInterface {
         if ($this->authenticated) {
             $this->userName  = $this->controller->getUserName();
             $this->userRoles = array_merge(
-                [$this->userName, $cfg->publicRole],
+                [$this->userName, $cfg->publicRole, $cfg->loggedInRole],
                 $this->controller->getUserData()->groups ?? []
             );
         } else {
@@ -90,7 +90,7 @@ class Auth implements AuthInterface {
         $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
         $this->isPublic  = $this->userName === $cfg->publicRole;
-        
+
         if (!$this->isPublic && !empty($cfg->cookie?->name)) {
             setcookie($cfg->cookie->name, $this->getUserName(), 0, $cfg->cookie->path ?? '/');
         } else {

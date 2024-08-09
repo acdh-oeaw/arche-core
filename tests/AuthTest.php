@@ -79,6 +79,33 @@ class AuthTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
 
         $this->rollbackTransaction($txId);
+
+        // loggedIn role check
+        $id           = (int) preg_replace('`^.*/`', '', $location);
+        $prop         = $cfg['accessControl']['schema']['read'];
+        $loggedInRole = $cfg['accessControl']['loggedInRole'];
+        
+        $query        = self::$pdo->prepare("DELETE FROM metadata WHERE id = ? AND property = ?");
+        $query->execute([$id, $prop]);
+        $query        = self::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value) VALUES (?, ?, '', '', ?)");
+        $query->execute([$id, $prop, $cfg['accessControl']['adminRoles'][0]]);
+        $req          = new Request('get', $location, []);
+        $resp         = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
+        $req          = new Request('get', $location, ['foo' => 'ssouser']);
+        $resp         = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
+        
+        $query        = self::$pdo->prepare("DELETE FROM metadata WHERE id = ? AND property = ?");
+        $query->execute([$id, $prop]);
+        $query        = self::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value) VALUES (?, ?, '', '', ?)");
+        $query->execute([$id, $prop, $loggedInRole]);
+        $req          = new Request('get', $location, []);
+        $resp         = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
+        $req          = new Request('get', $location, ['foo' => 'ssouser']);
+        $resp         = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
     }
 
     public function testHttpBasic(): void {

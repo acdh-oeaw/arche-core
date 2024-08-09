@@ -12,6 +12,7 @@ accessControl:
     adminRoles:
         - admin
     publicRole: publicRole
+    loggedInRole: academic
     create:
         allowedRoles:
             - creator
