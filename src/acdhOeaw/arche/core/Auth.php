@@ -92,7 +92,7 @@ class Auth implements AuthInterface {
         $this->isPublic  = $this->userName === $cfg->publicRole;
 
         if (!$this->isPublic && !empty($cfg->cookie?->name)) {
-            setcookie($cfg->cookie->name, $this->getUserName(), 0, $cfg->cookie->path ?? '/');
+            setcookie($cfg->cookie->name, implode(',', $this->userRoles), 0, $cfg->cookie->path ?? '/');
         } else {
             setcookie($cfg->cookie->name, '', 1, $cfg->cookie->path ?? '/');
         }

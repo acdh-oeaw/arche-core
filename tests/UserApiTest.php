@@ -95,7 +95,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(2, count($data->groups));
         $this->assertContains(self::$createGroup, $data->groups);
         $this->assertContains(self::$publicGroup, $data->groups);
-        $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         // X-WWW-URLENCODED and non-array groups
         $headers['Content-Type'] = 'application/x-www-form-urlencoded';
@@ -133,7 +133,7 @@ class UserApiTest extends TestBase {
         $req                      = new Request('put', self::$baseUrl . 'user/foobar', $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $this->assertEquals(['archeLogin=foo; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=foo%2CpublicRole%2Cacademic%2Ccreator; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
@@ -154,7 +154,7 @@ class UserApiTest extends TestBase {
         foreach ($data as $i) {
             $this->assertContains(self::$publicGroup, $i->groups);
         }
-        $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         $data = json_decode($resp->getBody());
         $req  = new Request('get', self::$baseUrl . 'user/foo', $headers);
@@ -167,7 +167,7 @@ class UserApiTest extends TestBase {
         $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
-        $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         // as user
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:' . self::PSWD)];
@@ -180,7 +180,7 @@ class UserApiTest extends TestBase {
         $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
-        $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=bar%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         // /user by a non-admin user
         $req     = new Request('get', self::$baseUrl . 'user', $headers);
@@ -195,7 +195,7 @@ class UserApiTest extends TestBase {
         $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
-        $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=bar%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
         
         // lack of priviledges
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
@@ -219,7 +219,7 @@ class UserApiTest extends TestBase {
         $req     = new Request('get', self::$baseUrl . 'user/joe', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
-        $this->assertEquals(['archeLogin=admin; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         // sso user out of local database
         $req  = new Request('get', self::$baseUrl . 'user/ssouser', ['EPPN' => 'ssouser']);
@@ -231,7 +231,7 @@ class UserApiTest extends TestBase {
         $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
-        $this->assertEquals(['archeLogin=ssouser; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=ssouser%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
@@ -247,7 +247,7 @@ class UserApiTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Location'));
-        $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=bar%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
