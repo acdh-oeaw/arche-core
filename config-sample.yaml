@@ -160,6 +160,9 @@ rest:
     defaultMetadataSearchMode: resource
     # number of triples used to generate namespace aliases
     outputTriplesCache: 1000
+    # redirects from the /user/{userId} endpoint are allowed only to locations 
+    # mathing this regex
+    userEndpointAllowedRedirectRegex: "`^/"
     handlers:
         rabbitMq:
             #host: localhost

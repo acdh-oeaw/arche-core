@@ -142,6 +142,7 @@ rest:
             txRollback:
     urlBase: http://127.0.0.1
     pathBase: /
+    userEndpointAllowedRedirectRegex: "`^/`"
     headers:
         metadataReadMode: X-METADATA-READ-MODE
         metadataParentProperty: X-PARENT-PROPERTY

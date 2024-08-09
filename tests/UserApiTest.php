@@ -197,6 +197,21 @@ class UserApiTest extends TestBase {
     }
 
     #[Depends('testUserCreate')]
+    public function testRedirect(): void {
+        $headers = ['Authorization' => 'Basic ' . base64_encode('bar:' . self::PSWD)];
+
+        $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=/describe', $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(303, $resp->getStatusCode());
+        $this->assertEquals(['/describe'], $resp->getHeader('Location'));
+
+        $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=http%3A%2F%2Fexternal%2Flocation', $headers);
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals([], $resp->getHeader('Location'));
+    }
+
+    #[Depends('testUserCreate')]
     public function testUserPatch(): void {
         // as root
         $headers        = ['Authorization' => self::$adminAuth, 'Content-Type' => 'application/json'];

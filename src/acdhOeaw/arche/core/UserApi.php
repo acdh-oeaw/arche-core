@@ -55,7 +55,7 @@ class UserApi {
         if (!RC::$auth->isAdmin()) {
             RC::$auth->denyAccess([$user]);
         }
-        
+
         try {
             $this->db->getUser($user);
             throw new RepoException('User already exists', 400);
@@ -81,6 +81,13 @@ class UserApi {
         } else {
             $data = $this->checkUserExists($user);
             $data = $this->prepareUserData($data, $user);
+        }
+
+        $redirect      = $_GET['redirect'] ?? '';
+        $redirectRegex = RC::$config->rest->userEndpointAllowedRedirectRegex ?? '/^$/';
+        if (!empty($redirect) && preg_match($redirectRegex, $redirect)) {
+            RC::setHeader('Location', $redirect);
+            http_response_code(303);
         }
 
         $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
