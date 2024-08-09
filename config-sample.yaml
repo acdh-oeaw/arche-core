@@ -39,6 +39,10 @@ accessControl:
     schema:
         read: https://vocabs.acdh.oeaw.ac.at/schema#acl
         write: https://vocabs.acdh.oeaw.ac.at/schema#aclWrite
+    # if name is not empty a succesful authentication sets a cookie with a login in a given path
+    cookie:
+        path: /
+        name: archeLogin
     db:
         connStr: 'pgsql: '
         table: users
@@ -162,7 +166,7 @@ rest:
     outputTriplesCache: 1000
     # redirects from the /user/{userId} endpoint are allowed only to locations 
     # mathing this regex
-    userEndpointAllowedRedirectRegex: "`^/"
+    userEndpointAllowedRedirectRegex: "`^/`"
     handlers:
         rabbitMq:
             #host: localhost

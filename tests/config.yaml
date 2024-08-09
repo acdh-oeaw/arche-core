@@ -27,6 +27,9 @@ accessControl:
         read: https://vocabs.acdh.oeaw.ac.at/schema#acl
         write: https://vocabs.acdh.oeaw.ac.at/schema#aclWrite
     enforceOnMetadata: false
+    cookie:
+        path: /
+        name: archeLogin
     db:
         connStr: 'pgsql: '
         table: users

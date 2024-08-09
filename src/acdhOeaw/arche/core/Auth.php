@@ -90,6 +90,12 @@ class Auth implements AuthInterface {
         $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
         $this->isPublic  = $this->userName === $cfg->publicRole;
+        
+        if (!$this->isPublic && !empty($cfg->cookie?->name)) {
+            setcookie($cfg->cookie->name, $this->getUserName(), 0, $cfg->cookie->path ?? '/');
+        } else {
+            setcookie($cfg->cookie->name, '', 1, $cfg->cookie->path ?? '/');
+        }
     }
 
     public function checkCreateRights(): void {
