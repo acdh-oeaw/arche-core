@@ -234,7 +234,7 @@ class UserApiTest extends TestBase {
 
         $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=http%3A%2F%2Fexternal%2Flocation', $headers);
         $resp = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Location'));
         $this->assertEquals(['archeLogin=bar; path=/'], $resp->getHeader('Set-Cookie'));
     }
