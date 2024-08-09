@@ -85,9 +85,13 @@ class UserApi {
 
         $redirect      = $_GET['redirect'] ?? '';
         $redirectRegex = RC::$config->rest->userEndpointAllowedRedirectRegex ?? '/^$/';
-        if (!empty($redirect) && preg_match($redirectRegex, $redirect)) {
-            RC::setHeader('Location', $redirect);
-            http_response_code(303);
+        if (!empty($redirect)) {
+            if (preg_match($redirectRegex, $redirect)) {
+                RC::setHeader('Location', $redirect);
+                http_response_code(303);
+            } else {
+                throw new RepoException('Redirect location not allowed', 400);
+            }
         }
 
         $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
