@@ -253,7 +253,7 @@ class RestController {
             $statusCode   = $ex->getCode() >= 100 ? $ex->getCode() : 500;
             self::$output = $ex->getMessage();
         } catch (PDOException $ex) {
-            $statusCode   = $ex->getCode() === Transaction::PG_LOCK_FAILURE ? 409 : 500;
+            $statusCode   = $ex->getCode() === Transaction::PG_LOCK_FAILURE || $ex->getCode() === Transaction::PG_DEADLOCK ? 409 : 500;
             self::$output = $ex->getMessage();
         } catch (Throwable $ex) {
             $statusCode = 500;

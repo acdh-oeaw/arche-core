@@ -48,6 +48,7 @@ class Transaction {
     const STATE_LOCKED             = 'locked';
     const PG_FOREIGN_KEY_VIOLATION = '23503';
     const PG_LOCK_FAILURE          = '55P03';
+    const PG_DEADLOCK              = '40P01';
     const PG_DUPLICATE_KEY         = '23505';
     const PG_WRONG_DATE_VALUE      = '22007';
     const PG_WRONG_TEXT_VALUE      = '22P02';
