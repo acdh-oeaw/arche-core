@@ -338,6 +338,7 @@ class Transaction {
         $pdo = new PDO(RC::$config->dbConn->admin);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 1);
+        $pdo->query("SET application_name TO rest_tx_pre_" . RC::$logId);
         $pdo->query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ; SET TRANSACTION SNAPSHOT '" . $this->snapshot . "'");
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 0);
         return $pdo;
