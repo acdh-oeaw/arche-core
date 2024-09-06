@@ -31,6 +31,7 @@ use PDOException;
 use PDOStatement;
 use RuntimeException;
 use Throwable;
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\exception\RepoLibException;
 
@@ -137,6 +138,34 @@ class Transaction {
             foreach ($ids as $i) {
                 $query->execute([$i, $resId]);
             }
+            $query = $this->pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            foreach (RC::$auth->getCreateRights() as $triple) {
+                $pred = $triple->getPredicate();
+                $obj  = $triple->getObject();
+                $query->execute([
+                    $resId, $pred->getValue(), $obj->getDatatype(),
+                    $obj->getLang() ?? '', null, null, $obj->getValue()
+                ]);
+            }
+            $now  = new \DateTimeImmutable();
+            $nowY = $now->format('Y');
+            $nowT = $now->format(\DateTimeImmutable::ISO8601);
+            $query->execute([
+                $resId, (string) RC::$schema->creationDate, RDF::XSD_DATE_TIME, '',
+                $nowY, $nowT, $nowT
+            ]);
+            $query->execute([
+                $resId, (string) RC::$schema->creationUser, RDF::XSD_STRING,
+                '', null, null, RC::$auth->getUserName()
+            ]);
+            $query->execute([
+                $resId, (string) RC::$schema->modificationDate, RDF::XSD_DATE_TIME,
+                '', $nowY, $nowT, $nowT
+            ]);
+            $query->execute([
+                $resId, (string) RC::$schema->modificationUser, RDF::XSD_STRING,
+                '', null, null, RC::$auth->getUserName()
+            ]);
         } catch (PDOException $e) {
             $this->pdo->rollBack();
             if ($e->getCode() === self::PG_DUPLICATE_KEY) {

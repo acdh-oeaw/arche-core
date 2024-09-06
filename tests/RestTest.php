@@ -383,7 +383,8 @@ class RestTest extends TestBase {
     }
 
     public function testResourceCreateMetadata(): void {
-        $idTmpl = new PT(self::$schema->id);
+        $idTmpl  = new PT(self::$schema->id);
+        $relTmpl = new PT('http://test/hasRelation');
 
         $txId = $this->beginTransaction();
 
@@ -419,10 +420,16 @@ class RestTest extends TestBase {
         sort($allowed);
         $this->assertEquals($allowed, $ids);
 
-        $this->assertMatchesRegularExpression('|^' . self::$baseUrl . '[0-9]+$|', (string) $metaN1->getObjectValue(new PT('http://test/hasRelation')));
+        $this->assertMatchesRegularExpression('|^' . self::$baseUrl . '[0-9]+$|', (string) $metaN1->getObjectValue($relTmpl));
         $this->assertEquals('title', $metaN1->getObjectValue(new PT('http://test/hasTitle')));
         $this->assertEquals(date('Y-m-d'), substr((string) $metaN1->getObjectValue(new PT('http://test/hasDate')), 0, 10));
         $this->assertEquals(123.5, $metaN1->getObjectValue(new PT('http://test/hasNumber')));
+        $this->assertEquals('admin', $metaN1->getObjectValue(new PT(self::$schema->creationUser)));
+        $this->assertEquals('admin', $metaN1->getObjectValue(new PT(self::$schema->modificationUser)));
+        $this->assertEquals(date('Y-m-d'), substr($metaN1->getObjectValue(new PT(self::$schema->creationDate)), 0, 10));
+        $this->assertEquals(date('Y-m-d'), substr($metaN1->getObjectValue(new PT(self::$schema->modificationDate)), 0, 10));
+        $this->assertEquals('admin', $metaN1->getObjectValue(new PT(self::$config->accessControl->schema->read)));
+        $this->assertEquals('admin', $metaN1->getObjectValue(new PT(self::$config->accessControl->schema->write)));
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -431,6 +438,20 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals((string) $body, (string) $resp->getBody());
+
+        // check automatically created resource metadata
+        $locationA = $metaN2->getObjectValue($relTmpl);
+        $req       = new Request('get', $locationA . '/metadata', $this->getHeaders());
+        $resp      = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $metaA     = new DatasetNode(DF::namedNode($locationA));
+        $metaA->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertEquals('admin', $metaA->getObjectValue(new PT(self::$schema->creationUser)));
+        $this->assertEquals('admin', $metaA->getObjectValue(new PT(self::$schema->modificationUser)));
+        $this->assertEquals(date('Y-m-d'), substr($metaA->getObjectValue(new PT(self::$schema->creationDate)), 0, 10));
+        $this->assertEquals(date('Y-m-d'), substr($metaA->getObjectValue(new PT(self::$schema->modificationDate)), 0, 10));
+        $this->assertEquals('admin', $metaA->getObjectValue(new PT(self::$config->accessControl->schema->read)));
+        $this->assertEquals('admin', $metaA->getObjectValue(new PT(self::$config->accessControl->schema->write)));
     }
 
     public function testPatchMetadataMerge(): void {
