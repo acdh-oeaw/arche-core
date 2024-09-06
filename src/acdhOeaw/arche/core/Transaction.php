@@ -272,11 +272,20 @@ class Transaction {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
+        $count = '?';
+        try {
+            $query = $this->pdo->prepare("SELECT count(*) FROM resources WHERE transaction_id = ?");
+            $query->execute([$this->id]);
+            $count = $query->fetchColumn();
+        } catch (PDOException) {
+            
+        }
         $response = json_encode([
-                'transactionId' => $this->id,
-                'startedAt'     => $this->startedAt,
-                'lastRequest'   => $this->lastRequest,
-                'state'         => $this->state,
+                'transactionId'       => $this->id,
+                'startedAt'           => $this->startedAt,
+                'lastRequest'         => $this->lastRequest,
+                'state'               => $this->state,
+                'lockedResourceCount' => $count,
             ]) . "\n";
         RC::setHeader(RC::$config->rest->headers->transactionId, (string) $this->id);
         RC::setHeader('Content-Type', 'application/json');

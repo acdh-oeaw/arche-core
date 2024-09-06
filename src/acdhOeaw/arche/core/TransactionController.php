@@ -336,7 +336,7 @@ class TransactionController {
         $queryRelDel      = $curState->prepare("DELETE FROM relations WHERE id = ?");
         $queryMetaDel     = $curState->prepare("DELETE FROM metadata WHERE id = ?");
         $queryFtsDel      = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
-        $queryResUpd      = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $queryResUpd      = $curState->prepare("UPDATE resources SET state = ?, transaction_id = null, lock = null WHERE id = ?");
         $queryIdIns       = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
         $queryRelIns      = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
         $queryMetaIns     = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
@@ -360,7 +360,7 @@ class TransactionController {
                 // resource didn't exist before - delete it but only if it's not referenced
                 // by a resource from other transaction (or no transaction at all)
                 // if it's referenced, keep it but mark it as belonging to the referer transaction
-                $this->log->debug("  deleting $rid");
+                $this->log->debug("  deleting $rid ($txId)");
                 $queryResDelCheck->execute([$rid, $txId]);
                 $otherTx = $queryResDelCheck->fetchColumn();
                 if ($otherTx === false) {
@@ -368,7 +368,7 @@ class TransactionController {
                     $binary = new BinaryPayload($rid);
                     $binary->delete();
                 } else {
-                    $this->log->debug("    keeping $rid and migrating to transaction " . ($otherTx ?? 'null'));
+                    $this->log->debug("    keeping $rid ($txId) and migrating to transaction " . ($otherTx ?? 'null'));
                     $queryResMigrate->execute([$otherTx, $rid]);
                 }
             } else {
@@ -378,9 +378,7 @@ class TransactionController {
         }
         foreach ($toRestore as $rid => $state) {
             // resource existed before - restore it's state
-            $this->log->debug("  restoring $rid state to $state");
-
-            $queryResUpd->execute([$state, $rid]);
+            $this->log->debug("  restoring $rid state to $state ($txId)");
 
             $queryIdDel->execute([$rid]);
             $queryIdSel->execute([$rid]);
@@ -409,8 +407,11 @@ class TransactionController {
             $binary = new BinaryPayload($rid);
             $ret    = $binary->restore((string) $txId);
             if ($ret) {
-                $this->log->debug("    binary state of $rid restored");
+                $this->log->debug("    binary state of $rid restored ($txId)");
             }
+            
+            // at the end as it clears the transaction_id of a resource
+            $queryResUpd->execute([$state, $rid]);
         }
         $curState->commit();
     }
