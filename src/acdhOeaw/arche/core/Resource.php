@@ -176,6 +176,9 @@ class Resource {
             // RC::getRangeHeader() drops it for mutltiple ranges request
             $contentType = RC::getHeader('Content-Type')[0] ?? null;
             RC::setOutput(new OutputFile($path, RC::getRangeHeader(), $contentType));
+            if (filter_input(\INPUT_GET, 'skipContentDisposition') !== null) {
+                RC::setHeader('Content-Disposition', '');
+            }
 
             if (RC::$handlersCtl->hasHandlers('get')) {
                 $meta = new Metadata($this->id);

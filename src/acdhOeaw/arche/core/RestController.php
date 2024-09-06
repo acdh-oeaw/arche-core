@@ -256,7 +256,7 @@ class RestController {
             $statusCode   = $ex->getCode() === Transaction::PG_LOCK_FAILURE || $ex->getCode() === Transaction::PG_DEADLOCK ? 409 : 500;
             self::$output = $ex->getMessage();
         } catch (Throwable $ex) {
-            $statusCode = 500;
+            $statusCode   = 500;
             self::$output = '';
         } finally {
             if (isset($ex)) {
@@ -347,8 +347,12 @@ class RestController {
     }
 
     static public function setHeader(string $header, string $value): void {
-        $header                 = strtolower($header);
-        self::$headers[$header] = [$value];
+        $header = strtolower($header);
+        if (empty($value)) {
+            unset(self::$headers[$header]);
+        } else {
+            self::$headers[$header] = [$value];
+        }
     }
 
     static public function addHeader(string $header, string $value): void {

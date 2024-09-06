@@ -51,6 +51,8 @@ use acdhOeaw\arche\core\util\Schema;
  */
 class TestBase extends \PHPUnit\Framework\TestCase {
 
+    const BINARY_RES_PATH = __DIR__ . '/data/test.ttl';
+
     static protected string $baseUrl;
     static protected Client $client;
     static protected Config $config;
@@ -185,7 +187,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body    = (string) file_get_contents(__DIR__ . '/data/test.ttl');
+        $body    = (string) file_get_contents(self::BINARY_RES_PATH);
         $req     = new Request('post', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
 

@@ -1218,6 +1218,23 @@ class RestTest extends TestBase {
         $this->assertFalse($g->any($fooBarTmpl));
     }
 
+    public function testSkipContentDisposition(): void {
+        $location = $this->createBinaryResource();
+
+        $req       = new Request('get', $location, $this->getHeaders());
+        $resp      = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(file_get_contents(self::BINARY_RES_PATH), (string) $resp->getBody());
+        $refHeader = ['attachment; filename="' . basename(self::BINARY_RES_PATH) . '"'];
+        $this->assertEquals($refHeader, $resp->getHeader('Content-Disposition'));
+
+        $req  = new Request('get', $location . '?skipContentDisposition=', $this->getHeaders());
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(file_get_contents(self::BINARY_RES_PATH), (string) $resp->getBody());
+        $this->assertEquals([], $resp->getHeader('Content-Disposition'));
+    }
+
     public function testImageDimensions(): void {
         $txId    = $this->beginTransaction();
         $headers = [
@@ -1309,7 +1326,6 @@ class RestTest extends TestBase {
      * corrupted, etc.
      */
     public function testPutErrors2(): void {
-        // create meta-only resource
         $location   = $this->createBinaryResource();
         $id         = (int) preg_replace('`^.*/`', '', $location);
         $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
