@@ -162,6 +162,12 @@ class Resource {
                 RC::setHeader($header, $value);
             }
             RC::addHeader('Link', '<' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
+            
+            if (RC::$handlersCtl->hasHandlers('head')) {
+                $meta = new Metadata($this->id);
+                $meta->loadFromDb(RRI::META_RESOURCE);
+                RC::$handlersCtl->handleResource('head', (int) $this->id, $meta->getDatasetNode(), $binary->getPath());
+            }
         } catch (NoBinaryException $e) {
             http_response_code(302);
             RC::setHeader('Location', $metaUrl);
