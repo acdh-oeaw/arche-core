@@ -81,6 +81,11 @@ spatialSearch:
     sizeLimit: 100M
 fullTextSearch:
     tikaLocation: http://127.0.0.1:12345/
+    skipTags:
+        - application/xml
+        - application/tei+xml
+        - text/html
+        - text/xml
     sizeLimits:
         indexing: 1G
         highlighting: 10M
@@ -91,6 +96,7 @@ fullTextSearch:
             - text/plain
             - text/turtle
             - text/xml
+            - application/tei+xml
             - application/xml
             - application/pdf
 metadataManager:

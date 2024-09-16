@@ -109,6 +109,11 @@ spatialSearch:
 fullTextSearch:
     # e.g. "java -Xmx1g -jar ../tika-app.jar --text" or "http://127.0.0.1:12345/"
     tikaLocation: http://127.0.0.1:12345/
+    # mime types for which the XML tags are removed before the indexing
+    skipTags:
+        - application/xml
+        - text/html
+        - text/xml
     sizeLimits:
         indexing: 1G
         highlighting: 10M

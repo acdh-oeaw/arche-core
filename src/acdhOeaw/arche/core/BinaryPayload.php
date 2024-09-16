@@ -43,6 +43,8 @@ use acdhOeaw\arche\lib\BinaryPayload as BP;
  */
 class BinaryPayload {
 
+    const TS_VECTOR_MAX_LEN = 1048575;
+
     static public function getStorageDir(int $id, string $path, int $level,
                                          int $levelMax): string {
         if ($level < $levelMax) {
@@ -303,8 +305,9 @@ class BinaryPayload {
     }
 
     private function updateFts(): bool {
-        $limit  = $this->toBytes(RC::$config->fullTextSearch->sizeLimits->highlighting);
-        $result = false;
+        $limit           = $this->toBytes(RC::$config->fullTextSearch->sizeLimits->highlighting);
+        $skipTagsFormats = RC::$config->fullTextSearch->skipTags ?? [];
+        $result          = false;
 
         $query = RC::$pdo->prepare("INSERT INTO full_text_search (id, segments, raw) VALUES (?, to_tsvector('simple', ?), ?)");
         $tika  = RC::$config->fullTextSearch->tikaLocation;
@@ -314,9 +317,20 @@ class BinaryPayload {
             $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
             $resp   = $client->send($req);
             if ($resp->getStatusCode() === 200) {
-                $body    = (string) $resp->getBody();
+                $body   = (string) $resp->getBody();
+                $format = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+                if (in_array($format, $skipTagsFormats)) {
+                    $body = preg_replace('`<[^>]*>`', '', $body);
+                    RC::$log->info("\t\tskipping XML/HTML tags from extracted text");
+                }
                 $bodyLen = strlen($body);
-                if ($bodyLen === 0) {
+                if ($bodyLen > self::TS_VECTOR_MAX_LEN) {
+                    // this is defensive as the ts_vector size will be for sure smaller (will skip blank characters, etc.)
+                    // but we have no way to predict the ts_vector size
+                    $body    = substr($body, 0, self::TS_VECTOR_MAX_LEN);
+                    RC::$log->info("\t\ttruncating extracted text from $bodyLen to " . self::TS_VECTOR_MAX_LEN . " characters");
+                    $bodyLen = self::TS_VECTOR_MAX_LEN;
+                } elseif ($bodyLen === 0) {
                     RC::$log->info("\t\tno text extracted");
                 }
                 $query->execute([$this->id, $body, $bodyLen <= $limit ? $body : null]);
