@@ -91,9 +91,9 @@ CREATE TABLE full_text_search (
     raw text,
     CHECK ((id IS NULL)::int + (iid IS NULL)::int + (mid IS NULL)::int = 2)
 );
-CREATE INDEX full_text_search_id_index ON full_text_search USING btree (id) WHERE id IS NOT NULL;
-CREATE INDEX full_text_search_iid_index ON full_text_search USING btree (iid) WHERE iid IS NOT NULL;
-CREATE INDEX full_text_search_mid_index ON full_text_search USING btree (mid) WHERE mid IS NOT NULL;
+CREATE INDEX full_text_search_id_index ON full_text_search USING btree (id);
+CREATE INDEX full_text_search_iid_index ON full_text_search USING btree (iid);
+CREATE INDEX full_text_search_mid_index ON full_text_search USING btree (mid);
 CREATE INDEX full_text_search_text_index ON full_text_search USING gin (segments);
 
 CREATE TABLE spatial_search (
