@@ -255,7 +255,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp;
     }
 
-    protected function deleteResource(string $location, int $txId = null): bool {
+    protected function deleteResource(string $location, ?int $txId = null): bool {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -276,7 +276,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
      * @param int $txId
      * @return array<string, mixed>
      */
-    protected function getHeaders(int $txId = null): array {
+    protected function getHeaders(?int $txId = null): array {
         return [
             self::$config->rest->headers->transactionId => $txId,
             'Eppn'                                      => 'admin',

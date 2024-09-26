@@ -145,7 +145,7 @@ class Metadata {
         $this->graph->add($newMeta->map(fn($x) => $x->withSubject($node))->withNode($node));
     }
 
-    public function loadFromRequest(string $resUri = null): int {
+    public function loadFromRequest(?string $resUri = null): int {
         $format      = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         $length      = (int) filter_input(INPUT_SERVER, 'CONTENT_LENGTH');
         $node        = DF::namedNode($this->getUri());

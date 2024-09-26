@@ -33,7 +33,7 @@ namespace acdhOeaw\arche\core;
 class ConflictException extends BadRequestException {
 
     public function __construct(string $message = "", int $code = 409,
-                                \Throwable $previous = null) {
+                                ?\Throwable $previous = null) {
         parent::__construct($message, $code, $previous);
     }
 }
