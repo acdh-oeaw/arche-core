@@ -333,6 +333,9 @@ BEGIN
     IF TG_OP IN ('UPDATE', 'INSERT') THEN
         INSERT INTO full_text_search (iid, segments, raw)
             SELECT id, to_tsvector('simple', ids), ids
+            FROM allnew
+          UNION
+            SELECT id, to_tsvector('simple', replace(regexp_replace(lower(ids), '^https?://[^/]+/', ''), '/', ' ')), ids
             FROM allnew;
     END IF;
     RETURN NULL;
