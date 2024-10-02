@@ -336,7 +336,8 @@ BEGIN
             FROM allnew
           UNION
             SELECT id, to_tsvector('simple', replace(regexp_replace(lower(ids), '^https?://[^/]+/', ''), '/', ' ')), ids
-            FROM allnew;
+            FROM allnew
+            WHERE ids ~* '^https?://[^/]+/';
     END IF;
     RETURN NULL;
 END;

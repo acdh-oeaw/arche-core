@@ -576,7 +576,7 @@ class SearchTest extends TestBase {
         $meta     = $this->extractResource($resp, $location);
         $meta->add([
             DF::quad($meta->getNode(), DF::namedNode('http://another/match'), DF::literal('foo bar verbunden foo baz')),
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://verbunden')),
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://foo/verbunden')),
         ]);
         $this->updateResource($meta, $txId);
         $this->commitTransaction($txId);
@@ -611,7 +611,7 @@ class SearchTest extends TestBase {
             $value = str_replace("\n", '', $value);
             $prop  = $res->getObjectValue(new PT($ftsPropProp . $i));
             $this->assertArrayHasKey($prop, $expected);
-            $this->assertEquals($expected[$prop], $value);
+            $this->assertEquals($expected[$prop], $value, $i);
         }
         $this->assertCount($i - 1, $expected);
         $g   = $this->runSearch($opts);
@@ -639,7 +639,7 @@ class SearchTest extends TestBase {
 
         $expected = [
             'http://another/match'    => '<b>verbunden</b>',
-            self::$config->schema->id => '<b>verbunden</b>',
+            self::$config->schema->id => 'http://foo/<b>verbunden</b>',
             SearchConfig::FTS_BINARY  => 'aufs engste <b>verbunden</b> . Auf  kleinasiatischem@Kettenbrücken ) miteinander <b>verbunden</b> . Zoll für@Donautal <b>verbunden</b> . Das Klima entspricht',
         ];
         $this->testFullTextSearch1($expected);
@@ -711,6 +711,42 @@ class SearchTest extends TestBase {
         $this->assertEquals("abc", $g->getObjectValue(new QT($r, DF::namedNode($ftsQueryProp . '1'))));
     }
 
+    public function testFullTextSearchUri(): void {
+        $ftsValueProp = self::$config->schema->searchFts;
+        $ftsPropProp  = self::$config->schema->searchFtsProperty;
+        $ftsQueryProp = self::$config->schema->searchFtsQuery;
+
+        $opts = [
+            'query'   => [
+                'property[]' => 'https://id',
+                'value[]'    => '',
+                'operator[]' => '@@',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => RRI::META_RESOURCE,
+            ],
+        ];
+
+        $searchVals = [
+            'https://foo.bar/baz#bom' => "https://<b>foo.bar</b>/baz#bom",
+            //'https://foo.bar'         => "https://<b>foo.bar</b>/baz#bom",
+            'foo.bar'                 => "https://<b>foo.bar</b>/baz#bom",
+            //'foo.bar/baz'             => "https://<b>foo.bar</b>/baz#bom",
+            'foo.bar/baz#bom'         => "https://<b>foo.bar</b>/baz#bom",
+        ];
+        foreach ($searchVals as $sv => $hv) {
+            $opts['query']['value[]'] = $sv;
+            $g                        = $this->runSearch($opts);
+            $this->assertTrue($g->any(new QT($this->m[0]->getNode())), $sv);
+            $this->assertFalse($g->any(new QT($this->m[1]->getNode())), $sv);
+            $this->assertFalse($g->any(new QT($this->m[2]->getNode())), $sv);
+            $r                        = $this->m[0]->getNode();
+            $this->assertEquals($hv, $g->getObjectValue(new QT($r, DF::namedNode($ftsValueProp . '1'))), $sv);
+            $this->assertEquals("https://id", $g->getObjectValue(new QT($r, DF::namedNode($ftsPropProp . '1'))), $sv);
+            $this->assertEquals($sv, $g->getObjectValue(new QT($r, DF::namedNode($ftsQueryProp . '1'))), $sv);
+        }
+    }
+
     public function testFullTextSearchManual(): void {
         $ftsValueProp = self::$config->schema->searchFts;
         $ftsPropProp  = self::$config->schema->searchFtsProperty;
@@ -730,7 +766,7 @@ class SearchTest extends TestBase {
         $meta         = $this->extractResource($resp, $location);
         $meta->add([
             DF::quad($meta->getNode(), DF::namedNode('http://another/match'), DF::literal('foo bar verbunden foo baz')),
-            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://verbunden')),
+            DF::quad($meta->getNode(), self::$schema->id, DF::namedNode('http://foo/verbunden')),
         ]);
         $this->updateResource($meta, $txId);
         $this->commitTransaction($txId);
@@ -777,7 +813,7 @@ class SearchTest extends TestBase {
         $this->assertArrayHasKey('http://another/match', $results);
         $binaryExpected = '<b>engste</b> verbunden#<b>engste</b> Stelle';
         $this->assertEquals(['v' => $binaryExpected, 'q' => 'engste'], $results[SearchTerm::PROPERTY_BINARY]);
-        $this->assertEquals(['v' => 'http://%verbunden^', 'q' => 'verbunden'], $results[$idProp]);
+        $this->assertEquals(['v' => 'http://foo/%verbunden^', 'q' => 'verbunden'], $results[$idProp]); // marking match in identifier doesn't work
         $this->assertEquals(['v' => 'foo bar %verbunden^ foo baz', 'q' => 'verbunden'], $results['http://another/match']);
     }
 

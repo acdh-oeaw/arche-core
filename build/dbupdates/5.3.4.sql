@@ -11,12 +11,13 @@ BEGIN
             FROM allnew
           UNION
             SELECT id, to_tsvector('simple', replace(regexp_replace(lower(ids), '^https?://[^/]+/', ''), '/', ' ')), ids
-            FROM allnew;
+            FROM allnew
+            WHERE ids ~* '^\w+:(\/?\/?)[^\s]+';
     END IF;
     RETURN NULL;
 END;
 $$;
 
-INSERT INTO full_text_search (iid, segments, raw) SELECT id, to_tsvector('simple', replace(regexp_replace(lower(ids), '^https?://[^/]+/', ''), '/', ' ')), ids FROM identifiers;
+INSERT INTO full_text_search (iid, segments, raw) SELECT id, to_tsvector('simple', replace(regexp_replace(lower(ids), '^https?://[^/]+/', ''), '/', ' ')), ids FROM identifiers WHERE ids ~* '^\w+:(\/?\/?)[^\s]+';
 
 COMMIT;

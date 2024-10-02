@@ -15,7 +15,7 @@
         "ext-gd": "*",
         "zozlak/auth": "^2",
         "guzzlehttp/guzzle": "^7",
-        "acdh-oeaw/arche-lib": "^6",
+        "acdh-oeaw/arche-lib": "^7",
         "sweetrdf/simple-rdf": "^2",
         "zozlak/http-accept": ">=0.1.0 <1",
         "zozlak/logging": "^1",
