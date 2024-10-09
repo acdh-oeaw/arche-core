@@ -508,9 +508,9 @@ class Resource {
         // delete all metadata but access rights
         RC::$pdo->query("DELETE FROM relations WHERE id IN (SELECT id FROM delres)");
         RC::$pdo->query("DELETE FROM identifiers WHERE id IN (SELECT id FROM delres)");
-        $query     = RC::$pdo->prepare("DELETE FROM metadata WHERE id IN (SELECT id FROM delres) AND property NOT IN (?, ?, ?)");
+        $query     = RC::$pdo->prepare("DELETE FROM metadata WHERE id IN (SELECT id FROM delres) AND property NOT IN (?, ?)");
         $aclSchema = RC::$config->accessControl->schema;
-        $query->execute([$aclSchema->read, $aclSchema->update, $aclSchema->write]);
+        $query->execute([$aclSchema->read, $aclSchema->write]);
 
         $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
         while ($id    = $query->fetchColumn()) {
