@@ -162,7 +162,7 @@ class Resource {
                 RC::setHeader($header, $value);
             }
             RC::addHeader('Link', '<' . $metaUrl . '>; rel="alternate"; type="' . RC::$config->rest->defaultMetadataFormat . '"');
-            
+
             if (RC::$handlersCtl->hasHandlers('head')) {
                 $meta = new Metadata($this->id);
                 $meta->loadFromDb(RRI::META_RESOURCE);
@@ -505,9 +505,12 @@ class Resource {
         RC::$log->debug((string) $query->fetchColumn());
 
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
-        // keep metadata because they can still store important information, e.g. access rights
+        // delete all metadata but access rights
         RC::$pdo->query("DELETE FROM relations WHERE id IN (SELECT id FROM delres)");
         RC::$pdo->query("DELETE FROM identifiers WHERE id IN (SELECT id FROM delres)");
+        $query     = RC::$pdo->prepare("DELETE FROM metadata WHERE id IN (SELECT id FROM delres) AND property NOT IN (?, ?, ?)");
+        $aclSchema = RC::$config->accessControl->schema;
+        $query->execute([$aclSchema->read, $aclSchema->update, $aclSchema->write]);
 
         $query = RC::$pdo->query("SELECT id FROM delres ORDER BY id");
         while ($id    = $query->fetchColumn()) {
