@@ -218,4 +218,15 @@ class Auth implements AuthInterface {
         }
         throw new RepoException('Forbidden', 403);
     }
+
+    public function logout(string $redirectUrl = ''): void {
+        // the right way would be to have a $this->controller->logout()
+        unset($_SERVER['PHP_AUTH_USER'], $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['AUTHORIZATION']);
+        $this->controller->advertise();
+
+        if (!empty($redirectUrl)) {
+            header("Refresh: 0; url=$redirectUrl");
+        }
+        throw new RepoException('Logged out', 401);
+    }
 }

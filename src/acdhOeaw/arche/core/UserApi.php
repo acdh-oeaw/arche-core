@@ -67,10 +67,21 @@ class UserApi {
     }
 
     public function get(string $user): void {
-        if (RC::$auth->isPublic() || !RC::$auth->isAdmin() && !empty($user) && $user !== RC::$auth->getUserName()) {
+        if (RC::$auth->isPublic() || !RC::$auth->isAdmin() && !empty($user) && $user !== RC::$auth->getUserName() && $user !== 'logout') {
             RC::$auth->denyAccess([$user]);
         }
-        
+
+        $redirect      = $_GET['redirect'] ?? '';
+        $redirectRegex = RC::$config->rest->userEndpointAllowedRedirectRegex ?? '/^$/';
+        if (!empty($redirect)) {
+            if (preg_match($redirectRegex, $redirect)) {
+                RC::setHeader('Location', $redirect);
+                http_response_code(303);
+            } else {
+                throw new RepoException('Redirect location not allowed', 400);
+            }
+        }
+
         if (empty($user)) {
             $where = '';
             $param = [];
@@ -86,20 +97,11 @@ class UserApi {
             foreach ($users as $user) {
                 $data[] = $this->prepareUserData($this->db->getUser($user), $user);
             }
-        } else {
+        } elseif ($user !== 'logout') {
             $data = $this->checkUserExists($user);
             $data = $this->prepareUserData($data, $user);
-        }
-
-        $redirect      = $_GET['redirect'] ?? '';
-        $redirectRegex = RC::$config->rest->userEndpointAllowedRedirectRegex ?? '/^$/';
-        if (!empty($redirect)) {
-            if (preg_match($redirectRegex, $redirect)) {
-                RC::setHeader('Location', $redirect);
-                http_response_code(303);
-            } else {
-                throw new RepoException('Redirect location not allowed', 400);
-            }
+        } else {
+            RC::$auth->logout($redirect);
         }
 
         $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
