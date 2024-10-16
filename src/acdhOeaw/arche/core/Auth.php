@@ -224,6 +224,10 @@ class Auth implements AuthInterface {
         unset($_SERVER['PHP_AUTH_USER'], $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['AUTHORIZATION']);
         $this->controller->advertise();
 
+        if (!empty($cfg->cookie?->name)) {
+            setcookie($cfg->cookie->name, '', 1, $cfg->cookie->path ?? '/');
+        }
+        
         if (!empty($redirectUrl)) {
             header("Refresh: 0; url=$redirectUrl");
         }
