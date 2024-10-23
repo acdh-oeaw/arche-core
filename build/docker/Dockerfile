@@ -17,8 +17,8 @@ RUN locale-gen en_US.UTF-8 && \
     rm /var/www/html/* && \
     chown -R www-data:www-data /var/www && \
     su -l www-data -c 'mkdir /var/www/tika' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.9.2/tika-server-standard-2.9.2.jar > /var/www/tika/tika-server.jar' && \
-    su -l www-data -c 'curl https://archive.apache.org/dist/tika/2.9.2/tika-app-2.9.2.jar > /var/www/tika/tika-app.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/3.0.0/tika-server-standard-3.0.0.jar > /var/www/tika/tika-server.jar' && \
+    su -l www-data -c 'curl https://archive.apache.org/dist/tika/3.0.0/tika-app-3.0.0.jar > /var/www/tika/tika-app.jar' && \
     chown -R www-data:www-data /var/run/postgresql
 COPY /root /
 RUN a2ensite mod_php
