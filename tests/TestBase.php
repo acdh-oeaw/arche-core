@@ -287,7 +287,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
                                        ?string $location = null): DatasetNode {
         $graph    = new Dataset();
         $graph->add(RdfIoUtil::parse($body, new DF()));
-        $location = $location === null ? $graph[0]->getSubject() : DF::namedNode($location);
+        $location = $location === null ? $graph->getSubject() : DF::namedNode($location);
         return (new DatasetNode($location))->withDataset($graph);
     }
 

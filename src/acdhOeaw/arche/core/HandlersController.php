@@ -76,7 +76,7 @@ class HandlersController {
 
     /**
      *
-     * @var array<string, ?object>
+     * @var array<string, object|null>
      */
     private $queue;
 

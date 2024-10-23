@@ -34,5 +34,29 @@ use acdhOeaw\arche\lib\exception\RepoLibException;
  * @author zozlak
  */
 class RepoException extends RepoLibException {
-    //put your code here
+
+    /**
+     * HTTP response headers to be set
+     * @var array<string, string|array<string>>
+     */
+    private array $headers;
+
+    /**
+     * 
+     * @param array<string, string|array<string>> $headers
+     */
+    public function __construct(string $message = "", int $code = 0,
+                                \Throwable | null $previous = null,
+                                array $headers = []) {
+        parent::__construct($message, $code, $previous);
+        $this->headers = $headers;
+    }
+
+    /**
+     * 
+     * @return array<string, string|array<string>>
+     */
+    public function getHeaders(): array {
+        return $this->headers;
+    }
 }

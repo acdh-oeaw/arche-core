@@ -611,7 +611,7 @@ class SearchTest extends TestBase {
             $value = str_replace("\n", '', $value);
             $prop  = $res->getObjectValue(new PT($ftsPropProp . $i));
             $this->assertArrayHasKey($prop, $expected);
-            $this->assertEquals($expected[$prop], $value, $i);
+            $this->assertEquals($expected[$prop], $value, (string) $i);
         }
         $this->assertCount($i - 1, $expected);
         $g   = $this->runSearch($opts);

@@ -67,7 +67,7 @@ class UserApi {
     }
 
     public function get(string $user): void {
-        if (RC::$auth->isPublic() || !RC::$auth->isAdmin() && !empty($user) && $user !== RC::$auth->getUserName() && $user !== 'logout') {
+        if ((RC::$auth->isPublic() || !RC::$auth->isAdmin() && !empty($user) && $user !== RC::$auth->getUserName()) && $user !== 'logout') {
             RC::$auth->denyAccess([$user]);
         }
 
@@ -82,30 +82,31 @@ class UserApi {
             }
         }
 
-        if (empty($user)) {
-            $where = '';
-            $param = [];
-            if (!RC::$auth->isAdmin()) {
-                $where = "WHERE user_id = ?";
-                $param = [RC::$auth->getUserName()];
-            }
-
-            $query = RC::$pdo->prepare("SELECT user_id FROM users $where ORDER BY user_id");
-            $query->execute($param);
-            $users = $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
-            $data  = [];
-            foreach ($users as $user) {
-                $data[] = $this->prepareUserData($this->db->getUser($user), $user);
-            }
-        } elseif ($user !== 'logout') {
-            $data = $this->checkUserExists($user);
-            $data = $this->prepareUserData($data, $user);
-        } else {
+        if ($user === 'logout') {
             RC::$auth->logout($redirect);
-        }
+        } else {
+            if (!empty($user)) {
+                $data = $this->checkUserExists($user);
+                $data = $this->prepareUserData($data, $user);
+            } else {
+                $where = '';
+                $param = [];
+                if (!RC::$auth->isAdmin()) {
+                    $where = "WHERE user_id = ?";
+                    $param = [RC::$auth->getUserName()];
+                }
 
-        $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
-        RC::setOutput($data, 'application/json');
+                $query = RC::$pdo->prepare("SELECT user_id FROM users $where ORDER BY user_id");
+                $query->execute($param);
+                $users = $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
+                $data  = [];
+                foreach ($users as $user) {
+                    $data[] = $this->prepareUserData($this->db->getUser($user), $user);
+                }
+            }
+            $data = json_encode($data) ?: throw new \RuntimeException("Can't serialise to JSON");
+            RC::setOutput($data, 'application/json');
+        }
     }
 
     public function patch(string $user): void {

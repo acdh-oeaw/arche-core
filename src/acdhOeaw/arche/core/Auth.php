@@ -74,7 +74,7 @@ class Auth implements AuthInterface {
             $this->controller->addMethod($method, self::DICT_ADVERTISE[$i->advertise ?? 'once']);
         }
 
-        $this->authenticated = $this->controller->authenticate();
+        $this->authenticated = $this->controller->authenticate(true);
 
         if ($this->authenticated) {
             $this->userName  = $this->controller->getUserName();
@@ -91,10 +91,9 @@ class Auth implements AuthInterface {
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
         $this->isPublic  = $this->userName === $cfg->publicRole;
 
-        if (!$this->isPublic && !empty($cfg->cookie?->name)) {
-            setcookie($cfg->cookie->name, implode(',', $this->userRoles), 0, $cfg->cookie->path ?? '/');
-        } else {
-            setcookie($cfg->cookie->name, '', 1, $cfg->cookie->path ?? '/');
+        $cookieName = $cfg->cookie?->name ?? '';
+        if (!empty($cookieName) && !$this->isPublic()) {
+            RC::addHeader('set-cookie', $this->getCookieHeaderValue($cookieName, implode(',', $this->userRoles), -1, $cfg->cookie->path ?? '/'));
         }
     }
 
@@ -213,24 +212,46 @@ class Auth implements AuthInterface {
      */
     public function denyAccess(array $allowed): void {
         RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
-        if ($this->isPublic() && $this->controller->advertise()) {
-            throw new RepoException('Unauthorized', 401);
+
+        $cookieHeader = [];
+        $cookieName   = RC::$config->accessControl->cookie?->name ?? '';
+        if (!empty($cookieName)) {
+            $cookieHeader['set-cookie'] = $this->getCookieHeaderValue($cookieName, '', 0, RC::$config->accessControl->cookie->path ?? '/');
         }
-        throw new RepoException('Forbidden', 403);
+
+        if ($this->isPublic()) {
+            $resp = $this->controller->advertise();
+            if ($resp !== null) {
+                $headers = array_merge($resp->getHeaders(), $cookieHeader);
+                throw new RepoException((string) $resp->getBody(), $resp->getStatusCode(), headers: $headers);
+            }
+        }
+        RC::$log->alert("FOO! " . implode(',', $cookieHeader));
+        throw new RepoException('Forbidden', 403, headers: $cookieHeader);
     }
 
     public function logout(string $redirectUrl = ''): void {
-        // the right way would be to have a $this->controller->logout()
-        unset($_SERVER['PHP_AUTH_USER'], $_SERVER['HTTP_AUTHORIZATION'], $_SERVER['AUTHORIZATION']);
-        $this->controller->advertise();
-
-        if (!empty(RC::$config->accessControl->cookie?->name)) {
-            setcookie(RC::$config->accessControl->cookie->name, '', 1, RC::$config->accessControl->cookie->path ?? '/');
+        $resp = $this->controller->logout($redirectUrl);
+        if ($resp === null) {
+            throw new RepoException('', 201);
         }
-
-        if (!empty($redirectUrl)) {
-            header("Refresh: 0; url=$redirectUrl");
+        $headers    = $resp->getHeaders();
+        $cookieName = RC::$config->accessControl->cookie?->name ?? '';
+        if (!empty($cookieName)) {
+            $headers['set-cookie'] = $this->getCookieHeaderValue($cookieName, '', 0, RC::$config->accessControl->cookie->path ?? '/');
         }
-        throw new RepoException('Logged out', 401);
+        throw new RepoException((string) $resp->getBody(), $resp->getStatusCode(), headers: $headers);
+    }
+
+    private function getCookieHeaderValue(string $name, string $value = '',
+                                          int $expires = -1, string $path = ''): string {
+        $cookie = rawurlencode($name) . '=' . rawurlencode($value);
+        if ($expires >= 0) {
+            $cookie .= '; max-Age=' . $expires;
+        }
+        if (!empty($path)) {
+            $cookie .= '; path=' . $path;
+        }
+        return $cookie;
     }
 }

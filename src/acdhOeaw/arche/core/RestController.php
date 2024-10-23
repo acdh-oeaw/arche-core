@@ -247,17 +247,25 @@ class RestController {
                 self::$output->lazyLoadFromDb();
             }
         } catch (BadRequestException $ex) {
-            $statusCode   = $ex->getCode();
-            self::$output = $ex->getMessage();
-        } catch (RepoLibException $ex) {
+            $statusCode    = $ex->getCode();
+            self::$output  = $ex->getMessage();
+            self::$headers = [];
+        } catch (RepoException $ex) {
             $statusCode   = $ex->getCode() >= 100 ? $ex->getCode() : 500;
             self::$output = $ex->getMessage();
+            self::setHeaders($ex->getHeaders());
+        } catch (RepoLibException $ex) {
+            $statusCode    = $ex->getCode() >= 100 ? $ex->getCode() : 500;
+            self::$output  = $ex->getMessage();
+            self::$headers = [];
         } catch (PDOException $ex) {
-            $statusCode   = $ex->getCode() === Transaction::PG_LOCK_FAILURE || $ex->getCode() === Transaction::PG_DEADLOCK ? 409 : 500;
-            self::$output = $ex->getMessage();
+            $statusCode    = $ex->getCode() === Transaction::PG_LOCK_FAILURE || $ex->getCode() === Transaction::PG_DEADLOCK ? 409 : 500;
+            self::$output  = $ex->getMessage();
+            self::$headers = [];
         } catch (Throwable $ex) {
-            $statusCode   = 500;
-            self::$output = '';
+            $statusCode    = 500;
+            self::$output  = '';
+            self::$headers = [];
         } finally {
             if (isset($ex)) {
                 if (self::$pdo->inTransaction()) {
@@ -276,7 +284,6 @@ class RestController {
                         }
                     }
                 }
-                self::$headers = [];
             }
             if (isset($statusCode)) {
                 http_response_code($statusCode);
@@ -353,6 +360,15 @@ class RestController {
         } else {
             self::$headers[$header] = [$value];
         }
+    }
+
+    /**
+     * 
+     * @param array<string, string|array<string>> $headers
+     * @return void
+     */
+    static public function setHeaders(array $headers): void {
+        self::$headers = array_map(fn($x) => is_array($x) ? $x : [$x], $headers);
     }
 
     static public function addHeader(string $header, string $value): void {

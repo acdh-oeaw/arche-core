@@ -295,7 +295,7 @@ class TransactionTest extends TestBase {
         $meta3 = $this->extractResource($resp, $loc1);
         $ids   = $meta3->copy(new PT(self::$schema->id));
         $this->assertCount(1, $ids);
-        $this->assertEquals($loc1, $ids[0]->getObject()->getValue());
+        $this->assertEquals($loc1, $ids->getObjectValue());
 
         $loc2  = $this->createMetadataResource($meta1);
         $meta4 = $this->getResourceMeta($loc2);

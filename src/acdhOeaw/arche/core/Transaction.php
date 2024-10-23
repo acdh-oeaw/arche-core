@@ -142,6 +142,7 @@ class Transaction {
             foreach (RC::$auth->getCreateRights() as $triple) {
                 $pred = $triple->getPredicate();
                 $obj  = $triple->getObject();
+                /** @var \rdfInterface\LiteralInterface $obj  */
                 $query->execute([
                     $resId, $pred->getValue(), $obj->getDatatype(),
                     $obj->getLang() ?? '', null, null, $obj->getValue()

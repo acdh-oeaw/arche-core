@@ -126,14 +126,14 @@ class UserApiTest extends TestBase {
         $req  = new Request('put', self::$baseUrl . 'user/foobar', [], $body);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertMatchesRegularExpression('`^archeLogin=deleted; expires=.*; Max-Age=0; path=/`', $resp->getHeader('Set-Cookie')[0] ?? '');
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // lack of priviledges
         $headers['Authorization'] = 'Basic ' . base64_encode('foo:' . self::PSWD);
         $req                      = new Request('put', self::$baseUrl . 'user/foobar', $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $this->assertEquals(['archeLogin=foo%2CpublicRole%2Cacademic%2Ccreator; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
@@ -142,7 +142,7 @@ class UserApiTest extends TestBase {
         $req  = new Request('get', self::$baseUrl . 'user');
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertMatchesRegularExpression('`^archeLogin=deleted; expires=.*; Max-Age=0; path=/`', $resp->getHeader('Set-Cookie')[0] ?? '');
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // as root
         $headers = ['Authorization' => self::$adminAuth];
@@ -202,24 +202,25 @@ class UserApiTest extends TestBase {
         $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // wrong password
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:xxx')];
         $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $this->assertMatchesRegularExpression('`^archeLogin=deleted; expires=.*; Max-Age=0; path=/`', $resp->getHeader('Set-Cookie')[0] ?? '');
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // non-existing user
         $req     = new Request('get', self::$baseUrl . 'user/joe', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $this->assertMatchesRegularExpression('`^archeLogin=deleted; expires=.*; Max-Age=0; path=/`', $resp->getHeader('Set-Cookie')[0] ?? '');
+        $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
         $headers = ['Authorization' => self::$adminAuth];
         $req     = new Request('get', self::$baseUrl . 'user/joe', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
-        $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals([], $resp->getHeader('Set-Cookie'));
 
         // sso user out of local database
         $req  = new Request('get', self::$baseUrl . 'user/ssouser', ['EPPN' => 'ssouser']);
@@ -242,12 +243,13 @@ class UserApiTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(303, $resp->getStatusCode());
         $this->assertEquals(['/describe'], $resp->getHeader('Location'));
+        $this->assertEquals('archeLogin=bar%2CpublicRole%2Cacademic; path=/', $resp->getHeader('Set-Cookie')[0] ?? '');
 
         $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=http%3A%2F%2Fexternal%2Flocation', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Location'));
-        $this->assertEquals(['archeLogin=bar%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
+        $this->assertEquals([], $resp->getHeader('Set-Cookie'));
     }
 
     #[Depends('testUserCreate')]
@@ -255,16 +257,10 @@ class UserApiTest extends TestBase {
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
 
         // logout without credentials
+        // 201 as the auth library is unable to determine the logout method
         $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo');
         $resp = self::$client->send($req);
-        $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertEquals([], $resp->getHeader('Refresh'));
-
-        // logout with invalid credentials
-        $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo', [
-            'Authorization' => 'Basic ' . base64_encode('x:y')]);
-        $resp = self::$client->send($req);
-        $this->assertEquals(403, $resp->getStatusCode());
+        $this->assertEquals(201, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Refresh'));
 
         // logout with valid credentials
@@ -277,7 +273,15 @@ class UserApiTest extends TestBase {
         $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=' . rawurldecode('/foo/bar'), $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertEquals(['0; url=/foo/bar'], $resp->getHeader('Refresh'));
+        $this->assertEquals(['0: url=/foo/bar'], $resp->getHeader('Refresh'));
+        
+        // logout with invalid credentials and redirect
+        $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo', [
+            'Authorization' => 'Basic ' . base64_encode('x:y')]);
+        $resp = self::$client->send($req);
+        $this->assertEquals(401, $resp->getStatusCode());
+        $this->assertEquals(['0: url=/foo'], $resp->getHeader('Refresh'));
+
     }
 
     #[Depends('testUserCreate')]
