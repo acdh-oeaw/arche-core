@@ -1,5 +1,6 @@
 #!/usr/bin/php
 <?php
+
 /*
  * The MIT License
  *
@@ -43,7 +44,7 @@ for ($i = 1; $i < count($argv); $i++) {
 $targetFile = $params[1] ?? '';
 if (empty($targetFile) || empty($params[0] ?? '')) {
     exit(<<<AAA
-backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--compression method] [--include mode] [--lock mode] repoConfigFile targetFile
+backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--compression method] [--compressionLevel level] [--include mode] [--lock mode] [--chunkSize sizeMiB] [--dbConn connectionName] repoConfigFile targetFile
 
 Creates a repository backup.
 
@@ -53,14 +54,16 @@ Parameters:
     
     --dateFile path to a file storying the --dateFrom parameter value
         the file content is automatically updated with the --dateTo value after a successful dump
-        whcich provides an easy implementation of incremental backups
+        which provides an easy implementation of incremental backups
         if the file doesn't exist, 1900-01-01T00:00:00 is assumed as the --dateFrom value
         --dateFrom takes precedence over --dateFile content
     --dateFrom, --dateTo only binaries modified within a given time period are included in the dump
         (--dateFrom default is 1900-01-01T00:00:00, --dateTo default is current date and time)
         --dateFrom takes precedence over --dateFile
     --compression (default none) compression method - one of none/bzip2/gzip
+    --compressionLevel (default 1) compression level from 1 to 9 to be passed to bzip2/gzip
     --include (default all) set of database tables to include:
+        none - don't include a database dump
         all - include all tables
         skipSearch - skip full text search and spatial tables
         skipHistory - skip metadata history table
@@ -69,6 +72,11 @@ Parameters:
         try - try to acquire a lock on all matching binaries and fail if it's not possible
         wait - wait until it's possible to acquire a lock on all matching binaries
         skip - acquire lock on all matching binaries which are not cuurently locked by other transactions
+    --chunkSize maximum size of resources included in a single targetFile.
+        After a resource added to the targetFile exceeds this size a new targetFile with a name suffix 
+        is created.
+        If compression is used, the targetSize files can be smaller than this size.
+    --dbConn (default backup) name of the database connection parameters in the config file
 
 
 AAA
@@ -91,11 +99,12 @@ try {
     $cfg = json_decode(json_encode($cfg));
 
     if (substr($cfg->storage->dir, 0, 1) !== '/') {
-        throw Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
+        throw new Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
     }
 
     $pgdumpConnParam = ['host' => '-h', 'port' => '-p', 'dbname' => '', 'user' => '-U'];
-    $pdoConnStr      = $cfg->dbConnStr->backup ?? 'pgsql:';
+    $connName        = $params['dbConn'] ?? 'backup';
+    $pdoConnStr      = $cfg->dbConnStr->$connName ?? 'pgsql:';
     $pgdumpConnStr   = 'pg_dump';
     foreach (explode(' ', preg_replace('/ +/', ' ', trim(substr($pdoConnStr, 6)))) as $i) {
         if (!empty($i)) {
@@ -128,9 +137,10 @@ try {
     // BEGINNING TRANSACTION
     echo "Acquiring database locks\n";
 
-    $pdo = new PDO($pdoConnStr);
-    if ($pdo === false) {
-        throw new Exception('Database connection failed.');
+    try {
+        $pdo = new PDO($pdoConnStr);
+    } catch (PDOException) {
+        throw new BackupException("Could not connect to the database using the settings '$pdoConnStr'");
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->query("SET application_name TO backupscript");
@@ -144,7 +154,7 @@ try {
     $txId  = $query->fetchColumn();
 
     $matchQuery = "
-        SELECT id 
+        SELECT id
         FROM 
             resources
             JOIN metadata m1 USING (id)
@@ -188,18 +198,20 @@ try {
     $snapshot = $pdo->query("SELECT pg_export_snapshot()")->fetchColumn();
 
     // DATABASE
-    $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions --snapshot $snapshot -f $targetFileSql";
-    $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearch' ? ' -T full_text_search -T spatial_search' : '';
-    $dbDumpCmd .= ($params['include'] ?? '') == 'skipHistory' ? ' -T metadata_history' : '';
-    $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearchHistory' ? ' -T full_text_search -T metadata_history' : '';
-    echo "Dumping database with:\n\t$dbDumpCmd\n";
-    $out       = $ret       = null;
-    exec($dbDumpCmd, $out, $ret);
-    if ($ret !== 0) {
-        throw new Exception("Dumping database failed:\n\n" . $out);
+    if ($params['include'] !== 'none') {
+        $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions --snapshot $snapshot -f $targetFileSql";
+        $dbDumpCmd .= ($params['include']) == 'skipSearch' ? ' -T full_text_search -T spatial_search' : '';
+        $dbDumpCmd .= ($params['include']) == 'skipHistory' ? ' -T metadata_history' : '';
+        $dbDumpCmd .= ($params['include']) == 'skipSearchHistory' ? ' -T full_text_search -T metadata_history' : '';
+        echo "Dumping database with:\n\t$dbDumpCmd\n";
+        $out       = $ret       = null;
+        exec($dbDumpCmd, $out, $ret);
+        if ($ret !== 0) {
+            throw new Exception("Dumping database failed:\n\n" . implode("\n", $out));
+        }
+        printf("\tdump size: %.3f MB\n", filesize($targetFileSql) / 1024 / 1024);
+        $pdo->commit(); // must be here so the snapshot passed to pg_dump exists
     }
-    printf("\tdump size: %.3f MB\n", filesize($targetFileSql) / 1024 / 1024);
-    $pdo->commit(); // must be here so the snapshot passed to pg_dump exists
     // BINARIES LIST FILE
     echo "Preparing binary files list\n";
 
@@ -210,48 +222,86 @@ try {
         }
         return $path;
     }
+    $out           = $ret           = null;
+    exec('pv -h', $out, $ret);
+    $pv            = $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a'" : '';
+    $level         = $params['compressionLevel'] ?? 1;
+    $tarCmdTmpl    = "tar -c -T $targetFileList $pv";
+    $tarCmdTmpl    .= match ($params['compression'] ?? '') {
+        'gzip' => " | gzip  -$level -c",
+        'bzip2' => " | bzip2 -$level -c",
+        default => '',
+    };
+    $tarCmdTmpl    .= " > %targetFile% ; exit \${PIPESTATUS[0]}";
+    $targetFileExt = match ($params['compression'] ?? '') {
+        'gzip' => '.gz',
+        'bzip2' => '.bz',
+        default => '.tar',
+    };
+    $chunkNo       = 0;
+    $targetFiles   = [];
 
-    $query = $pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
-    $query->execute([$txId]);
-    $tfl   = fopen($targetFileList, 'w');
-    if ($tfl === false) {
-        throw new Exception('Can not create binary files index file');
-    }
-    $nStrip = strlen(preg_replace('|/$|', '', $cfg->storage->dir)) + 1;
-    $n      = $size   = 0;
-    while ($id     = $query->fetchColumn()) {
-        $path = getStorageDir($id, $cfg->storage->dir, 0, $cfg->storage->levels) . '/' . $id;
-        if (file_exists($path)) {
-            fwrite($tfl, substr($path, $nStrip) . "\n");
-            $n++;
-            $size += filesize($path);
-        } else {
-            echo "\twarning - binary $path is missing\n";
+    /**
+     * @param resource $tflHandle
+     */
+    function writeOutput($tflHandle, int $chunkNo): mixed {
+        global $targetFiles, $targetFile, $tarCmdTmpl, $targetFileList, $targetFileExt;
+
+        fclose($tflHandle);
+
+        $tfName        = $targetFile . ($chunkNo > 0 ? "_$chunkNo" : '') . $targetFileExt;
+        $targetFiles[] = $tfName;
+        $targetFiles[] = $tfName . '.tmp';
+        $tflName       = preg_replace('/[.][^.]+$/', '.list', $tfName);
+        $targetFiles[] = $tflName;
+        $tarCmd        = str_replace('%targetFile%', $tfName . '.tmp', $tarCmdTmpl);
+        echo "Creating dump with:\n\t$tarCmd\n";
+        $ret           = null;
+        system('bash -c ' . escapeshellarg($tarCmd), $ret); // bash is needed to use the $PIPESTATUS
+        if ($ret !== 0) {
+            throw new Exception("Dump file creation failed");
         }
+        rename($targetFileList, $tflName);
+        rename($tfName . '.tmp', $tfName);
+        return fopen($targetFileList, 'w') ?: throw new Exception('Can not create binary files index file');
+        ;
     }
-    $size = sprintf('%.3f', $size / 1024 / 1024);
+    $chunkSize = (($params['chunkSize'] ?? 0) << 20) ?: PHP_INT_MAX;
+    $nStrip    = strlen(preg_replace('|/$|', '', $cfg->storage->dir)) + 1;
+    chdir($cfg->storage->dir);
+
+    $query = $pdo->prepare("SELECT count(*), sum(value_n) FROM resources JOIN metadata USING (id) WHERE transaction_id = ? AND property = ?");
+    $query->execute([$txId, $cfg->schema->binarySize]);
+    list($n, $totalSize) = $query->fetch(PDO::FETCH_NUM);
+    $size  = sprintf('%.3f', $totalSize / 1024 / 1024);
     echo "\tfound $n file(s) with a total size of $size MB\n";
 
-    fwrite($tfl, basename($targetFileSql) . "\n");
-    fclose($tfl);
-    $tfl = null;
-
-    // OUTPUT FILE creation    
-    chdir($cfg->storage->dir);
-    $tarCmd = "tar -c -T $targetFileList";
-    $tarCmd .= ($params['compression'] ?? '') === 'gzip' ? ' -z' : '';
-    $tarCmd .= ($params['compression'] ?? '') === 'bzip2' ? ' -j' : '';
-    $out    = $ret    = null;
-    exec('pv -h', $out, $ret);
-    $tarCmd .= $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a' > $targetFile" : "-f $targetFile";
-    $tarCmd .= "; exit \${PIPESTATUS[0]}";
-    echo "Creating dump with:\n\t$tarCmd\n";
-    $tarCmd = 'bash -c ' . escapeshellarg($tarCmd); // bash is needed to use the $PIPESTATUS
-    $ret    = null;
-    system($tarCmd, $ret);
-    if ($ret !== 0) {
-        throw new Exception("Dump file creation failed");
+    $query       = $pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+    $query->execute([$txId]);
+    $tflHandle   = fopen($targetFileList, 'w') ?: throw new Exception('Can not create binary files index file');
+    $size        = $chunksCount = 0;
+    while ($id          = $query->fetchColumn()) {
+        $path = getStorageDir($id, $cfg->storage->dir, 0, $cfg->storage->levels) . '/' . $id;
+        if (!file_exists($path)) {
+            echo "\twarning - binary $path is missing\n";
+            continue;
+        }
+        $fSize = filesize($path);
+        fwrite($tflHandle, substr($path, $nStrip) . "\n");
+        $n++;
+        $size  += $fSize;
+        if ($size > $chunkSize) {
+            $chunksCount++;
+            $tflHandle = writeOutput($tflHandle, $chunksCount);
+            $size      = 0;
+        }
     }
+    if (file_exists($targetFileSql)) {
+        fwrite($tflHandle, basename($targetFileSql) . "\n");
+    }
+    $chunksCount += $chunksCount > 0;
+    $tflHandle   = writeOutput($tflHandle, $chunksCount);
+    fclose($tflHandle);
 
     // FINISHING
     if (isset($params['dateFile'])) {
@@ -261,21 +311,25 @@ try {
     echo "Dump completed successfully\n";
 } catch (BackupException $e) {
     // Well-known errors which don't require stack traces
-    if (file_exists($targetFile)) {
-        unlink($targetFile);
+    foreach ($targetFiles ?? [] as $i) {
+        if (file_exists($i)) {
+            unlink($i);
+        }
     }
     echo 'ERROR: ' . $e->getMessage() . "\n";
     $exit = 1;
 } catch (Throwable $e) {
-    if (file_exists($targetFile)) {
-        unlink($targetFile);
+    foreach ($targetFiles ?? [] as $i) {
+        if (file_exists($i)) {
+            unlink($i);
+        }
     }
     throw $e;
 } finally {
-    if ($tfl ?? null) {
-        fclose($tfl);
+    if (is_resource($tflHandle ?? null)) {
+        fclose($tflHandle);
     }
-    foreach ([$targetFileSql, $targetFileList] as $f) {
+    foreach ([$targetFileSql ?? '', $targetFileList ?? ''] as $f) {
         if (file_exists($f)) {
             unlink($f);
         }
