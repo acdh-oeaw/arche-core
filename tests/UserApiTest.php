@@ -273,14 +273,14 @@ class UserApiTest extends TestBase {
         $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=' . rawurldecode('/foo/bar'), $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertEquals(['0: url=/foo/bar'], $resp->getHeader('Refresh'));
+        $this->assertEquals(['0; url=/foo/bar'], $resp->getHeader('Refresh'));
         
         // logout with invalid credentials and redirect
         $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo', [
             'Authorization' => 'Basic ' . base64_encode('x:y')]);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
-        $this->assertEquals(['0: url=/foo'], $resp->getHeader('Refresh'));
+        $this->assertEquals(['0; url=/foo'], $resp->getHeader('Refresh'));
 
     }
 

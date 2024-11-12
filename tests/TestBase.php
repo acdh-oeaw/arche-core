@@ -175,7 +175,8 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $g;
     }
 
-    protected function createBinaryResource(?int $txId = null): string {
+    protected function createBinaryResource(?int $txId = null,
+                                            string $path = self::BINARY_RES_PATH): string {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -183,11 +184,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
 
         $headers = [
             self::$config->rest->headers->transactionId => $txId,
-            'Content-Disposition'                       => 'attachment; filename="test.ttl"',
+            'Content-Disposition'                       => 'attachment; filename="' . basename($path) . '"',
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body    = (string) file_get_contents(self::BINARY_RES_PATH);
+        $body    = (string) file_get_contents($path);
         $req     = new Request('post', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
 

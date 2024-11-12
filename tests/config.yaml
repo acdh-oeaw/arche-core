@@ -162,6 +162,11 @@ rest:
         resourceProperties: X-RESOURCE-PROPERTIES
         relativesProperties: X-RELATIVES-PROPERTIES
     cors: __origin__
+download:
+    compressionMethod: store
+    compressionLevel: ~
+    fileName: data.zip
+    strict: false
 schema:
     id: https://id
     label: https://label

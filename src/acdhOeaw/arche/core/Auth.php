@@ -104,7 +104,7 @@ class Auth implements AuthInterface {
     }
 
     public function checkAccessRights(int $resId, string $privilege,
-                                      bool $metadataRead): void {
+                                      bool $metadataRead, bool $deny = true): void {
         $c = RC::$config->accessControl;
         if ($metadataRead && !$c->enforceOnMetadata || $this->isAdmin) {
             return;
@@ -115,7 +115,11 @@ class Auth implements AuthInterface {
         $allowed = json_decode($allowed) ?? [];
         $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
         if (count(array_intersect($this->userRoles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
-            $this->denyAccess($allowed);
+            if ($deny) {
+                $this->denyAccess($allowed);
+            } else {
+                throw new RepoException('Unauthorized', $this->isPublic() ? 401 : 403);
+            }
         }
     }
 
@@ -226,7 +230,6 @@ class Auth implements AuthInterface {
                 throw new RepoException((string) $resp->getBody(), $resp->getStatusCode(), headers: $headers);
             }
         }
-        RC::$log->alert("FOO! " . implode(',', $cookieHeader));
         throw new RepoException('Forbidden', 403, headers: $cookieHeader);
     }
 

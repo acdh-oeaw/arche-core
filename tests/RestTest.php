@@ -283,7 +283,7 @@ class RestTest extends TestBase {
         $req  = new Request('head', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertEquals('attachment; filename="test.ttl"', $resp->getHeader('Content-Disposition')[0] ?? '');
+        $this->assertEquals("attachment; filename*=UTF-8''test.ttl", $resp->getHeader('Content-Disposition')[0] ?? '');
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
         // In HTTP/1.1 and newer server may respond with transfer-encoding: chuncked which does not contain the content-length header
         if (count($resp->getHeader('Content-Length')) > 0) {
@@ -1225,7 +1225,7 @@ class RestTest extends TestBase {
         $resp      = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(self::BINARY_RES_PATH), (string) $resp->getBody());
-        $refHeader = ['attachment; filename="' . basename(self::BINARY_RES_PATH) . '"'];
+        $refHeader = ["attachment; filename*=UTF-8''" . basename(self::BINARY_RES_PATH)];
         $this->assertEquals($refHeader, $resp->getHeader('Content-Disposition'));
 
         $req  = new Request('get', $location . '?skipContentDisposition=', $this->getHeaders());

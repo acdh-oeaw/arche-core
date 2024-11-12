@@ -174,7 +174,7 @@ class BinaryPayload {
             throw new NoBinaryException();
         }
         if (!empty($data->filename)) {
-            $headers['Content-Disposition'] = 'attachment; filename="' . $data->filename . '"';
+            $headers['Content-Disposition'] = "attachment; filename*=UTF-8''" . rawurlencode($data->filename);
         }
         if (!empty($data->mime)) {
             $headers['Content-Type'] = $data->mime;
@@ -278,7 +278,7 @@ class BinaryPayload {
 
         $fileName = null;
         if (preg_match('/^attachment; filename=/', $contentDisposition)) {
-            $fileName = (string) preg_replace('/^attachment; filename="?/', '', $contentDisposition);
+            $fileName = (string) preg_replace('/^attachment; filename(=|[*]=.*\'.*\')"?/', '', $contentDisposition);
             $fileName = (string) preg_replace('/"$/', '', $fileName);
             RC::$log->debug("\t\tfile name: $fileName");
         }

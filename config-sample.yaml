@@ -214,6 +214,12 @@ rest:
         withReferences: X-WITH-REFERENCES
         resourceProperties: X-RESOURCE-PROPERTIES
         relativesProperties: X-RELATIVES-PROPERTIES
+download:
+    # store or deflate
+    compressionMethod: store
+    compressionLevel: ~
+    fileName: data.zip
+    strict: false
 schema:
     id: https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier
     label: https://vocabs.acdh.oeaw.ac.at/schema#hasTitle

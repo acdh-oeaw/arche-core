@@ -208,6 +208,13 @@ class RestController {
                 } else {
                     $search->options(405);
                 }
+            } elseif ($path === 'download') {
+                $dwnld = new Download();
+                if ($method === 'Get' || $method === 'Post') {
+                    $dwnld->get();
+                } else {
+                    $dwnld->options($method === 'Options' ? 204 : 405);
+                }
             } elseif (preg_match('>^([0-9]+/?)?(metadata|tombstone)?$>', $path)) {
                 $collection = $suffix     = '';
                 $id         = null;
