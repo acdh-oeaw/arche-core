@@ -30,7 +30,6 @@ jobs:
         java-package: jdk
         distribution: oracle
     - uses: shivammathur/setup-php@v2
-      if: ${{ ! inputs.debug }}
       with:
         php-version: ${{ matrix.php }}
         extensions: gd,json,mbstring,pcre,xmlreader,yaml
