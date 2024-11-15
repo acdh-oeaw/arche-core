@@ -30,6 +30,7 @@ jobs:
         java-package: jdk
         distribution: oracle
     - uses: shivammathur/setup-php@v2
+      if: ${{ ! inputs.debug }}
       with:
         php-version: ${{ matrix.php }}
         extensions: gd,json,mbstring,pcre,xmlreader,yaml
@@ -42,7 +43,6 @@ jobs:
     - name: environment
       run: |
         docker build -t arche-dev build/docker
-        mkdir log
         docker run --name arche-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d arche-dev
         sleep 10
     - uses: mxschmitt/action-tmate@v3
