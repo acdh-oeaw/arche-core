@@ -40,6 +40,7 @@ use ZipStream\CompressionMethod;
  */
 class Download {
 
+    const CONTENT_TYPE                     = 'application/zip';
     const DEFAULT_COMPRESSION_METHOD       = CompressionMethod::STORE;
     const DEFAULT_COMPRESSION_LEVEL        = 1;
     const DEFAULT_STRICT                   = false;
@@ -113,7 +114,7 @@ class Download {
         $this->parents  = [];
         unset($this->parentQuery);
         unset($this->parentQueryParam);
-        $zip            = new ZipStream(defaultCompressionMethod: $method, defaultDeflateLevel: $level, enableZip64: !$strict, defaultEnableZeroHeader: !$strict, outputName: $fileName);
+        $zip            = new ZipStream(contentType: self::CONTENT_TYPE, defaultCompressionMethod: $method, defaultDeflateLevel: $level, enableZip64: !$strict, defaultEnableZeroHeader: !$strict, outputName: $fileName);
         foreach ($validIds as $id) {
             $binary = new BinaryPayload($id);
             $path   = $binary->getPath();
@@ -178,10 +179,12 @@ class Download {
      * @return array<string>
      */
     private function collectChildren(array $ids): array {
-        $query = RC::$pdo->prepare("SELECT id FROM get_relatives(?, ?, 999999, 0, false, false)");
-        $param = [null, RC::$schema->parent];
+        $baseUrl = RC::$config->rest->urlBase . RC::$config->rest->pathBase;
+        $query   = RC::$pdo->prepare("SELECT (get_relatives(id, ?, 999999, 0, false, false)).id FROM identifiers WHERE ids = ?");
+        $param   = [RC::$schema->parent, null];
+        $allIds  = [];
         foreach ($ids as $id) {
-            $param[0] = $id;
+            $param[1] = is_numeric($id) ? $baseUrl . $id : $id;
             $query->execute($param);
             while ($i        = $query->fetchColumn()) {
                 $allIds[(string) $i] = '';

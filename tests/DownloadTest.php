@@ -93,7 +93,7 @@ class DownloadTest extends TestBase {
         $this->commitTransaction($txId);
 
         // two arbitrary binaries using GET
-        $ids        = [$binaries[2][1], $binaries[0][0]];
+        $ids        = [self::$baseUrl . $binaries[2][1], $binaries[0][0]];
         $ids        = array_map(fn($x) => preg_replace('`^.*/`', '', $x), $ids);
         $uri        = self::$baseUrl . 'download?' . http_build_query(['ids' => $ids]);
         $req        = new Request('get', $uri, ['eppn' => 'admin']);
@@ -197,7 +197,7 @@ class DownloadTest extends TestBase {
     private function testZipBasics(Response $resp, int $expectedCount): array {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(["attachment; filename*=UTF-8''data.zip"], $resp->getHeader('Content-Disposition'));
-        $this->assertEquals(['application/x-zip'], $resp->getHeader('Content-Type'));
+        $this->assertEquals(['application/zip'], $resp->getHeader('Content-Type'));
         file_put_contents(self::TMP_ZIP, (string) $resp->getBody());
         $zip     = new ZipArchive();
         $this->assertTrue($zip->open(self::TMP_ZIP));
