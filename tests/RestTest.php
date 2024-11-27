@@ -647,11 +647,10 @@ class RestTest extends TestBase {
         $fooProp                                                 = DF::namedNode('http://foo');
         $barProp                                                 = DF::namedNode('http://bar');
         $bazProp                                                 = DF::namedNode('http://baz');
-        $refProp                                                 = DF::nameNode('http://ref');
+        $refProp                                                 = DF::namedNode('http://ref');
         $fooTmpl                                                 = new PT($fooProp);
         $barTmpl                                                 = new PT($barProp);
         $bazTmpl                                                 = new PT($bazProp);
-        $refTmpl                                                 = new PT($refProp);
         $txId                                                    = $this->beginTransaction();
         $headers                                                 = $this->getHeaders($txId);
         $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
@@ -706,7 +705,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $metaRef = new DatasetNode(DF::namedNode($locRef));
         $metaRef->add(RdfIoUtil::parse($resp, new DF()));
-        $this->assertTrue($metaRef->contains(new PT($refProp, $loc1)));
+        $this->assertTrue($metaRef->any(new PT($refProp, $loc1)));
 
         $this->commitTransaction($txId);
 
@@ -718,7 +717,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $metaRef = new DatasetNode(DF::namedNode($locRef));
         $metaRef->add(RdfIoUtil::parse($resp, new DF()));
-        $this->assertTrue($metaRef->contains(new PT($refProp, $loc1)));
+        $this->assertTrue($metaRef->any(new PT($refProp, $loc1)));
     }
 
     /**
@@ -726,6 +725,7 @@ class RestTest extends TestBase {
      * @return void
      */
     public function testMergeRollback(): void {
+        $refProp = DF::namedNode('http://ref');
         $barProp = DF::namedNode('http://bar');
         $barTmpl = new PT($barProp);
         $idsTmpl = new PT(self::$schema->id);
@@ -743,6 +743,13 @@ class RestTest extends TestBase {
         $loc2    = $this->createMetadataResource($meta2);
         $id1     = substr($loc1, strlen(self::$baseUrl));
         $id2     = substr($loc2, strlen(self::$baseUrl));
+
+        $metaRef = new DatasetNode(self::$baseNode);
+        $metaRef->add([
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://resRef')),
+            DF::quadNoSubject($refProp, DF::namedNode($loc2)),
+        ]);
+        $locRef  = $this->createMetadataResource($metaRef);
 
         // as the https://github.com/acdh-oeaw/arche-core/issues/28 depends on
         // the order of rows returned by the database query try different
@@ -779,6 +786,12 @@ class RestTest extends TestBase {
                 $ids     = $metaRes->listObjects($idsTmpl)->getValues();
                 $this->assertContains('http://res2', $ids);
                 $this->assertEquals('A', $metaRes->getObjectValue($barTmpl));
+
+                $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+                $this->assertEquals(200, $resp->getStatusCode());
+                $metaRef = new DatasetNode(DF::namedNode($locRef));
+                $metaRef->add(RdfIoUtil::parse($resp, new DF()));
+                $this->assertTrue($metaRef->any(new PT($refProp, $loc2)));
             }
         }
     }

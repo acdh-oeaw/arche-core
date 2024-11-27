@@ -120,6 +120,11 @@ class Resource {
         $srcRes = new Resource($srcId);
         $srcRes->checkCanWrite();
 
+        // include resources referencing the $srcId in the transaction
+        $query = RC::$pdo->prepare("CREATE TEMPORARY TABLE delres AS SELECT ?::bigint AS id");
+        $query->execute([$srcId]);
+        $this->deleteCheckReferences(RC::$transaction->getId(), true);
+        
         $srcMeta    = new Metadata($srcId);
         $srcMeta->loadFromDb(RRI::META_RESOURCE);
         $srcMeta    = $srcMeta->getDatasetNode();
@@ -141,6 +146,7 @@ class Resource {
         $query = RC::$pdo->prepare("UPDATE resources SET state = ? WHERE id = ?");
         $query->execute([self::STATE_DELETED, $srcId]);
         $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+        $query->execute([$srcId]);
         $query = RC::$pdo->prepare("
             INSERT INTO relations (id, target_id, property)
             SELECT id, ?, property
@@ -150,8 +156,6 @@ class Resource {
         ");
         $query->execute([$this->id, $srcId]);
         $query = RC::$pdo->prepare("DELETE FROM relations WHERE target_id = ?");
-        $query->execute([$srcId]);
-
         $query->execute([$srcId]);
         $targetMeta->save();
         $this->headMetadata(true);
