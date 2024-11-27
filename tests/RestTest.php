@@ -647,9 +647,11 @@ class RestTest extends TestBase {
         $fooProp                                                 = DF::namedNode('http://foo');
         $barProp                                                 = DF::namedNode('http://bar');
         $bazProp                                                 = DF::namedNode('http://baz');
+        $refProp                                                 = DF::nameNode('http://ref');
         $fooTmpl                                                 = new PT($fooProp);
         $barTmpl                                                 = new PT($barProp);
         $bazTmpl                                                 = new PT($bazProp);
+        $refTmpl                                                 = new PT($refProp);
         $txId                                                    = $this->beginTransaction();
         $headers                                                 = $this->getHeaders($txId);
         $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
@@ -672,6 +674,13 @@ class RestTest extends TestBase {
         $id1  = substr($loc1, strlen(self::$baseUrl));
         $id2  = substr($loc2, strlen(self::$baseUrl));
 
+        $metaRef = new DatasetNode(self::$baseNode);
+        $metaRef->add([
+            DF::quadNoSubject(self::$schema->id, DF::namedNode('http://resRef')),
+            DF::quadNoSubject($refProp, DF::namedNode($loc2)),
+        ]);
+        $locRef  = $this->createMetadataResource($metaRef, $txId);
+
         $req  = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
         $resp = self::$client->send($req);
 
@@ -689,17 +698,27 @@ class RestTest extends TestBase {
         $this->assertEquals(['2'], $meta->listObjects($barTmpl)->getValues());
         $this->assertEquals(['B'], $meta->listObjects($bazTmpl)->getValues());
 
-        $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+        $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
-        $resp = self::$client->send(new Request('get', $loc2));
+        $resp    = self::$client->send(new Request('get', $loc2));
         $this->assertEquals(404, $resp->getStatusCode());
+        $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $metaRef = new DatasetNode(DF::namedNode($locRef));
+        $metaRef->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertTrue($metaRef->contains(new PT($refProp, $loc1)));
 
         $this->commitTransaction($txId);
 
-        $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+        $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
-        $resp = self::$client->send(new Request('get', $loc2));
+        $resp    = self::$client->send(new Request('get', $loc2));
         $this->assertEquals(404, $resp->getStatusCode());
+        $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $metaRef = new DatasetNode(DF::namedNode($locRef));
+        $metaRef->add(RdfIoUtil::parse($resp, new DF()));
+        $this->assertTrue($metaRef->contains(new PT($refProp, $loc1)));
     }
 
     /**

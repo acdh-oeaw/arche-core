@@ -141,6 +141,17 @@ class Resource {
         $query = RC::$pdo->prepare("UPDATE resources SET state = ? WHERE id = ?");
         $query->execute([self::STATE_DELETED, $srcId]);
         $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+        $query = RC::$pdo->prepare("
+            INSERT INTO relations (id, target_id, property)
+            SELECT id, ?, property
+            FROM relations
+            WHERE target_id = ?
+            ON CONFLICT DO NOTHING
+        ");
+        $query->execute([$this->id, $srcId]);
+        $query = RC::$pdo->prepare("DELETE FROM relations WHERE target_id = ?");
+        $query->execute([$srcId]);
+
         $query->execute([$srcId]);
         $targetMeta->save();
         $this->headMetadata(true);
