@@ -21,7 +21,8 @@
         "zozlak/logging": "^1",
         "zozlak/rdf-constants": "^1",
         "php-amqplib/php-amqplib": "^3.1",
-        "maennchen/zipstream-php": "^3.1"
+        "maennchen/zipstream-php": "^3.1",
+        "splitbrain/php-archive": "^1.4"
     },
     "autoload": {
         "psr-4": {
