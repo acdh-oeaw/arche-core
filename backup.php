@@ -25,14 +25,36 @@
  * THE SOFTWARE.
  */
 
+$composerDir = realpath(__DIR__);
+while ($composerDir !== false && !file_exists("$composerDir/vendor")) {
+    $composerDir = realpath("$composerDir/..");
+}
+require_once "$composerDir/vendor/autoload.php";
+
+use splitbrain\PHPArchive\Tar;
+use zozlak\logging\Log;
+use Psr\Log\LogLevel;
+
 class BackupException extends Exception {
     
 }
 
-$params = [];
+$params = [
+    'compression'      => 'none',
+    'compressionLevel' => 3,
+    'lock'             => 'wait',
+    'chunkSize'        => 0,
+    'include'          => 'all',
+    'checkOnly'        => false,
+    'help'             => false,
+];
 $n      = 0;
 for ($i = 1; $i < count($argv); $i++) {
-    if (substr($argv[$i], 0, 2) === '--') {
+    if ($argv[$i] === '--help') {
+        $params['help'] = true;
+    } elseif ($argv[$i] === '--checkOnly') {
+        $params['checkOnly'] = true;
+    } elseif (substr($argv[$i], 0, 2) === '--') {
         $params[substr($argv[$i], 2)] = $argv[$i + 1];
         $i++;
     } else {
@@ -41,10 +63,10 @@ for ($i = 1; $i < count($argv); $i++) {
     }
 }
 
-$targetFile = $params[1] ?? '';
-if (empty($targetFile) || empty($params[0] ?? '')) {
+$targetFile = $params[0] ?? '';
+if ($params['help'] || empty($targetFile) || empty($params[1] ?? '') && !$params['checkOnly']) {
     exit(<<<AAA
-backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--compression method] [--compressionLevel level] [--include mode] [--lock mode] [--chunkSize sizeMiB] [--dbConn connectionName] repoConfigFile targetFile
+backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--compression method] [--compressionLevel level] [--include mode] [--lock mode] [--chunkSize sizeMiB] [--dbConn connectionName] [--tmpDir tmpDir] [--checkOnly] targetFile repoConfigFile
 
 Creates a repository backup.
 
@@ -60,8 +82,8 @@ Parameters:
     --dateFrom, --dateTo only binaries modified within a given time period are included in the dump
         (--dateFrom default is 1900-01-01T00:00:00, --dateTo default is current date and time)
         --dateFrom takes precedence over --dateFile
-    --compression (default none) compression method - one of none/bzip2/gzip
-    --compressionLevel (default 1) compression level from 1 to 9 to be passed to bzip2/gzip
+    --compression (default none) compression method - one of none/bzip/gzip
+    --compressionLevel (default 3) compression level from 1 to 9
     --include (default all) set of database tables to include:
         none - don't include a database dump
         all - include all tables
@@ -77,22 +99,35 @@ Parameters:
         is created.
         If compression is used, the targetSize files can be smaller than this size.
     --dbConn (default backup) name of the database connection parameters in the config file
+    --tmpDir (default read from the yaml config) temporary directory location. For performance reasons
+        you might prefer to set it to the same directory as the targetFile.
+    --checkOnly if set, the targetFile consistency is checked (hashes of files it contains are checked
+        against hashes in the corresponding .list file) instead of a backup file creation
 
 
 AAA
     );
 }
 
-if (substr($targetFile, 0, 1) !== '/') {
-    $targetFile = getcwd() . '/' . $targetFile;
-}
+$log = new Log('php://stdout', LogLevel::DEBUG);
 try {
+    if (substr($targetFile, 0, 1) !== '/') {
+        $targetFile = getcwd() . '/' . $targetFile;
+    }
+    $targetFile = preg_replace('`[.][^./]+$`', '', $targetFile);
+    if (!file_exists(dirname($targetFile)) || !is_dir(dirname($targetFile))) {
+        throw new Exception("Target location '" . dirname($targetFile) . "' does not exist or is not a directory");
+    }
+    if ($params['checkOnly']) {
+        goto CHECK;
+    }
+
     // CONFIG PARSING
-    if (!file_exists($params[0])) {
+    if (!file_exists($params[1])) {
         print_r($params);
         throw new Exception('Repository config yaml file does not exist');
     }
-    $cfg = yaml_parse_file($params[0]);
+    $cfg = yaml_parse_file($params[1]);
     if ($cfg === false) {
         throw new Exception('Repository config yaml file can not be parsed as YAML');
     }
@@ -101,6 +136,12 @@ try {
     if (substr($cfg->storage->dir, 0, 1) !== '/') {
         throw new Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
     }
+
+    $tmpDir = $params['tmpDir'] ?? $cfg->storage->tmpDir;
+    if (!file_exists($tmpDir) || !is_dir($tmpDir)) {
+        throw new Exception("Temporary directory '$tmpDir' does not exist or is not a directory");
+    }
+    $tmpFileBase = $tmpDir . '/' . basename($targetFile);
 
     $pgdumpConnParam = ['host' => '-h', 'port' => '-p', 'dbname' => '', 'user' => '-U'];
     $connName        = $params['dbConn'] ?? 'backup';
@@ -120,9 +161,6 @@ try {
         }
     }
 
-    $targetFileSql  = $cfg->storage->dir . '/' . basename($targetFile) . '.sql';
-    $targetFileList = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.list';
-
     if (isset($params['dateFile'])) {
         $params['dateFile'] = realpath(dirname($params['dateFile'])) . '/' . basename($params['dateFile']);
         if (!isset($params['dateFrom']) && file_exists($params['dateFile'])) {
@@ -132,10 +170,10 @@ try {
     $params['dateFrom'] = $params['dateFrom'] ?? '1900-01-01 00:00:00';
     $params['dateTo']   = $params['dateTo'] ?? date('Y-m-d H:i:s');
 
-    echo "Dumping binaries for time period " . $params['dateFrom'] . " - " . $params['dateTo'] . "\n";
+    $log->info("Dumping binaries for time period " . $params['dateFrom'] . " - " . $params['dateTo']);
 
     // BEGINNING TRANSACTION
-    echo "Acquiring database locks\n";
+    $log->info("Acquiring database locks");
 
     try {
         $pdo = new PDO($pdoConnStr);
@@ -170,19 +208,12 @@ try {
         $cfg->schema->binarySize,
     ];
 
-    switch ($params['lock'] ?? 'none') {
-        case 'try':
-            $matchQuery = $matchQuery . " FOR UPDATE NOWAIT";
-            break;
-        case 'wait':
-            $matchQuery = $matchQuery . " FOR UPDATE";
-            break;
-        case 'skip':
-            $matchQuery = $matchQuery . " FOR UPDATE SKIP LOCKED";
-            break;
-        default:
-            throw new BackupException('Unknown lock method - should be one of try/wait/skip');
-    }
+    $matchQuery .= match ($params['lock']) {
+        'try' => " FOR UPDATE NOWAIT",
+        'wait' => " FOR UPDATE",
+        'skip' => " FOR UPDATE SKIP LOCKED",
+        default => throw new BackupException("Unknown lock method '" . $params['lock'] . "' - should be one of try/wait/skip"),
+    };
     $matchQuery = $pdo->prepare("
         UPDATE resources SET transaction_id = ? WHERE id IN ($matchQuery)
     ");
@@ -199,21 +230,26 @@ try {
 
     // DATABASE
     if ($params['include'] !== 'none') {
-        $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions --snapshot $snapshot -f $targetFileSql";
+        $sqlFile   = $tmpFileBase . '.sql';
+        $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions --snapshot $snapshot -f $sqlFile";
         $dbDumpCmd .= ($params['include']) == 'skipSearch' ? ' -T full_text_search -T spatial_search' : '';
         $dbDumpCmd .= ($params['include']) == 'skipHistory' ? ' -T metadata_history' : '';
         $dbDumpCmd .= ($params['include']) == 'skipSearchHistory' ? ' -T full_text_search -T metadata_history' : '';
-        echo "Dumping database with:\n\t$dbDumpCmd\n";
+        $log->info("Dumping database with: $dbDumpCmd");
         $out       = $ret       = null;
         exec($dbDumpCmd, $out, $ret);
         if ($ret !== 0) {
             throw new Exception("Dumping database failed:\n\n" . implode("\n", $out));
         }
-        printf("\tdump size: %.3f MB\n", filesize($targetFileSql) / 1024 / 1024);
+        $log->info(sprintf("    dump size: %.3f MB\n", filesize($sqlFile) / 1024 / 1024));
         $pdo->commit(); // must be here so the snapshot passed to pg_dump exists
     }
-    // BINARIES LIST FILE
-    echo "Preparing binary files list\n";
+    // BINARIES
+    $log->info("Selecting binaries");
+    $query = $pdo->prepare("SELECT count(*), sum(value_n) FROM resources JOIN metadata USING (id) WHERE transaction_id = ? AND property = ?");
+    $query->execute([$txId, $cfg->schema->binarySize]);
+    list($totalN, $totalSize) = $query->fetch(PDO::FETCH_NUM);
+    $log->info("    found $totalN file(s) with a total size of " . round($totalSize >> 20, 3) . " MB");
 
     function getStorageDir(int $id, string $path, int $level, int $levelMax): string {
         if ($level < $levelMax) {
@@ -222,93 +258,166 @@ try {
         }
         return $path;
     }
-    $out           = $ret           = null;
-    exec('pv -h', $out, $ret);
-    $pv            = $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a'" : '';
-    $level         = $params['compressionLevel'] ?? 1;
-    $tarCmdTmpl    = "tar -c -T $targetFileList $pv";
-    $tarCmdTmpl    .= match ($params['compression'] ?? '') {
-        'gzip' => " | gzip  -$level -c",
-        'bzip2' => " | bzip2 -$level -c",
-        default => '',
-    };
-    $tarCmdTmpl    .= " > %targetFile% ; exit \${PIPESTATUS[0]}";
-    $targetFileExt = match ($params['compression'] ?? '') {
-        'gzip' => '.gz',
-        'bzip2' => '.bz',
-        default => '.tar',
-    };
-    $chunkNo       = 0;
-    $targetFiles   = [];
 
-    /**
-     * @param resource $tflHandle
-     */
-    function writeOutput($tflHandle, int $chunkNo): mixed {
-        global $targetFiles, $targetFile, $tarCmdTmpl, $targetFileList, $targetFileExt;
-
-        fclose($tflHandle);
-
-        $tfName        = $targetFile . ($chunkNo > 0 ? "_$chunkNo" : '') . $targetFileExt;
-        $targetFiles[] = $tfName;
-        $targetFiles[] = $tfName . '.tmp';
-        $tflName       = preg_replace('/[.][^.]+$/', '.list', $tfName);
-        $targetFiles[] = $tflName;
-        $tarCmd        = str_replace('%targetFile%', $tfName . '.tmp', $tarCmdTmpl);
-        echo "Creating dump with:\n\t$tarCmd\n";
-        $ret           = null;
-        system('bash -c ' . escapeshellarg($tarCmd), $ret); // bash is needed to use the $PIPESTATUS
-        if ($ret !== 0) {
-            throw new Exception("Dump file creation failed");
-        }
-        rename($targetFileList, $tflName);
-        rename($tfName . '.tmp', $tfName);
-        return fopen($targetFileList, 'w') ?: throw new Exception('Can not create binary files index file');
-        ;
+    function renameTmp(string $targetFile, int $part, string $tmpArchivePath,
+                       string $tmpListPath, string $compression): void {
+        global $log;
+        $log->info("    closing chunk $part");
+        $ext  = match ($compression) {
+            'bzip' => '.tbz',
+            'gzip' => '.tgz',
+            default => '.tar',
+        };
+        $part = $part > 0 ? "_part$part" : "";
+        rename($tmpArchivePath, "$targetFile$part$ext");
+        rename($tmpListPath, "$targetFile$part.list");
+        $log->info("        ended");
     }
-    $chunkSize = (($params['chunkSize'] ?? 0) << 20) ?: PHP_INT_MAX;
-    $nStrip    = strlen(preg_replace('|/$|', '', $cfg->storage->dir)) + 1;
-    chdir($cfg->storage->dir);
 
-    $query = $pdo->prepare("SELECT count(*), sum(value_n) FROM resources JOIN metadata USING (id) WHERE transaction_id = ? AND property = ?");
-    $query->execute([$txId, $cfg->schema->binarySize]);
-    list($n, $totalSize) = $query->fetch(PDO::FETCH_NUM);
-    $size  = sprintf('%.3f', $totalSize / 1024 / 1024);
-    echo "\tfound $n file(s) with a total size of $size MB\n";
+    function createArchive(string $path, array $params): Tar {
+        $tar         = new Tar();
+        $compression = match ($params['compression']) {
+            'bzip' => Tar::COMPRESS_BZIP,
+            'gzip' => Tar::COMPRESS_GZIP,
+            default => null,
+        };
+        if (!empty($compression)) {
+            $tar->setCompression($params['compressionLevel'], $compression);
+        }
+        $tar->create($path);
+        return $tar;
+    }
+    $chunksCount    = 0;
+    $chunkMaxSize   = ($params['chunkSize'] << 20) ?: PHP_INT_MAX;
+    $pathCutpoint   = strlen(preg_replace('|/$|', '', $cfg->storage->dir)) + 1;
+    $tmpArchivePath = $tmpFileBase . '.archive';
+    $tmpListPath    = $tmpFileBase . '.list';
+    $tmpArchive     = createArchive($tmpArchivePath, $params);
+    $tmpList        = fopen($tmpListPath, 'w');
+    if ($tmpList === false) {
+        throw new Exception("Failed to open files list file '$tmpListPath' for writing");
+    }
 
-    $query       = $pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
-    $query->execute([$txId]);
-    $tflHandle   = fopen($targetFileList, 'w') ?: throw new Exception('Can not create binary files index file');
-    $size        = $chunksCount = 0;
-    while ($id          = $query->fetchColumn()) {
-        $path = getStorageDir($id, $cfg->storage->dir, 0, $cfg->storage->levels) . '/' . $id;
+    $query  = $pdo->prepare("SELECT id, value AS hash FROM resources JOIN metadata USING (id) WHERE transaction_id = ? AND property = ?");
+    $query->execute([$txId, $cfg->schema->hash]);
+    $size   = $SIZE   = 0;
+    $n      = $N      = 0;
+    $t      = $tStart = time();
+    $log->info("Creating backup file(s) using $tmpArchivePath temp file");
+    while ($res    = $query->fetch(PDO::FETCH_OBJ)) {
+        $path = getStorageDir($res->id, $cfg->storage->dir, 0, $cfg->storage->levels) . '/' . $res->id;
         if (!file_exists($path)) {
-            echo "\twarning - binary $path is missing\n";
+            $log->error("binary $path is missing");
             continue;
         }
         $fSize = filesize($path);
-        fwrite($tflHandle, substr($path, $nStrip) . "\n");
-        $n++;
+        $lPath = substr($path, $pathCutpoint);
+        fwrite($tmpList, "$lPath,$res->hash\n");
+        $tmpArchive->addFile($path, $lPath);
         $size  += $fSize;
-        if ($size > $chunkSize) {
+        $SIZE  += $fSize;
+        $n++;
+        $N++;
+        if (time() - $t > 10) {
+            $t = time();
+            $log->debug("~   $N / $totalN (" . round(100 * $N / $totalN, 2) . "%) " . ($SIZE >> 20) . "MB / " . ($totalSize >> 20) . "MB (" . round(100 * $SIZE / $totalSize, 2) . "%) " . round($t - $tStart) . " s");
+        }
+        if ($size > $chunkMaxSize) {
+            $tmpArchive->close();
+            fclose($tmpList);
             $chunksCount++;
-            $tflHandle = writeOutput($tflHandle, $chunksCount);
-            $size      = 0;
+            renameTmp($targetFile, $chunksCount, $tmpArchivePath, $tmpListPath, $params['compression']);
+            $tmpArchive = createArchive($tmpArchivePath, $params);
+            $tmpList    = fopen($tmpListPath, 'w');
+            if ($tmpList === false) {
+                throw new Exception("Failed to open files list file '$tmpListPath' for writing");
+            }
+            $size = 0;
+            $n    = 0;
         }
     }
-    if (file_exists($targetFileSql)) {
-        fwrite($tflHandle, basename($targetFileSql) . "\n");
+    if (isset($sqlFile) && file_exists($sqlFile)) {
+        $log->info("    adding SQL dump file");
+        $n++;
+        $N++;
+        fwrite($tmpList, "dbdump.sql,sha1:" . sha1_file($sqlFile) . "\n");
+        $tmpArchive->addFile($sqlFile, 'dbdump.sql');
     }
-    $chunksCount += $chunksCount > 0;
-    $tflHandle   = writeOutput($tflHandle, $chunksCount);
-    fclose($tflHandle);
+    $tmpArchive->close();
+    fclose($tmpList);
+    if ($n > 0 || $N === 0) {
+        $chunksCount += $chunksCount > 0;
+        renameTmp($targetFile, $chunksCount, $tmpArchivePath, $tmpListPath, $params['compression']);
+    }
+
+    // CHECKING HASHES
+    CHECK:
+    $targetFiles = array_merge(
+        glob($targetFile . "*tar"),
+        glob($targetFile . "*tgz"),
+        glob($targetFile . "*tbz"),
+    );
+    if (count($targetFiles) === 0) {
+        $log->warning("No backup files to check");
+    }
+    foreach ($targetFiles as $i) {
+        $log->info("Checking content of $i");
+        $listFile = dirname($i) . '/' . preg_replace('/[^.]+$/', 'list', basename($i));
+        if (!file_exists($listFile)) {
+            $log->error("list file for $i not found");
+            continue;
+        }
+        // read reference hashes
+        $ref      = [];
+        $listFile = fopen($listFile, 'r');
+        while (($l        = fgetcsv($listFile)) && count($l) === 2) {
+            $ref[$l[0]] = $l[1];
+        }
+        fclose($listFile);
+        $N        = count($ref);
+        // read the file
+        $dataFile = new Tar();
+        $dataFile->open($i);
+        $t        = $tStart   = time();
+        $n        = 0;
+        foreach ($dataFile->yieldContents() as $i) {
+            if ($i->getIsdir()) {
+                continue;
+            }
+            $n++;
+            $path = $i->getPath();
+            if (!isset($ref[$path])) {
+                $log->error("$path not in the list file");
+                continue;
+            }
+            list($algo, $refhash) = explode(':', $ref[$path]);
+            $hash  = hash_init($algo);
+            while ($chunk = $dataFile->readCurrentEntry(4194304)) {
+                hash_update($hash, $chunk);
+            }
+            $hash = hash_final($hash);
+            if ($refhash !== $hash) {
+                $log->error("$path hash $hash does not match hash from the list file $refhash");
+                $exit = 2;
+            }
+            unset($ref[$path]);
+            if (time() - $t > 10) {
+                $t = time();
+                $log->debug("~   $n / $N (" . round(100 * $n / $N, 2) . "%) " . round($t - $tStart) . " s");
+            }
+        }
+        foreach ($ref as $path) {
+            $log->error("$path not in the backup");
+            $exit = 2;
+        }
+    }
 
     // FINISHING
-    if (isset($params['dateFile'])) {
-        echo "Updating date file '" . $params['dateFile'] . "' with " . $params['dateTo'] . "\n";
+    if (isset($params['dateFile']) && !isset($exit)) {
+        $log->info("Updating date file '" . $params['dateFile'] . "' with " . $params['dateTo']);
         file_put_contents($params['dateFile'], $params['dateTo']);
     }
-    echo "Dump completed successfully\n";
+    $log->info("Dump completed " . (isset($exit) ? 'wit errors' : 'successfully'));
 } catch (BackupException $e) {
     // Well-known errors which don't require stack traces
     foreach ($targetFiles ?? [] as $i) {
@@ -316,26 +425,25 @@ try {
             unlink($i);
         }
     }
-    echo 'ERROR: ' . $e->getMessage() . "\n";
+    $log->error($e->getMessage());
     $exit = 1;
 } catch (Throwable $e) {
-    foreach ($targetFiles ?? [] as $i) {
+    throw $e;
+} finally {
+    if (is_resource($tmpList ?? null)) {
+        fclose($tmpList);
+    }
+    if (isset($tmpArchive)) {
+        unset($tmpArchive);
+    }
+    $tmpFileBase ??= "/__no such dir__/";
+    foreach (array_merge([$sqlFile ?? ''], glob("$tmpFileBase*")) as $i) {
         if (file_exists($i)) {
             unlink($i);
         }
     }
-    throw $e;
-} finally {
-    if (is_resource($tflHandle ?? null)) {
-        fclose($tflHandle);
-    }
-    foreach ([$targetFileSql ?? '', $targetFileList ?? ''] as $f) {
-        if (file_exists($f)) {
-            unlink($f);
-        }
-    }
     if (isset($pdo) && !empty($txId)) {
-        echo "Releasing database locks\n";
+        $log->info("Releasing database locks");
         $query = $pdo->prepare("UPDATE resources SET transaction_id = NULL WHERE transaction_id = ?");
         $query->execute([$txId]);
         $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
