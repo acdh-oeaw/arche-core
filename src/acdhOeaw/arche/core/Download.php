@@ -180,8 +180,16 @@ class Download {
      */
     private function collectChildren(array $ids): array {
         $baseUrl = RC::$config->rest->urlBase . RC::$config->rest->pathBase;
-        $query   = RC::$pdo->prepare("SELECT (get_relatives(id, ?, 999999, 0, false, false)).id FROM identifiers WHERE ids = ?");
-        $param   = [RC::$schema->parent, null];
+        $query   = RC::$pdo->prepare("
+            SELECT gr.id 
+            FROM 
+                identifiers i,
+                LATERAL get_relatives(i.id, ?, 999999, 0, false, false) gr
+            WHERE
+                i.ids = ?
+                AND EXISTS (SELECT 1 FROM metadata WHERE id = gr.id AND property = ?)
+        ");
+        $param   = [RC::$schema->parent, null, RC::$schema->binarySize];
         $allIds  = [];
         foreach ($ids as $id) {
             $param[1] = is_numeric($id) ? $baseUrl . $id : $id;
