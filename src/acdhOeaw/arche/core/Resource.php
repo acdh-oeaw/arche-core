@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core;
 
 use Throwable;
+use PDOException;
 use quickRdf\Dataset;
 use quickRdf\Quad;
 use quickRdf\DataFactory as DF;
@@ -124,7 +125,7 @@ class Resource {
         $query = RC::$pdo->prepare("CREATE TEMPORARY TABLE delres AS SELECT ?::bigint AS id");
         $query->execute([$srcId]);
         $this->deleteCheckReferences(RC::$transaction->getId(), true);
-        
+
         $srcMeta    = new Metadata($srcId);
         $srcMeta->loadFromDb(RRI::META_RESOURCE);
         $srcMeta    = $srcMeta->getDatasetNode();
@@ -316,12 +317,7 @@ class Resource {
             http_response_code(201);
             $this->getMetadata();
         } catch (Throwable $e) {
-            try {
-                RC::$transaction->deleteResource($this->id);
-            } catch (\Throwable $de) {
-                RC::$log->error($de);
-            }
-            throw $e;
+            $this->cancelResourceCreation($e);
         }
     }
 
@@ -351,8 +347,7 @@ class Resource {
             http_response_code(201);
             $this->getMetadata();
         } catch (Throwable $e) {
-            RC::$transaction->deleteResource($this->id);
-            throw $e;
+            $this->cancelResourceCreation($e);
         }
     }
 
@@ -541,5 +536,18 @@ class Resource {
                 $meta->save();
             }
         }
+    }
+
+    private function cancelResourceCreation(Throwable $e): void {
+        try {
+            RC::$transaction->deleteResource($this->id);
+        } catch (Throwable $de) {
+            if($de instanceof PDOException && $de->getCode() === Transaction::PG_FOREIGN_KEY_VIOLATION) {
+                RC::$log->error("Aborting resource creation failed - it is already referenced by other resources");
+            } else {
+                RC::$log->error($de);
+            }
+        }
+        throw $e;
     }
 }
