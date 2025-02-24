@@ -965,9 +965,10 @@ class SearchTest extends TestBase {
                 self::$config->rest->headers->metadataReadMode => RRI::META_NONE,
             ],
         ];
-        $resp = self::$client->request('get', self::$baseUrl . 'search', $opts);
-        $this->assertEquals(204, $resp->getStatusCode());
-        $this->assertEmpty((string) $resp->getBody());
+        $g    = $this->runSearch($opts);
+        $this->assertCount(2, $g);
+        $this->assertEquals(1, (int) $g->getObjectValue(new PT(self::$schema->searchCount)));
+        $this->assertTrue($g->any(new QT($this->m[1]->getNode(), self::$schema->searchMatch)));
     }
 
     public function testWrongHttpMethod(): void {

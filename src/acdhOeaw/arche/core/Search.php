@@ -87,10 +87,6 @@ class Search {
 
         $meta = new MetadataReadOnly(0);
         $meta->loadFromPdoStatement($repo, $pdoStmnt, true);
-        if ($config->metadataMode === RRI::META_NONE) {
-            http_response_code(204);
-            return;
-        }
         $format = Metadata::negotiateFormat();
         RC::setOutput($meta, $format);
     }
