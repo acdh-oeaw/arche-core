@@ -108,21 +108,27 @@ class BinaryPayload {
         } else {
             RC::$log->debug("\tskipping full text search update (tika: $tikaFlag, size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
+        // image dimensions
+        if (str_starts_with($mimeType, 'image/')) {
+            $this->readImageDimensions();
+        }
         // spatial search
-        $query    = RC::$pdo->prepare("DELETE FROM spatial_search WHERE id = ?");
+        $query     = RC::$pdo->prepare("DELETE FROM spatial_search WHERE id = ?");
         $query->execute([$this->id]);
-        $c        = RC::$config->spatialSearch;
+        $c         = RC::$config->spatialSearch;
+        $dimSize   = 3 * ($this->imagePxHeight ?? 0) * ($this->imagePxWidth ?? 0);
+        $sizeLimit = $this->toBytes($c->sizeLimit);
+        if ($dimSize > 0) {
+            $sizeFlag = $dimSize <= $sizeLimit;
+        } else {
+            $sizeFlag = $this->size > 0 && $this->size <= $sizeLimit;
+        }
         $mimeFlag = isset($c->mimeTypes->$mimeType);
-        $sizeFlag = $this->size <= $this->toBytes($c->sizeLimit) && $this->size > 0;
         if ($mimeFlag && $sizeFlag) {
             RC::$log->debug("\tupdating spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
             $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
             RC::$log->debug("\tskipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
-        }
-        // image dimensions
-        if (str_starts_with($mimeType, 'image/')) {
-            $this->readImageDimensions();
         }
 
         $targetPath = $this->getPath(true);
