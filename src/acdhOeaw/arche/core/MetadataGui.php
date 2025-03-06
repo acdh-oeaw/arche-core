@@ -38,6 +38,7 @@ use acdhOeaw\arche\core\util\Triple;
  */
 class MetadataGui {
 
+    const NO_TYPE    = [RDF::XSD_STRING, RDF::RDF_LANG_STRING];
     const CHILD_PROP = 'Child resources';
     const TYPE_ID    = 'ID';
     const TYPE_REL   = 'REL';
@@ -178,7 +179,7 @@ TMPL;
         unset($v);
 
         foreach ($this->titles as $k => &$v) {
-            $v = htmlentities((string) $v->value);
+            $v = htmlspecialchars((string) $v->value);
         }
         unset($v);
     }
@@ -199,7 +200,7 @@ TMPL;
         fwrite($this->stream, sprintf(self::TMPL, $title, $header));
 
         foreach ($this->data as $id => $props) {
-            fwrite($this->stream, '        <a href="' . htmlentities($baseUrl . $id) . '" class="s">' . $this->formatResource($baseUrl . $id) . "</a>\n");
+            fwrite($this->stream, '        <a href="' . htmlspecialchars($baseUrl . $id) . '" class="s">' . $this->formatResource($baseUrl . $id) . "</a>\n");
             // title
             $this->outputProperty($props[$titleProp] ?? [], $titleProp, $baseUrl);
             // ids
@@ -228,7 +229,7 @@ TMPL;
      */
     private function outputProperty(array $values, string $p, string $baseUrl): void {
         if (count($values) > 0) {
-            fwrite($this->stream, '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n");
+            fwrite($this->stream, '<div class="p"><a href="' . htmlspecialchars($p) . '">' . $this->properties[$p] . "</a></div>\n");
             foreach ($values as $n => $t) {
                 fwrite($this->stream, '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n");
             }
@@ -241,25 +242,25 @@ TMPL;
             if ($o->type === self::TYPE_REL) {
                 $o->value = $baseUrl . $o->value;
             }
-            $href   = htmlentities($o->value);
-            $suffix = substr($o->value, 0, strlen($baseUrl)) === $baseUrl ? '/metadata' : '';
+            $href   = htmlspecialchars($o->value);
+            $suffix = htmlspecialchars(substr($o->value, 0, strlen($baseUrl)) === $baseUrl ? '/metadata' : '');
             return sprintf('<a href="%s%s">%s</a>', $href, $suffix, $this->formatResource($o->value));
         } else {
-            $l = empty($o->lang) ? '' : ('@' . $o->lang);
-            $t = empty($o->type) || $o->type === RDF::XSD_STRING ? '' : ('^^' . $o->type);
-            return sprintf('"%s"<span class="tl">%s</span>', $o->value, $l . $t);
+            $l = htmlspecialchars(empty($o->lang) ? '' : ('@' . $o->lang));
+            $t = empty($o->type) || in_array($o->type, self::NO_TYPE) ? '' : ('^^' . $this->formatResource($o->type, false));
+            return sprintf('"%s"<span class="tl">%s</span>', htmlspecialchars($o->value), $l . $t);
         }
     }
 
     private function formatResource(string $res, bool $tryTitles = true): string {
         if ($tryTitles && isset($this->titles[$res])) {
-            return htmlentities($this->titles[$res]);
+            return $this->titles[$res];
         }
         foreach ($this->nmsp as $n => $u) {
             if (substr($res, 0, strlen($u)) === $u) {
                 return $n . ':' . substr($res, strlen($u));
             }
         }
-        return '&lt;' . htmlentities($res) . '&gt;';
+        return '&lt;' . htmlspecialchars($res) . '&gt;';
     }
 }
