@@ -58,9 +58,9 @@ class Transaction {
     const STMT_TIMEOUT_DEFAULT     = 60000;
 
     private ?int $id              = null;
-    private string $startedAt       = '';
-    private string $lastRequest     = '';
-    private string $state           = self::STATE_NOTX;
+    private string $startedAt     = '';
+    private string $lastRequest   = '';
+    private string $state         = self::STATE_NOTX;
     private string $snapshot;
     private bool $lockedResources = false;
 
@@ -332,6 +332,15 @@ class Transaction {
             RC::$handlersCtl->handleTransaction('commit', (int) $this->id, $this->getResourceList());
 
             RC::$log->debug('Cleaning up transaction ' . $this->id);
+
+            // remove binary backup files
+            $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+            $query->execute([$this->id]);
+            while ($id    = $query->fetchColumn()) {
+                $bin = new BinaryPayload($id);
+                $bin->delete((string) $this->id);
+            }
+
             $query = $this->pdo->prepare("
                 DELETE FROM resources
                 WHERE transaction_id = ? AND state = ?

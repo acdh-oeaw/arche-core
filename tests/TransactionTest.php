@@ -160,6 +160,8 @@ class TransactionTest extends TestBase {
         $this->assertGreaterThan(0, $txId);
 
         $location = $this->createBinaryResource($txId);
+        $globPath = $this->getGlobPath($location);
+        $this->assertCount(1, glob($globPath));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -171,14 +173,18 @@ class TransactionTest extends TestBase {
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
+        $this->assertCount(0, glob($globPath . "*"));
     }
 
     public function testDeleteRollback(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
+        $globPath = $this->getGlobPath($location);
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertCount(1, glob($globPath));
+        $this->assertCount(1, glob($globPath . "*"));
 
         // begin a transaction
         $txId = $this->beginTransaction();
@@ -191,10 +197,14 @@ class TransactionTest extends TestBase {
         $meta = new Dataset();
         $meta->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertTrue($meta->any(new QT(DF::namedNode($location), self::$schema->id, DF::namedNode($location))));
+        $this->assertCount(0, glob($globPath));
+        $this->assertCount(1, glob($globPath . "." . $txId));
 
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertCount(0, glob($globPath));
+        $this->assertCount(1, glob($globPath . "." . $txId));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -207,6 +217,8 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
+        $this->assertCount(1, glob($globPath));
+        $this->assertCount(1, glob($globPath . "*"));
     }
 
     public function testPatchMetadataRollback(): void {

@@ -542,7 +542,7 @@ class Resource {
         try {
             RC::$transaction->deleteResource($this->id);
         } catch (Throwable $de) {
-            if($de instanceof PDOException && $de->getCode() === Transaction::PG_FOREIGN_KEY_VIOLATION) {
+            if ($de instanceof PDOException && $de->getCode() === Transaction::PG_FOREIGN_KEY_VIOLATION) {
                 RC::$log->error("Aborting resource creation failed - it is already referenced by other resources");
             } else {
                 RC::$log->error($de);

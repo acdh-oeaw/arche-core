@@ -42,6 +42,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use acdhOeaw\arche\core\Metadata;
 use acdhOeaw\arche\lib\Config;
+use acdhOeaw\arche\core\BinaryPayload;
 use acdhOeaw\arche\core\util\Schema;
 
 /**
@@ -375,5 +376,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         }
         curl_multi_close($handle);
         return $responses;
+    }
+
+    protected function getGlobPath(string $location): string {
+        $cfg = self::$config->storage;
+        $id  = preg_replace('`^.*/`', '', $location);
+        return BinaryPayload::getStorageDir($id, $cfg->dir, 0, $cfg->levels) . '/' . $id;
     }
 }

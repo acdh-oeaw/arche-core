@@ -125,6 +125,9 @@ class RestTest extends TestBase {
 
     public function testResourceDelete(): void {
         $location = $this->createBinaryResource();
+        $globPath = $this->getGlobPath($location);
+        $this->assertCount(1, glob($globPath));
+        $this->assertCount(1, glob($globPath . "*"));
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -135,6 +138,8 @@ class RestTest extends TestBase {
         $meta = new DatasetNode(DF::namedNode($location));
         $meta->add(RdfIoUtil::parse($resp, new DF()));
         $this->assertEquals($location, $meta->getObjectValue(new PT(self::$schema->id)));
+        $this->assertCount(0, glob($globPath));
+        $this->assertCount(1, glob($globPath . "." . $txId));
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -145,6 +150,7 @@ class RestTest extends TestBase {
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
+        $this->assertCount(0, glob($globPath . '*'));
     }
 
     public function testTombstoneDelete(): void {
@@ -323,9 +329,11 @@ class RestTest extends TestBase {
     public function testPut(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
+        $globPath = $this->getGlobPath($location);
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertCount(1, glob($globPath));
 
         $txId    = $this->beginTransaction();
         $headers = [
@@ -346,6 +354,8 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
         $this->assertStringContainsString("<$location/metadata>; rel=\"alternate\"", $resp->getHeader('Link')[0] ?? '');
+        $this->assertCount(1, glob($globPath));
+        $this->assertCount(1, glob($globPath . '.' . $txId));
 
         $this->commitTransaction($txId);
 
@@ -353,6 +363,8 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
+        $this->assertCount(1, glob($globPath));
+        $this->assertCount(1, glob($globPath . '*'));
     }
 
     public function testPutReturnMeta(): void {
