@@ -148,7 +148,7 @@ RETURNS TABLE(id bigint, role text, privilege text) LANGUAGE sql STABLE PARALLEL
     FROM resources JOIN metadata USING (id) 
     WHERE property = read_prop 
   UNION
-    SELECT id, value, 'read' 
+    SELECT id, value, 'write' 
     FROM resources JOIN metadata USING (id) 
     WHERE property = write_prop
   ;
@@ -247,10 +247,10 @@ CREATE OR REPLACE FUNCTION get_relatives_metadata(
     max_depth_up integer DEFAULT 999999, 
     max_depth_down integer default -999999, 
     neighbors bool default true,
-    reverse bool default false
+    reverse int default 0
 ) RETURNS SETOF metadata_view LANGUAGE sql STABLE PARALLEL SAFE AS $$
     WITH ids AS (
-        SELECT * FROM get_relatives(res_id, rel_prop, max_depth_up, max_depth_down, neighbors, reverse)
+        SELECT * FROM get_relatives(res_id, rel_prop, max_depth_up, max_depth_down, neighbors, reverse > 0)
     )
     SELECT id, property, type, lang, value
     FROM metadata JOIN ids USING (id)
@@ -260,6 +260,9 @@ CREATE OR REPLACE FUNCTION get_relatives_metadata(
   UNION
     SELECT id, property, 'REL'::text AS type, null::text AS lang, target_id::text AS value
     FROM relations r JOIN ids USING (id)
+  UNION
+    SELECT r.id, property, 'REL'::text AS type, null::text AS lang, target_id::text AS value
+    FROM relations r JOIN ids ON reverse = -1 AND r.target_id = ids.id
   ;
 $$;
 
