@@ -95,6 +95,7 @@ CREATE INDEX full_text_search_id_index ON full_text_search USING btree (id);
 CREATE INDEX full_text_search_iid_index ON full_text_search USING btree (iid);
 CREATE INDEX full_text_search_mid_index ON full_text_search USING btree (mid);
 CREATE INDEX full_text_search_text_index ON full_text_search USING gin (segments);
+CREATE INDEX full_text_search_raw_gindex ON full_text_search USING gin (raw gin_trgm_ops);
 
 CREATE TABLE spatial_search (
     spid bigint DEFAULT nextval('spid_seq') NOT NULL PRIMARY KEY,
