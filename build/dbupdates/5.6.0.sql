@@ -25,4 +25,8 @@ CREATE OR REPLACE FUNCTION get_relatives_metadata(
   ;
 $$;
 
+CREATE OR REPLACE FUNCTION get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF metadata_view LANGUAGE sql STABLE PARALLEL SAFE AS $$
+    SELECT * FROM get_relatives_metadata(res_id, null, 0, 0, true, 1);
+$$;
+
 COMMIT;
