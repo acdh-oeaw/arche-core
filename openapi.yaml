@@ -1,0 +1,1560 @@
+openapi: 3.0.0
+servers:
+  - description: SwaggerHub API Auto Mocking
+    url: https://virtserver.swaggerhub.com/zozlak/arche/1.11.0
+  - description: ARCHE-curation
+    url: https://arche-curation.acdh-dev.oeaw.ac.at/api
+  - description: ARCHE-development
+    url: https://arche-dev.acdh-dev.oeaw.ac.at/api
+  - description: ARCHE-production
+    url: https://arche.acdh.oeaw.ac.at/api
+info:
+  description: ARCHE-core API
+  version: '5.6'
+  title: ARCHE-core API
+  contact:
+    email: mateusz.zoltak@oeaw.ac.at
+    name: Mateusz Żółtak
+  license:
+    name: MIT
+security:
+  - basicAuth: []
+  - shibboleth: []
+paths:
+  /:
+    post:
+      description: |
+        Create repository resource from a binary payload.
+        
+        Returns created resource's metadata.
+        
+        If repository is set up to perform any metadata correctness checks (especially enforcing some metadata properties presence) it might be impossible to create a resource this way because of HTTP 400 reponse. In such a case create resource from metadata first with `POST /metadata` and then upload the binary with `PUT /{resourceId}`.
+      parameters:
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/contentType'
+      - $ref: '#/components/parameters/contentDisposition'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaFormat'
+      - $ref: '#/components/parameters/transactionIdQ'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      requestBody:
+        description: Payload to be stored as a resource's binary data.
+        required: true
+        content:
+          '*/*':
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Repository resource created
+          headers:
+            location:
+              description: Created repository resource URL
+              schema: 
+                type: string
+                format: uri
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '400':
+          description: Data correctness checks failed
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to create resources
+  /describe:
+    get:
+      description: Returns a YAML file with a repository configuration (to be used e.g. with the arche-lib client library)
+      responses:
+        '200':
+          description: Config returned
+          content:
+            text/vnd.yaml:
+              schema:
+                type: string
+  /user:
+    get:
+      description: Returns a list of user accounts
+      parameters:
+      - $ref: '#/components/parameters/redirect'
+      responses:
+        '200':
+          description: List returned
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  - userId: admin
+                    groups:
+                      - public
+                  - userId: init
+                    groups:
+                      - admin
+                      - public
+                  - userId: public
+                    groups:
+                      - public
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+  /user/logout:
+    get:
+      description: Special endpoint for invalidating HTTP Basic credentials cached by the browser
+      parameters:
+      - $ref: '#/components/parameters/redirect'
+      responses:
+        '401':
+          description: Logged out
+  /user/{userId}:
+    parameters: 
+    - name: userId
+      description: user id
+      in: path
+      required: true
+      schema:
+        type: string
+    get:
+      description: Returns information on a given account
+      responses:
+        '201':
+          description: Information about an account returned
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  - userId: admin
+                    groups:
+                      - public
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+    put:
+      description: Creates a new user account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/user'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/user'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/user'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  - userId: admin
+                    groups:
+                      - public
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+    patch:
+      description: Updates given user account
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/user'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/user'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/user'
+      responses:
+        '200':
+          description: Account update successful
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  - userId: admin
+                    groups:
+                      - public
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+    delete:
+      description: Removes given user account
+      responses:
+        '204':
+          description: Account deleted
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+  /metadata:
+    post:
+      description: |
+        Create repository resource from RDF metadata.
+        
+        Returns created resource's metadata.
+      parameters:
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaFormat'
+      - $ref: '#/components/parameters/transactionIdQ'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      requestBody:
+        description: RDF metadata
+        required: true
+        content:
+          text/turtle:
+            schema:
+              type: string
+          application/n-triples:
+            schema:
+              type: string
+          application/rdf+xml:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: string
+          application/ld+json:
+            schema:
+              type: string
+      responses:
+        '201':
+          description: Repository resource created
+          headers:
+            location:
+              description: Created repository resource URL
+              schema: 
+                type: string
+                format: uri
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '400':
+          description: Data correctness checks failed
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to create resources
+        '409':
+          description: Resource with a given identifier already exists
+  /transaction:
+    post:
+      description: Create a new transaction
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/transactionInfo'
+    get:
+      description: Get information about a transaction
+      parameters:
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      responses:
+        '200':
+          description: Transaction information returned
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/transactionInfo'
+        '400':
+          description: Unknown transaction id
+    put:
+      description: Commit a transaction
+      parameters:
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      responses:
+        '204':
+          description: Transaction commited
+        '400':
+          description: Unknown transaction id
+    delete:
+      description: Rollback a transaction
+      parameters:
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      responses:
+        '204':
+          description: Transaction rolled back
+        '400':
+          description: Unknown transaction id
+  /{resourceId}:
+    get:
+      description: |
+        Get repository resource's binary payload.
+        
+        If a resource lacks binary payload, redirect to the endpoint returning resource's metadata.
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      responses:
+        '200':
+          description: Resource's binary payload
+        '302':
+          description: Resource's metadata location (for a resource without a binary payload)
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to get resource's binary payload
+        '404':
+          description: Resource doesn't exist
+        '410':
+          description: Resource has been deleted (but tombstone exists)
+    put:
+      description: Update (overwrite) repository resource's binary payload
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      - $ref: '#/components/parameters/contentType'
+      - $ref: '#/components/parameters/contentDisposition'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      - $ref: '#/components/parameters/skipContentDisposition'
+      requestBody:
+        description: Payload to be stored as a resource's binary data.
+        required: true
+        content:
+          '*/*':
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Binary payload updated. The response contains up to date resource metadata.
+          content:
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '204':
+          description: Binary payload updated.
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to update the resource
+        '404':
+          description: Resource doesn't exist
+        '409':
+          description: Conflict - operation blocked by another request handled in parallel.
+        '410':
+          description: Resource has been deleted (but tombstone exists)
+    delete:
+      description: |
+        Delete a repository resource.
+        
+        It's worth noting that it's impossible to delete a resource which is pointed by other resources (this triggers a 409 response). To make resource deletion a simpler task the endpoint supports recursive deletion (see the `X-PARENT-PROPERTY` parameter) and automatice references removal (see the `X-WITH-REFERENCES` parameter). Please note the removal time corresponds to the total number of resources to be removed.
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      - $ref: '#/components/parameters/metaFormat'
+      - name: X-PARENT-PROPERTY
+        description: |
+          Triggers a recursive resources deletion.
+          
+          If present, deletion is performed recursively on all resources pointing to the deleted one with this RDF property.
+        in: header
+        required: false
+        schema:
+          type: string
+      - name: parentProperty
+        description: Can be provided instead of the `X-PARENT-PROPERTY` HTTP headers parameter (for more information see the `X-PARENT-PROPERTY` parameter description).
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: X-WITH-REFERENCES
+        description: |
+          Triggers removal of references to deleted resource(s).
+          
+          Allows to delete resource(s) which are still referenced by other ones by removing such references first. It's worth noting a "metadata modification" event is triggered on all resources from which references are removed which may lead to 400 response any handler registered for this event considers the change invalid.
+        in: header
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          maximum: 1
+          default: 0
+      - name: withReferences
+        description: Can be provided instead of the `X-WITH-REFERENCES` HTTP headers parameter (for more information see the `X-WITH-REFERENCES` parameter description).
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Resource(s) deleted. Response contains a list of removed resources' identifiers as RDF.
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '400':
+          description: Removing references to deleted resources causes data inconsistencies. Response content should provide detailed incosistencies description.
+          content:
+            text/html:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to delete at least one of resources to be deleted and or modify at least one resource from which references to deleted resources are to be removed.
+        '404':
+          description: Resource doesn't exist.
+        '409':
+          description: At least one of resources to be deleted/modified is owned by other transaction and/or at least one resource references deleted ones (and `withReferences` parameter is not set).
+          content:
+            text/html:
+              schema:
+                type: string
+        '410':
+          description: Resource is a tombstone one.
+    head:
+      description: Get basic information (size, mime type, filename) about a repository resource's binary payload
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      responses:
+        '200':
+          description: Basic information about a repository resource's binary as Content-Disposition, Content-Length and Content-Type HTTP headers
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to get resource's binary payload
+        '404':
+          description: Resource doesn't exist
+        '410':
+          description: Resource has been deleted (but tombstone exists)
+  /{resourceId}/metadata:
+    get:
+      description: Get repository resource's RDF metadata
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaResourceProperties'
+      - $ref: '#/components/parameters/metaRelativesProperties'
+      - $ref: '#/components/parameters/metaFormat'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      - $ref: '#/components/parameters/metaResourcePropertiesQ'
+      - $ref: '#/components/parameters/metaRelativesPropertiesQ'
+      responses:
+        '200':
+          description: Metadata returned
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to get resource's metadata
+        '404':
+          description: Resource doesn't exist
+        '410':
+          description: Resource has been deleted (but tombstone exists)
+    patch:
+      description: |
+        Update repository resource's RDF metadata.
+        
+        The exact way the metadata are updated depends on the `X-METADATA-WRITE-MODE` header value.
+        
+        To remove an RDF property values without providing new ones use the `delete://delete` special property. A triple `<resUri> <delete://delete> <propertyToBeRemovedUri>` in the uploaded metadata will remove all `<propertyToBeRemovedUri>` RDF property values from the resulting metadata. It even allows to remove resource identifiers (although the `{repoBaseUrl}/{repoInternalId}` identifier will always persist).
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      - $ref: '#/components/parameters/metaWriteMode'
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaWriteModeQ'
+      - $ref: '#/components/parameters/transactionIdQ'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      requestBody:
+        description: RDF metadata
+        required: true
+        content:
+          text/turtle:
+            schema:
+              type: string
+          application/n-triples:
+            schema:
+              type: string
+          application/rdf+xml:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: string
+          application/ld+json:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Metadata updated - returning metadata after the update
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to update resource's metadata
+        '404':
+          description: Resource doesn't exist
+        '409':
+          description: Conflict - operation blocked by another request handled in parallel.
+        '410':
+          description: Resource has been deleted (but tombstone exists)
+  /{resourceId}/tombstone:
+    delete:
+      description: Delete a tombstone resource
+      parameters:
+      - $ref: '#/components/parameters/resourceId'
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      responses:
+        '200':
+          description: Resource's tombstone deleted. Response contains a single RDF triple with the removed resource identifier.
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to remove resource's tombstone
+        '404':
+          description: Tombstone doesn't exist
+  /merge/{srcResourceId}/{targetResourceId}:
+    put:
+      description: |
+        Merges one resource with the other.
+        
+        Merging is done in a following way:
+        * All identifiers from the source resource are passed to the target one.
+        * All metadata triples pointing to the source resource are redirected to the target one.
+        * The target resource metadata is extended with metadata properties being unique for the source resouce (properties which the target resource doesn't have).
+        * The source resource is deleted.
+        
+        Response contains target resource metadata after the merge.
+      parameters:
+      - name: srcResourceId
+        in: path
+        description: Repository resource internal identifier
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - name: targetResourceId
+        description: URL of a resource to merge into.
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: integer
+      - $ref: '#/components/parameters/transactionId'
+      - $ref: '#/components/parameters/transactionIdQ'
+      - $ref: '#/components/parameters/metaReadMode'
+      - $ref: '#/components/parameters/metaParentProp'
+      - $ref: '#/components/parameters/metaFormat'
+      - $ref: '#/components/parameters/metaReadModeQ'
+      - $ref: '#/components/parameters/metaParentPropQ'
+      responses:
+        '200':
+          description: Resources merged.
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Not authorized to modify source and/or target resource
+        '404':
+          description: Source and/or target resource doesn't exist
+        '409':
+          description: Conflict - operation blocked by another request handled in parallel.
+  /search:
+    get:
+      description: |
+        Searches the repository (GET variant).
+        
+        Search is possible either by providing an SQL query with `sql` and `sqlParam[]` parameters or by providing a set of `property[]`, `operator[]`, `value[]`, `type[]` and `lang[]` parameters.
+        
+        Corresponding `property[]`, `operator[]`, `value[]`, `type[]` and `lang[]` parameter values form search terms. Empty parameter values are interpreted as "any" (with the exception of `operator[]` which is assumed to be = when empty). All search terms must be fulfilled for a resource to match the search.
+        
+        `property[]` and `value[]` allow specyfying alternatives using the `property[n][]` and `value[n][]` syntax, e.g. `property[0][]=foo&property[0][]=bar&property[1]=x&value[0]=baz&value[1][]=y&value[1][]=z` means *a resource with a value of baz either for property foo or bar and at the same time having property x with value y or z*.
+        
+        Search results can be paged using `limit` `offset` and `orderBy[]` parameters. If the `orderBy[]` parameter is used, reponse contains `<resourceURI> <search://order> orderNumber` triples indicating matching resources order.
+        
+        For performing a full text search against binary resource content use the `BINARY` value as a property name and the `@@` as an operator.
+        
+        Number of resources included in the response depends on the metadata read mode specified in the `X-METADATA-READ-MODE` header. Resources matching the search can be distinguished from ones added because of the metadata read mode by a presence of a `<resourceURI> <search://match> true` tripples.
+        
+        Highlighting full text search results is controlled by corresponding sets of `fts*` parameters.
+        
+        Highlighting full text search results is controlled by `fts*` parameters. In the output RDF the highlighted matches are represented by sets of three triples (`{N}` are consecutive numbers from 1 to the number of highlighted matches):
+        * `resourceId schema->searchFts{N} highlightedMatch` storing the hihghlighted match.
+        * `resourceId schema->searchFtsProperty{N} highlightedMatch` storing the metadata property in which the highlighted match was found (or `BINARY` if the match was in the binary content).
+        * `resourceId schema->searchFtsQuery{N} highlightedMatch` storing the hihghlighting query applied (useful when multiple `ftsQuery[]` parameters were provided).
+      parameters:
+        - $ref: '#/components/parameters/metaReadMode'
+        - $ref: '#/components/parameters/metaParentProp'
+        - $ref: '#/components/parameters/metaResourceProperties'
+        - $ref: '#/components/parameters/metaRelativesProperties'
+        - $ref: '#/components/parameters/metaReadModeQ'
+        - $ref: '#/components/parameters/metaParentPropQ'
+        - $ref: '#/components/parameters/metaResourcePropertiesQ'
+        - $ref: '#/components/parameters/metaRelativesPropertiesQ'
+        - in: query
+          name: sql
+          description: |
+            SQL query performing the search and returning a set of resource ids.
+            
+            If query takes parameters, mark them as '?' in the query string and pass their values using the sqlParam[] request parameter.
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: sqlParam[]
+          description: SQL search query parameter values.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: property[]
+          description: |
+            RDF property to search into.
+            
+            * Use the `BINARY` value to search in the resource's binary content.
+            * Prepend the property with a `^` to negate it. A negated property enforces the `rdfs:resource` `type` and the `value` is evaluated against triples subject resource ids (instead of object resources ids). A typical use case would be a search for a parent of a given resource.
+            * The parameter can be double-nested to indicated an alternative, e.g. `property[0][0]=foo` and `property[0][1]=bar` meaning _property "foo" or "bar"_.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: value[]
+          description: |
+            RDF property value to search for
+            
+            The parameter can be double-nested to indicated an alternative, e.g. `value[0][0]=foo` and `value[0][1]=bar` meaning _value "foo" or "bar"_.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: operator[]
+          description: |
+            Operator to be used to compare the search value with the actual values:
+            - `=`
+            - `>`
+            - `<`
+            - `>=`
+            - `<=` 
+            - `~` regular expression match
+            - `@@` full text search match
+            - `&&` spatial intersection (the corresponding `value[]` should be a WKT)
+            - `&&{number}` spatial search - geometry of the binary content/metadata property value within `{number}` meters from the corresponding `value[]` (corresponding `value[]` should be in WKT)
+            - `&<` geometry of the binary content/metadata property value contained in the corresponding `value[]` (corresponding `value[]` should be a WKT)
+            - `&>` geometry of the binary content/metadata property value contais the corresponding `value[]` (corresponding `value[]` should be a WKT)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+            default: =
+            enum:
+            - =
+            - '>'
+            - '<'
+            - '>='
+            - '<='
+            - '~'
+            - '@@'
+            - '&&'
+            - '&>'
+            - '&<'
+        - in: query
+          name: type[]
+          description: RDF property type to search for
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: language[]
+          description: RDF property language to search for
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          description: |
+            Limits the number of reported search results to a given number of resources.
+            
+            The limit is applied **before** gathering additional metadata as specified by the `X-METADATA-READ-MODE` parameter.
+          style: form
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: offset
+          description: |
+            Offset of the reported search result resources.
+            
+            TO be used with the `limit` parameter.
+          style: form
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: orderBy[]
+          description: |
+            RDF property(ies) to be used for ordering search results if `limit` and/or `offset` parameters are provided.
+            
+            Remarks:
+            
+            * If the parameter isn't provided, search results are sorted by the internal resource id.
+            * Only literal values are used for sorting.
+            * To get descending order, prefix the property URI with a dash, e.g. `^http://sample/property`
+            * If `orderByLang` is specified values tagged with non-matching lang tag are skipped while values without the lang tag are still used.
+            * If (after applying the `orderByLang` filter) there is more than one literal value of a given order by property for a given value, the lowest value is used for sorting.
+            * Order of resources matching the search can be read from an artificial RDF property `schema->searchOrder`. The property name for particular repository instance can be read using the `/describe` endpoint.
+            * Value used for ordering can be read from an artificial RDF properties `schema->searchOrderValue{N}` where `{N}` are consecutive numbers from 1 to the number of `orderBy[]` parameter values.
+              `{N}` of `1` is used for values of the `orderBy[]` with the lowest key (if keys were not specified, the first `orderBy[]` in the request URL), `2` for the `orderBy[]` with second lowest key, etc.
+              The property name prefix for particular repository instance can be read using the `/describe` endpoint.
+            * Values are compared using either the collation specified by the `orderByCollation` parameter or, when it's not provided, by the default database collation. The default collation and available collations list can be checked in the output of the `/describe` endpoint.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: orderByLang
+          description: Prefered language tag - see the `orderBy[]` parameter description.
+          style: form
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: orderByCollation
+          description: Collation to be used for ordering. The default and available collations are listed by the `/describe` endpoint.
+          style: form
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: ftsProperty[]
+          description: |
+            Limits highlighting to given RDF properties.
+            
+            If not provided, initialized to corresponding `value[]` parameters of all search filters where the `operator[]` indicates the full text search (`@@`). This obviously does not apply to searches baded on the `sql` parameter.
+            
+            Can be double-nested to indicated an alternative, e.g. `ftsProperty[0][0]=foo` and `ftsProperty[0][1]=bar` meaning _higligh matches in properties "foo" and "bar"_.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: ftsQuery[]
+          description: |
+            Search phrase to be used for full text search highlighting.
+            
+            If not provided, initialized to corresponding `value[]` parameters of all search filters where the `operator[]` indicates the full text search (`@@`). This obviously does not apply to searches baded on the `sql` parameter.
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: ftsStartSel[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: ftsStopSel[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: ftsMinWords[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: ftsMaxWords[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: ftsShortWord[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: ftsHighlightAll[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: boolean
+        - in: query
+          name: ftsMaxFragments[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: ftsFragmentDelimiter[]
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          style: form
+          explode: true
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results matching criteria
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '400':
+          description: Bad input parameter(s)
+    post:
+      description: |
+        Searches the repository (POST variant).
+        
+        Search is possible either by providing an SQL query with `sql` and `sqlParam` parameters or by providing a set of `property`, `operator`, `value`, `type` and `lang` parameters.
+        
+        Corresponding `property`, `operator`, `value`, `type` and `lang` parameter values form search terms. Empty parameter values are interpreted as "any" (with the exception of `operator` which is assumed to be = when empty). All search terms must be fulfilled for a resource to match the search.
+        
+        `property` and `value` accept both single values and arrays. Passing an array means an alternative (*any of specified properties* or *any of provided values*).
+        
+        Search results can be paged using `limit`, `offset` and `orderBy` parameters. If the `orderBy[]` parameter is used, reponse contains `<resourceURI> <search://order> orderNumber` triples indicating matching resources order.
+        
+        For performing a full text search against binary resource content use the `BINARY` value as a property name and the `@@` as an operator.
+        
+        Number of resources included in the response depends on the metadata read mode specified in the `X-METADATA-READ-MODE` header. Resources matching the search can be distinguished from ones added because of the metadata read mode by a presence of a `<resourceURI> <search://match> true` tripples.
+        
+        Highlighting full text search results is controlled by corresponding sets of `fts*` parameters.
+        
+        In the output RDF the highlighted matches are represented by sets of three triples (`{N}` are consecutive numbers from 1 to the number of highlighted matches):
+        * `resourceId schema->searchFts{N} highlightedMatch` storing the hihghlighted match.
+        * `resourceId schema->searchFtsProperty{N} highlightedMatch` storing the metadata property in which the highlighted match was found (or `BINARY` if the match was in the binary content).
+        * `resourceId schema->searchFtsQuery{N} highlightedMatch` storing the hihghlighting query applied (useful when multiple `ftsQuery[]` parameters were provided).
+      responses:
+        '200':
+          description: Matched resources RDF metadata
+          content:
+            text/html:
+              schema:
+                type: string
+            text/turtle:
+              schema:
+                type: string
+            application/n-triples:
+              schema:
+                type: string
+            application/rdf+xml:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: string
+            application/ld+json:
+              schema:
+                type: string
+        '400':
+          description: Wrong query
+      parameters:
+        - $ref: '#/components/parameters/metaReadMode'
+        - $ref: '#/components/parameters/metaParentProp'
+        - $ref: '#/components/parameters/metaResourceProperties'
+        - $ref: '#/components/parameters/metaRelativesProperties'
+        - $ref: '#/components/parameters/metaReadModeQ'
+        - $ref: '#/components/parameters/metaParentPropQ'
+        - $ref: '#/components/parameters/metaResourcePropertiesQ'
+        - $ref: '#/components/parameters/metaRelativesPropertiesQ'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/search'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/search'
+        description: Search query
+  /download:
+    get:
+      description: |
+        Download multiple repository resources.
+      parameters:
+        - in: query
+          name: ids[]
+          description: |
+            Identifiers of resources to be downloaded. Either as URIs or as internal id numbers. Can be mixed.
+            
+            If a resource has children, its children are downaloaded as well.
+          style: form
+          explode: true
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: skipUnauthorized
+          description: |
+            Should resources user lack authorization to access be silently skipped (`true`) or should HTTP 403 Unauthorized be returned (`false`)
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - in: query
+          name: strict
+          description: |
+            Should the response zip be generated in a strict compatibility mode?
+            
+            This makes the response zip readable by old zip apps which e.g. do not support zip64 but it also limits the size of downloaded resources to 4 GB (as this is a limit imposed by the original zip format).
+            
+            Set to true only if you experience issues with opening the response zip.
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: resources downloaded as a zip file
+        '403':
+          description: unauthorized to download some/all of requested resources
+    post:
+      description: |
+        Download multiple repository resources.
+      responses:
+        '200':
+          description: resources downloaded as a zip file
+        '403':
+          description: unauthorized to download some/all of requested resources
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/download'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/download'
+        description: Search query
+components:
+  schemas:
+    user:
+      type: object
+      properties:
+        groups:
+          description: list of groups user belongs to
+          type: array
+          items:
+            type: string
+        password:
+          description: password to be set
+          type: string
+    download:
+      type: object
+      properties:
+        ids:
+          description: |
+            Identifiers of resources to be downloaded. Either as URIs or as internal id numbers. Can be mixed.
+            
+            If a resource has children, its children are downaloaded as well.
+          type: array
+          items:
+            type: string
+        skipUnauthorized:
+          description: |
+            Should resources user lack authorization to access be silently skipped (`true`) or should HTTP 403 Unauthorized be returned (`false`)
+          type: boolean
+          default: false
+        strict:
+          description: |
+            Should the response zip be generated in a strict compatibility mode?
+            
+            This makes the response zip readable by old zip apps which e.g. do not support zip64 but it also limits the size of downloaded resources to 4 GB (as this is a limit imposed by the original zip format).
+            
+            Set to true only if you experience issues with opening the response zip.
+          type: boolean
+          default: false
+    search:
+      type: object
+      properties:
+        readMode:
+          description: Can be provided instead of the `X-METADATA-READ-MODE` HTTP headers parameter (for more information see the `X-METADATA-READ-MODE` parameter description).
+          type: string
+          default: resource
+        parentProperty:
+          description: Can be provided instead of the `X-PARENT-PROPERTY` HTTP headers parameter (for more information see the `X-PARENT-PROPERTY` parameter description).
+          type: string
+        metaResourceProperties:
+          description: Can be provided instead of the `X-RESOURCE-PROPERTIES` HTTP headers parameter (for more information see the `X-RESOURCE-PROPERTIES` parameter description).
+          type: array
+          items: 
+            type: string
+        metaRelativesProperties:
+          description: Can be provided instead of the `X-RELATIVES-PROPERTIES` HTTP headers parameter (for more information see the `X-RELATIVES-PROPERTIES` parameter description).
+          type: array
+          items: 
+            type: string
+        sql:
+          description: |
+            SQL query performing the search and returning a set of resource ids.
+            
+            If query takes parameters, mark them as '?' in the query string and pass their values using the sqlParam[] request parameter.
+          type: string
+        sqlParam:
+          description: SQL search query parameter values
+          type: array
+          items:
+            type: string
+        property:
+          description: |
+            RDF property to search into.
+            
+            * Use the `BINARY` value to search in the resource's binary content.
+            * Prepend the property with a `^` to negate it. A negated property enforces the `rdfs:resource` `type` and the `value` is evaluated against triples subject resource ids (instead of object resources ids). A typical use case would be a search for a parent of a given resource.
+          type: array
+          items:
+            type: string
+        value:
+          description: RDF properties value to search for (string or array)
+          type: array
+          items:
+            type: string
+        operator:
+          description: |
+            Operator to be used to compare the search value with the actual values:
+            - `=`
+            - `>`
+            - `<`
+            - `>=`
+            - `<=` 
+            - `~` regular expression match
+            - `@@` full text search match
+            - `&&` spatial intersection (the corresponding `value[]` should be a WKT)
+            - `&&{number}` spatial search - geometry of the binary content/metadata property value within `{number}` meters from the corresponding `value[]` (corresponding `value[]` should be in WKT)
+            - `&<` geometry of the binary content/metadata property value contained in the corresponding `value[]` (corresponding `value[]` should be a WKT)
+            - `&>` geometry of the binary content/metadata property value contais the corresponding `value[]` (corresponding `value[]` should be a WKT)
+          type: array
+          items:
+            type: string
+            default: =
+            enum:
+            - =
+            - '>'
+            - '<'
+            - '>='
+            - '<='
+            - '~'
+            - '@@'
+            - '&&'
+            - '&<'
+            - '&>'
+        type:
+          description: RDF properties type to search for
+          type: array
+          items:
+            type: string
+        language:
+          description: RDF properties language to search for
+          type: array
+          items:
+            type: string
+        limit:
+          description: |
+            Limits the number of reported search results to a given number of resources.
+            
+            The limit is applied **before** gathering additional metadata as specified by the `X-METADATA-READ-MODE` parameter.
+          type: integer
+          minimum: 0
+        offset:
+          description: |
+            Offset of the reported search result resources.
+            
+            To be used with the `limit` parameter.
+          type: integer
+          minimum: 0
+        orderBy:
+          description: |
+            RDF property(ies) to be used for ordering search results if `limit` and/or `offset` parameters are provided.
+            
+            Remarks:
+            
+            * If the parameter isn't provided, search results are sorted by the internal resource id.
+            * Only literal values are used for sorting.
+            * To get descending order, prefix the property URI with a dash, e.g. `^http://sample/property`
+            * If `orderByLang` is specified values tagged with non-matching lang tag are skipped while values without the lang tag are still used.
+            * If (after applying the `orderByLang` filter) there is more than one literal value of a given order by property for a given value, the lowest value is used for sorting.
+            * Order of resources matching the search can be read from an artificial RDF property `schema->searchOrder`. The property name for particular repository instance can be read using the `/describe` endpoint.
+            * Value used for ordering can be read from an artificial RDF properties `schema->searchOrderValue{N}` where `{N}` are consecutive numbers from 1 to the number of `orderBy[]` parameter values.
+              `{N}` of `1` is used for values of the `orderBy[]` with the lowest key (if keys were not specified, the first `orderBy[]` in the request URL), `2` for the `orderBy[]` with second lowest key, etc.
+              The property name prefix for particular repository instance can be read using the `/describe` endpoint.
+            * Values are compared using either the collation specified by the `orderByCollation` parameter or, when it's not provided, by the default database collation. The default collation and available collations list can be checked in the output of the `/describe` endpoint.
+          type: array
+          items:
+            type: string
+        orderByLang:
+          description: Prefered language tag - see the `orderBy` parameter description.
+          type: string
+        orderByCollation:
+          description: Collation to be used for ordering. The default and available collations are listed by the `/describe` endpoint.
+          type: string
+        ftsProperty:
+          description: |
+            Limits highlighting to given RDF properties.
+            
+            If not provided, initialized to corresponding `value[]` parameters of all search filters where the `operator[]` indicates the full text search (`@@`). This obviously does not apply to searches baded on the `sql` parameter.
+            
+            Can be double-nested to indicated an alternative, e.g. `ftsProperty[0][0]=foo` and `ftsProperty[0][1]=bar` meaning _higligh matches in properties "foo" and "bar"_.
+          type: array
+          items:
+            type: string
+        ftsQuery:
+          description: |
+            Search phrase to be used for full text search highlighting.
+            
+            If not provided, initialized to corresponding `value[]` parameters of all search filters where the `operator[]` indicates the full text search (`@@`). This obviously does not apply to searches baded on the `sql` parameter.
+          type: string
+        ftsStartSel:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: string
+        ftsStopSel:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: string
+        ftsMinWords:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: integer
+            minimum: 0
+        ftsMaxWords:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch  -controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: integer
+            minimum: 0
+        ftsShortWord:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch  -controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: integer
+            minimum: 0
+        ftsHighlightAll:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: boolean
+        ftsMaxFragments:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: integer
+            minimum: 0
+        ftsFragmentDelimiter:
+          description: Fts highlighting options [see here](https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE)
+          type: array
+          items:
+            type: string
+    transactionInfo:
+      type: object
+      properties:
+        transactionId:
+          type: integer
+          description: Transaction id
+        startedAt:
+          type: string
+          format: date-time
+          description: Transaction start date and time
+        lastRequest:
+          type: string
+          format: date-time
+          description: Transaction last request date and time
+        state:
+          type: string
+          description: Transaction's current state
+          enum:
+          - active
+          - commit
+          - rollback
+  parameters:
+    redirect:
+      name: redirect
+      in: query
+      description: Location user should be redirected to (with HTTP 302 and the HTTP `Location` header for the `/user` endpoint or the HTTP `Refresh` header in case of the `/user/logout` endpoint). Allowed locations are 
+      required: false
+      schema:
+        type: string
+    resourceId:
+      name: resourceId
+      in: path
+      description: Repository resource internal identifier
+      required: true
+      style: simple
+      explode: false
+      schema:
+        type: integer
+    metaReadMode:
+      name: X-METADATA-READ-MODE
+      description: |
+        Mode of fetching resource metadata:
+        - `resource` - only resource's own metadata are fetched.
+        - `ids` - only minimal set of data is returned with resource repo URL as a subject and label property values as objects.
+        - `none` - provide no metadata at all.
+        - `{childrenDepth}_{parentsDepth}_{fromResource}_{toResource}`, e.g. `2_1_0_1` - fetches metadata of connected resources according to the provided specification:
+        
+          - up to `{childrenDepth}` levels of resources reverse-following the `X-PARENT-PROPERTY` property (e.g. `1` - only direct children, `3` - up to 3rd order children);
+          - up to `{parentDepth}` levels of resources following the `X-PARENT-PROPERTY` property (e.g. `1` - only direct parent);
+          - `{fromResource}` (`0` or `1`) - when `1` metadata of all resources pointed by fetched resource(s) is also included;
+          - `{toResource}` (`0`, `-1` or `1`) - when `-1` only triples pointing to the fetched resource(s) are included and when `1` metadata of all resources pointing to the fetched resource(s) is also included.
+          
+          If a given part isn't specified (e.g. value of `1_0` is passed), lacking elements are assumed to be `0`.
+          
+          Most common combination of values have named aliases - see below.
+        - `resource` - alias for `0_0_0_0`.
+        - `neighbors` - alias for `0_0_1_1`.
+        - `relatives` - alias for `999999_999999_1_0`.
+        - `relativesOnly` - alias for `999999_999999_0_0`.
+        - `relativesReverse` - alias for `999999_999999_1_1`.
+        - `parents` - alias for `0_999999_1_0`.
+        - `parentsOnly` - alias for `0_999999_0_0`.
+        - `parentsReverse` - alias for `0_999999_1_1`.
+      in: header
+      required: false
+      schema:
+        type: string
+        default: resource
+    metaParentProp:
+      name: X-PARENT-PROPERTY
+      description: RDF property to be used if the metaReadMode equals to "relatives"
+      in: header
+      required: false
+      schema:
+        type: string
+    metaResourceProperties:
+      name: X-RESOURCE-PROPERTIES
+      description: When present limits the set of RDF properties returned for the requested resource/resources matching the search to the listed ones.
+      
+        The filtering doesn't apply to artificial RDF properties created by the search and denoting resources matching the search, their order, etc.
+      in: header
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+    metaRelativesProperties:
+      name: X-RELATIVES-PROPERTIES
+      description: When present limits the set of RDF properties returned for the resources related to the fetched/searched for ones according to the metadata read mode (see the `X-METADATA-READ-MODE` header parameter or the `readMode` query parameter).
+      in: header
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+    metaWriteMode:
+      name: X-METADATA-WRITE-MODE
+      description: |
+        Mode of merging current and provided resource's metadata:
+        - add - provided metadata is added to already existing ones, 
+        - overwrite - all current metadata (including identifiers) is removed and new metadata is added, 
+        - merge [default] - all metadata properties but identifiers which exist in new metadata are removed and new metadata is added  
+          (e.g. if current metadata contains `<resUri> <myProp> "foo"` and the new metadata contains `<resUri> <myProp> "bar"`, then `<resUri> <myProp> "foo"` is remove and `<resUri> <myProp> "bar"` is added)
+      in: header
+      required: false
+      schema:
+        type: string
+        default: merge
+        enum:
+        - add
+        - overwrite
+        - merge
+    metaReadModeQ:
+      name: readMode
+      description: Can be provided instead of the `X-METADATA-READ-MODE` HTTP headers parameter (for more information see the `X-METADATA-READ-MODE` parameter description).
+      in: query
+      required: false
+      schema:
+        type: string
+        default: resource
+    metaParentPropQ:
+      name: parentProperty
+      description: Can be provided instead of the `X-PARENT-PROPERTY` HTTP headers parameter (for more information see the `X-PARENT-PROPERTY` parameter description).
+      in: query
+      required: false
+      schema:
+        type: string
+    metaResourcePropertiesQ:
+      name: resourceProperties[]
+      description: Can be provided instead of the `X-RESOURCE-PROPERTIES` HTTP headers parameter (for more information see the `X-RESOURCE-PROPERTIES` parameter description).
+      in: query
+      required: false
+      schema:
+        type: array
+        items: 
+          type: string
+    metaRelativesPropertiesQ:
+      name: relativesProperties[]
+      description: Can be provided instead of the `X-RELATIVES-PROPERTIES` HTTP headers parameter (for more information see the `X-RELATIVES-PROPERTIES` parameter description).
+      in: query
+      required: false
+      schema:
+        type: array
+        items: 
+          type: string
+    metaWriteModeQ:
+      name: writeMode
+      description: Can be provided instead of the `X-METADATA-WRITE-MODE` HTTP headers parameter (for more information see the `X-METADATA-WRITE-MODE` parameter description).
+      in: query
+      required: false
+      schema:
+        type: string
+        default: merge
+        enum:
+        - add
+        - overwrite
+        - merge
+    metaFormat:
+      in: query
+      name: format
+      description: Desired metadata output format MIME type. Overrides the value provided in the HTTP Accept header. Allows specifying metadata output from clients not allowing to set the HTTP Accept header (e.g. webbrowsers)
+      required: false
+      schema:
+        type: string
+    transactionId:
+      name: X-TRANSACTION-ID
+      description: Transaction id obtained with `POST /transaction`
+      in: header
+      required: true
+      schema:
+        type: integer
+    transactionIdQ:
+      name: transactionId
+      description: Can be provided instead of the `X-TRANSACTION-ID` HTTP headers parameter (for more information see the `X-TRANSACTION-ID` parameter description).
+      in: query
+      required: false
+      schema:
+        type: integer
+    contentType:
+      name: CONTENT-TYPE
+      description: Uploaded payload MIME type.
+      in: header
+      required: false
+      schema:
+        type: string
+        default: application/octet-stream
+    skipContentDisposition:
+      name: skipContentDisposition
+      description: If present, the response will not include the Content-Disposition header.
+      in: query
+      required: false
+      schema:
+        type: string
+    contentDisposition:
+      name: CONTENT-DISPOSITION
+      description: Original name of the uploaded file in form of a HTTP Content-Disposition header.
+      in: header
+      required: false
+      schema:
+        type: string
+        example: attachment; filename="sample_file.txt"
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    shibboleth:
+      type: apiKey
+      in: header
+      name: EPPN
