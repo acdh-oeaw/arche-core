@@ -187,6 +187,7 @@ class Resource {
         } catch (NoBinaryException $e) {
             http_response_code(302);
             RC::setHeader('Location', $metaUrl);
+            RC::addHeader('Link', $metaUrl . '; rel="canonical"');
         }
     }
 

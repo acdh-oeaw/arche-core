@@ -229,7 +229,13 @@ TMPL;
      */
     private function outputProperty(array $values, string $p, string $baseUrl): void {
         if (count($values) > 0) {
-            fwrite($this->stream, '<div class="p"><a href="' . htmlspecialchars($p) . '">' . $this->properties[$p] . "</a></div>\n");
+            $pHead = '<div class="p">';
+            $pHead .= str_starts_with($p, 'http')?'<a href="' . htmlspecialchars($p) . '">':'';
+            $pHead .= $this->properties[$p];
+            $pHead .= str_starts_with($p, 'http')?'</a>':'';
+            $pHead .= "</a></div>\n";
+            fwrite($this->stream, $pHead);
+            
             foreach ($values as $n => $t) {
                 fwrite($this->stream, '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n");
             }
