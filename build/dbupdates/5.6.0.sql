@@ -1,5 +1,7 @@
 BEGIN;
 
+DROP FUNCTION get_relatives_metadata;
+
 CREATE OR REPLACE FUNCTION get_relatives_metadata(
     res_id bigint, 
     rel_prop text, 
