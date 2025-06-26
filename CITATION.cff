@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: "ARCHE-core"
+license: "MIT"
+type: software
+abstract: "The core component of the ARCHE repository solution responsible for the CRUD operations and transaction support."
+authors:
+  - given-names: Mateusz
+    family-names: Żółtak
+    affiliation: Austrian Centre for Digital Humanities
+    orcid: "https://orcid.org/0000-0001-5853-2534"
