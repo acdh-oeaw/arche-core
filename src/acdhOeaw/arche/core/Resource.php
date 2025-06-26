@@ -248,7 +248,7 @@ class Resource {
             $resQuery = "SELECT ?::bigint AS id";
             $resParam = [$this->id];
         } else {
-            $resQuery = "SELECT * FROM get_relatives(?, ?, 999999, 0)";
+            $resQuery = "SELECT * FROM get_relatives(?::bigint, ?::text, 999999, 0)";
             $resParam = [$this->id, $parentProp];
         }
         $query = RC::$pdo->prepare("CREATE TEMPORARY TABLE delres AS $resQuery");

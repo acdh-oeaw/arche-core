@@ -145,7 +145,7 @@ class Download {
         $this->parentQuery      ??= RC::$pdo->prepare("
             SELECT r.id, n, COALESCE(m1.value, m2.value) AS filename
             FROM
-                get_relatives(?, ?, 0, -999999, false, false) r
+                get_relatives(?::bigint, ?::text, 0, -999999, false, false) r
                 LEFT JOIN metadata m1 ON r.id = m1.id AND m1.property = ?
                 LEFT JOIN metadata m2 ON r.id = m2.id AND m2.property = ?
             ORDER BY n DESC
