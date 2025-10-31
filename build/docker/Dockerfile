@@ -1,4 +1,4 @@
-from ubuntu:noble
+FROM ubuntu:noble
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && \
     apt full-upgrade -y && \
@@ -10,6 +10,7 @@ RUN locale-gen en_US.UTF-8 && \
     a2enmod rewrite proxy_fcgi setenvif && \
     a2dissite 000-default && \
     echo 'zend_extension=xdebug.so\nxdebug.mode=coverage' | tee /etc/php/*/*/conf.d/20-xdebug.ini && \
+    sed -i -E 's/^;? *ffi.enable=.*/ffi.enable=true/' /etc/php/*/*/php.ini && \
     curl -sS https://getcomposer.org/installer -o composer-setup.php && \
     php composer-setup.php --install-dir=/usr/local/bin --filename=composer && \
     rm composer-setup.php && \

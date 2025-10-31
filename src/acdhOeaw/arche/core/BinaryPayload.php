@@ -27,6 +27,9 @@
 namespace acdhOeaw\arche\core;
 
 use DateTime;
+use FFI;
+use FFI\CData;
+use FFI\Exception as FFIException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use quickRdf\DataFactory as DF;
@@ -44,6 +47,32 @@ use acdhOeaw\arche\lib\BinaryPayload as BP;
 class BinaryPayload {
 
     const TS_VECTOR_MAX_LEN = 1048575;
+    const GDAL_PATHS        = [
+        '/usr/lib/libgdal.so.*',
+        '/usr/lib64/libgdal.so.*',
+        '/usr/lib/*/libgdal.so.*',
+        '/usr/lib64/*/libgdal.so.*',
+    ];
+    const GDAL_CDEF         = '
+        typedef void *GDALDatasetH;
+        typedef void *OGRSpatialReferenceH;
+        typedef enum {GA_ReadOnly = 0, GA_Update = 1} GDALAccess;
+        typedef enum {CE_None = 0, CE_Log = 1, CE_Warning = 2, CE_Failure = 3, CE_Fatal = 4} CPLErr;
+        
+        void GDALAllRegister();
+        
+        GDALDatasetH GDALOpen(const char *pszFilename, int eAccess);
+        
+        int GDALGetRasterXSize(GDALDatasetH);
+        int GDALGetRasterYSize(GDALDatasetH);
+        CPLErr GDALGetGeoTransform(GDALDatasetH, double*);
+        OGRSpatialReferenceH GDALGetSpatialRef(GDALDatasetH);
+
+        const char *OSRGetAuthorityCode(OGRSpatialReferenceH hSRS, const char *pszTargetKey);
+    ';
+    const GDAL_READONLY     = 0;
+
+    static private FFI $gdal;
 
     static public function getStorageDir(int $id, string $path, int $level,
                                          int $levelMax): string {
@@ -54,12 +83,54 @@ class BinaryPayload {
         return $path;
     }
 
+    /**
+     * Tries to initialize the GDAL's FFI interface.
+     * 
+     * Using the GDAL allows efficient image dimensions extraction and raster
+     * files spatial indexing.
+     * 
+     * @param string $gdalSoPath
+     * @return bool
+     */
+    static public function initGdalFFI(string $gdalSoPath = ''): bool {
+        if (isset(self::$gdal)) {
+            return true;
+        }
+
+        $gdal = '';
+        if (!file_exists($gdalSoPath)) {
+            $gdalSoPath = '';
+        }
+        if (is_dir($gdalSoPath)) {
+            $gdal = glob("$gdalSoPath/libgdal.so.*");
+            $gdal = reset($gdal);
+        }
+        $paths = self::GDAL_PATHS;
+        while (empty($gdal)) {
+            $gdal = glob(array_pop($paths));
+            $gdal = reset($gdal);
+        }
+        if (empty($gdal)) {
+            return false;
+        }
+        try {
+            self::$gdal = FFI::cdef(self::GDAL_CDEF, $gdal);
+            self::$gdal->GDALAllRegister();
+            RC::$log->debug("BinaryPayload GDAL FFI initialized with $gdal");
+        } catch (FFIException $e) {
+            RC::$log->error("Failed to initialize the BinaryPayload GDAL FFI with: " . $e->getMessage());
+            return false;
+        }
+        return true;
+    }
+
     private int $id;
     private ?string $hash;
     private int $size;
     private int $imagePxHeight;
     private int $imagePxWidth;
     private string $tmpPath;
+    private CData $gdalRaster;
 
     public function __construct(int $id) {
         $this->id = $id;
@@ -361,6 +432,21 @@ class BinaryPayload {
     }
 
     private function updateSpatialSearch(SpatialInterface $spatial): void {
+        if ($spatial->isInputRaster()) {
+            if (!isset(self::$gdal)) {
+                self::initGdalFFI();
+            }
+            if (isset(self::$gdal)) {
+                $this->updateSpatialSearchGdal();
+            } else {
+                $this->updateSpatialSearchPostgis($spatial);
+            }
+        } else {
+            $this->updateSpatialSearchPostgis($spatial);
+        }
+    }
+
+    private function updateSpatialSearchPostgis(SpatialInterface $spatial): void {
         $query   = sprintf(
             "INSERT INTO spatial_search (id, geom) 
             SELECT ?::bigint, st_transform(st_envelope(geom), 4326)::geography
@@ -379,11 +465,55 @@ class BinaryPayload {
         $query->execute([$this->id, $content]);
     }
 
+    private function updateSpatialSearchGdal(): void {
+        if (!isset($this->gdalRaster)) {
+            $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
+        }
+
+        $projection = self::$gdal->GDALGetSpatialRef($this->gdalRaster);
+        $projection = (int) self::$gdal->OSRGetAuthorityCode($projection, null);
+
+        if ($projection === 0) {
+            RC::$log->info("\t\taborting spatial search update - no projection data");
+        } else {
+            $geotransform = self::$gdal->new(self::$gdal->type('double[6]'));
+            self::$gdal->GDALGetGeoTransform($this->gdalRaster, $geotransform);
+            $height       = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
+            $width        = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
+
+            $query = "
+                INSERT INTO spatial_search (id, geom) 
+                SELECT ?::bigint, st_transform(st_geomfromtext(?::text, ?::int), 4326)::geography
+            ";
+            $query = RC::$pdo->prepare($query);
+            $x0    = $geotransform[0];
+            $y0    = $geotransform[3];
+            $x1    = $x0 + $geotransform[1] * $width + $geotransform[2] * $height;
+            $y1    = $y0 + $geotransform[4] * $width + $geotransform[5] * $height;
+            $wkt   = "POLYGON(($x0 $y0, $x0 $y1, $x1 $y1, $x1 $y0, $x0 $y0))";
+            $query->execute([$this->id, $wkt, $projection]);
+        }
+    }
+
     private function readImageDimensions(): void {
-        $ret = getimagesize($this->tmpPath);
-        if (is_array($ret)) {
-            $this->imagePxHeight = $ret[1];
-            $this->imagePxWidth  = $ret[0];
+        if (!isset($this->imagePxHeight)) {
+            if (!isset(self::$gdal)) {
+                self::initGdalFFI();
+            }
+
+            if (isset(self::$gdal)) {
+                if (!isset($this->gdalRaster)) {
+                    $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
+                }
+                $this->imagePxHeight = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
+                $this->imagePxWidth  = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
+            } else {
+                $ret = getimagesize($this->tmpPath);
+                if (is_array($ret)) {
+                    $this->imagePxHeight = $ret[1];
+                    $this->imagePxWidth  = $ret[0];
+                }
+            }
         }
     }
 
