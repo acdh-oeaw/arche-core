@@ -162,7 +162,7 @@ class Download {
             $parentsMeta               = $this->parentQuery->fetchAll(PDO::FETCH_OBJ);
             for ($i = 0; $i < count($parentsMeta); $i++) {
                 $pid = (string) $parentsMeta[$i]->id;
-                if (isset($tthis->parents[$pid])) {
+                if (isset($this->parents[$pid])) {
                     break;
                 }
                 $this->parents[$pid] = [

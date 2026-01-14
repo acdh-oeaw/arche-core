@@ -41,12 +41,6 @@ use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
  */
 class Search {
 
-    /**
-     *
-     * @var \PDO
-     */
-    private $pdo;
-
     public function post(): void {
         RC::$pdo->query("BEGIN TRANSACTION READ ONLY");
 

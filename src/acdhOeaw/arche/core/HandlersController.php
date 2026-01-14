@@ -105,6 +105,7 @@ class HandlersController {
             $clbck            = [$this, 'callback'];
             $this->rmqChannel->basic_consume($this->rmqQueue, '', false, true, false, false, $clbck);
         }
+        /** @phpstan-ignore assign.propertyType */
         $this->handlers = array_map(fn(array | null $x) => $x ?? [], (array) $cfg->methods);
 
         foreach ((array) ($cfg->classLoader ?? []) as $nmsp => $path) {
@@ -210,6 +211,7 @@ class HandlersController {
      * @param string $data
      * @return null|Dataset
      * @throws RepoException
+     * @phpstan-ignore return.unusedType
      */
     private function sendRmqMessage(string $queue, string $data): null | Dataset {
         $id               = uniqid();
@@ -223,6 +225,7 @@ class HandlersController {
         } catch (AMQPTimeoutException $e) {
             
         }
+        /** @phpstan-ignore identical.alwaysTrue */
         if ($this->queue[$id] === null) {
             if ($this->rmqExceptionOnTimeout) {
                 throw new RepoException("$queue handler timeout", 500);
@@ -230,6 +233,7 @@ class HandlersController {
             RC::$log->debug("\tRPC handler with id $id using the $queue queue ended with a timeout");
             return null;
         }
+        /** @phpstan-ignore deadCode.unreachable */
         RC::$log->debug("\tRPC handler with id $id using the $queue queue ended");
         return $this->queue[$id];
     }

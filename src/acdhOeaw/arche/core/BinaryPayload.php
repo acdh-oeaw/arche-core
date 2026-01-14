@@ -115,6 +115,7 @@ class BinaryPayload {
         }
         try {
             self::$gdal = FFI::cdef(self::GDAL_CDEF, $gdal);
+            /** @phpstan-ignore method.notFound */
             self::$gdal->GDALAllRegister();
             RC::$log->debug("BinaryPayload GDAL FFI initialized with $gdal");
         } catch (FFIException $e) {
@@ -467,18 +468,24 @@ class BinaryPayload {
 
     private function updateSpatialSearchGdal(): void {
         if (!isset($this->gdalRaster)) {
+            /** @phpstan-ignore method.notFound */
             $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
         }
 
+        /** @phpstan-ignore method.notFound */
         $projection = self::$gdal->GDALGetSpatialRef($this->gdalRaster);
+        /** @phpstan-ignore method.notFound */
         $projection = (int) self::$gdal->OSRGetAuthorityCode($projection, null);
 
         if ($projection === 0) {
             RC::$log->info("\t\taborting spatial search update - no projection data");
         } else {
             $geotransform = self::$gdal->new(self::$gdal->type('double[6]'));
+            /** @phpstan-ignore method.notFound */
             self::$gdal->GDALGetGeoTransform($this->gdalRaster, $geotransform);
+            /** @phpstan-ignore method.notFound */
             $height       = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
+            /** @phpstan-ignore method.notFound */
             $width        = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
 
             $query = "
@@ -503,9 +510,12 @@ class BinaryPayload {
 
             if (isset(self::$gdal)) {
                 if (!isset($this->gdalRaster)) {
+                    /** @phpstan-ignore method.notFound */
                     $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
                 }
+                /** @phpstan-ignore method.notFound */
                 $this->imagePxHeight = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
+                /** @phpstan-ignore method.notFound */
                 $this->imagePxWidth  = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
             } else {
                 $ret = getimagesize($this->tmpPath);

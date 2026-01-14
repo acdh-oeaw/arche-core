@@ -191,9 +191,12 @@ class MetadataReadOnly {
         $nmsp = new RdfNamespace();
         for ($n = 0; $n < $triplesCacheCount - 1 && $iter->valid(); $n++) {
             $quad = $iter->current();
-            $nmsp->shorten($quad->getSubject(), true);
+            $sbj  = $quad->getSubject();
+            if ($sbj instanceof NamedNodeInterface) {
+                $nmsp->shorten($sbj, true);
+            }
             $nmsp->shorten($quad->getPredicate(), true);
-            $obj  = $quad->getObject();
+            $obj = $quad->getObject();
             if ($obj instanceof NamedNodeInterface) {
                 $nmsp->shorten($obj, true);
             }

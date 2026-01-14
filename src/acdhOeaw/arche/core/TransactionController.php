@@ -140,6 +140,7 @@ class TransactionController {
 
     public function __destruct() {
         if (!$this->child) {
+            /** @phpstan-ignore instanceof.alwaysTrue */
             if ($this->socket instanceof Socket) {
                 socket_close($this->socket);
             }
@@ -183,9 +184,7 @@ class TransactionController {
     }
 
     public function loadConfig(): void {
-        if (isset($this->log)) {
-            $this->log->info('Reloading configuration');
-        }
+        $this->log->info('Reloading configuration');
         $this->config           = Config::fromYaml($this->configFile);
         RestController::$config = $this->config;
     }

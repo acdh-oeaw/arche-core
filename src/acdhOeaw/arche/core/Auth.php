@@ -91,7 +91,7 @@ class Auth implements AuthInterface {
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
         $this->isPublic  = $this->userName === $cfg->publicRole;
 
-        $cookieName = $cfg->cookie?->name ?? '';
+        $cookieName = $cfg->cookie->name ?? '';
         if (!empty($cookieName) && !$this->isPublic()) {
             RC::addHeader('set-cookie', $this->getCookieHeaderValue($cookieName, implode(',', $this->userRoles), -1, $cfg->cookie->path ?? '/'));
         }
@@ -218,7 +218,7 @@ class Auth implements AuthInterface {
         RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
 
         $cookieHeader = [];
-        $cookieName   = RC::$config->accessControl->cookie?->name ?? '';
+        $cookieName   = RC::$config->accessControl->cookie->name ?? '';
         if (!empty($cookieName)) {
             $cookieHeader['set-cookie'] = $this->getCookieHeaderValue($cookieName, '', 0, RC::$config->accessControl->cookie->path ?? '/');
         }
@@ -239,7 +239,7 @@ class Auth implements AuthInterface {
             throw new RepoException('', 201);
         }
         $headers    = $resp->getHeaders();
-        $cookieName = RC::$config->accessControl->cookie?->name ?? '';
+        $cookieName = RC::$config->accessControl->cookie->name ?? '';
         if (!empty($cookieName)) {
             $headers['set-cookie'] = $this->getCookieHeaderValue($cookieName, '', 0, RC::$config->accessControl->cookie->path ?? '/');
         }
