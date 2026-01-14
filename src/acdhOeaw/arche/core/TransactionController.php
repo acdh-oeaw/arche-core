@@ -184,7 +184,10 @@ class TransactionController {
     }
 
     public function loadConfig(): void {
-        $this->log->info('Reloading configuration');
+        /** @phpstan-ignore isset.initializedProperty */
+        if (isset($this->log)) {
+            $this->log->info('Reloading configuration');
+        }
         $this->config           = Config::fromYaml($this->configFile);
         RestController::$config = $this->config;
     }
