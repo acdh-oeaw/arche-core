@@ -65,7 +65,7 @@ class Auth implements AuthInterface {
 
     public function __construct() {
         $cfg              = RC::$config->accessControl;
-        $db               = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
+        $db               = new PdoDb(RC::$pdo, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         $this->controller = new AuthController($db);
 
         foreach (RC::$config->accessControl->authMethods as $i) {

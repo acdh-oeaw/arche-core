@@ -119,7 +119,7 @@ class AuthTest extends TestBase {
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
         $cfg  = self::$config->accessControl;
-        $db   = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
+        $db   = new PdoDb(self::$pdo, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         $user = $cfg->create->allowedRoles[0];
         $pswd = '123qwe';
         $db->putUser($user, HttpBasic::pswdData($pswd));

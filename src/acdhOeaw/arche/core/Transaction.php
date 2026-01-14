@@ -54,6 +54,7 @@ class Transaction {
     const PG_WRONG_DATE_VALUE      = '22007';
     const PG_WRONG_TEXT_VALUE      = '22P02';
     const PG_WRONG_BINARY_VALUE    = '22P03';
+    const PG_TOO_MANY_CONNECTIONS  = '7';
     const LOCK_TIMEOUT_DEFAULT     = 10000;
     const STMT_TIMEOUT_DEFAULT     = 60000;
 
@@ -71,15 +72,10 @@ class Transaction {
     private PDO $pdo;
 
     public function __construct() {
-        $this->pdo   = new PDO(RC::$config->dbConn->admin);
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->pdo->query("SET application_name TO rest_tx_" . RC::$logId);
-        $lockTimeout = (int) (RC::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
-        $this->pdo->query("SET lock_timeout TO $lockTimeout");
-
         $id       = (int) RC::getRequestParameter('transactionId');
         $this->id = $id > 0 ? $id : null;
         if ($this->id !== null) {
+            $this->initPdo();
             header('Cache-Control: no-cache');
             $this->fetchData();
         }
@@ -89,6 +85,7 @@ class Transaction {
         if ($this->id === null) {
             return;
         }
+        $this->initPdo();
         $query = $this->pdo->prepare("
             UPDATE transactions 
             SET last_request = clock_timestamp() 
@@ -100,6 +97,7 @@ class Transaction {
     }
 
     public function deleteResource(int $resId): void {
+        $this->initPdo();
         if ($this->pdo->inTransaction()) {
             throw new RuntimeException("Can't delete a resource while inside a database transaction");
         }
@@ -117,6 +115,7 @@ class Transaction {
      * @throws PDOException
      */
     public function createResource(int $lockId, array $ids = []): int {
+        $this->initPdo();
         if ($this->pdo->inTransaction()) {
             throw new RuntimeException("Can't lock a resource while inside a database transaction");
         }
@@ -199,6 +198,7 @@ class Transaction {
      * @throws ConflictException
      */
     public function lockResource(int $resId, int $lockId): ?string {
+        $this->initPdo();
         if ($this->pdo->inTransaction()) {
             throw new RuntimeException("Can't lock a resource while inside a database transaction");
         }
@@ -243,6 +243,7 @@ class Transaction {
         if (!$this->lockedResources) {
             return;
         }
+        $this->initPdo();
         $inTx = (int) $this->pdo->inTransaction();
         if ($inTx) {
             RC::$log->warning("Calling Transaction::unlockResources() while it's PDO handler is inside a transaction - it will likely fail");
@@ -270,6 +271,7 @@ class Transaction {
     }
 
     public function head(bool $get = false): void {
+        $this->initPdo();
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
@@ -301,6 +303,7 @@ class Transaction {
     }
 
     public function delete(): void {
+        $this->initPdo();
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
@@ -321,6 +324,7 @@ class Transaction {
     }
 
     public function put(): void {
+        $this->initPdo();
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
@@ -362,10 +366,13 @@ class Transaction {
         header('Cache-Control: no-cache');
         try {
             $this->id = TransactionController::registerTransaction(RC::$config);
+        } catch (TooManyConnectionsException $e) {
+            throw $e;
         } catch (RepoLibException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
 
+        $this->initPdo();
         try {
             $this->pdo->beginTransaction();
             $this->lock(true);
@@ -535,6 +542,16 @@ class Transaction {
                 default:
                     throw $e;
             }
+        }
+    }
+
+    private function initPdo(): void {
+        if (!isset($this->pdo)) {
+            $this->pdo   = new PDO(RC::$config->dbConn->admin);
+            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->pdo->query("SET application_name TO rest_tx_" . RC::$logId);
+            $lockTimeout = (int) (RC::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
+            $this->pdo->query("SET lock_timeout TO $lockTimeout");
         }
     }
 }

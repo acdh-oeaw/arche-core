@@ -53,7 +53,7 @@ class UserApiTest extends TestBase {
         self::$pdo->query('DELETE FROM users');
 
         $cfg         = self::$config->accessControl;
-        $db          = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
+        $db          = new PdoDb(self::$pdo, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         self::$admin = $cfg->adminRoles[0];
         $db->putUser(self::$admin, HttpBasic::pswdData('strongPassword'));
 

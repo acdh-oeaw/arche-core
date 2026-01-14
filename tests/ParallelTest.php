@@ -366,8 +366,8 @@ class ParallelTest extends TestBase {
      * resource create + wrong resource (causing transaction rollback) + resource create (repeated)
      * Last sequence of resource creation requests may succeed for some time,
      * then it may throw 409 (once the transaction is locked),
-     * and finally they should start throwing 400 - no such transaction. At that
-     * point the first resource should not exist any more.
+     * and finally they should start throwing 400 - no such transaction. 
+     * At that point the first resource should not exist any more.
      */
     public function testParallelAtomicTransaction(): void {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -414,7 +414,7 @@ class ParallelTest extends TestBase {
                     $allowed = [400];
                 }
             }
-            $this->assertContains($sc, $allowed);
+            $this->assertContains($sc, $allowed, "Request $i");
             if ($sc === 409) {
                 $this->assertEquals("Transaction $tx is in rollback state and can't be locked", (string) $responses[$i]->getBody());
             } else if ($sc === 400) {

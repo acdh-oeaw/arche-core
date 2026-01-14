@@ -143,6 +143,14 @@ class RestController {
             http_response_code($e->getCode());
             echo $e->getMessage();
             self::logFinalStatus();
+        } catch (PDOException $e) {
+            $statusCode = match ((string) $e->getCode()) {
+                Transaction::PG_TOO_MANY_CONNECTIONS => 429,
+                default => 500,
+            };
+            self::$log->error($e);
+            http_response_code($statusCode);
+            self::logFinalStatus();
         } catch (Throwable $e) {
             self::$log->error($e);
             http_response_code(500);
@@ -266,7 +274,12 @@ class RestController {
             self::$output  = $ex->getMessage();
             self::$headers = [];
         } catch (PDOException $ex) {
-            $statusCode    = $ex->getCode() === Transaction::PG_LOCK_FAILURE || $ex->getCode() === Transaction::PG_DEADLOCK ? 409 : 500;
+            $statusCode    = match ((string) $ex->getCode()) {
+                Transaction::PG_TOO_MANY_CONNECTIONS => 429,
+                Transaction::PG_LOCK_FAILURE => 409,
+                Transaction::PG_DEADLOCK => 409,
+                default => 500,
+            };
             self::$output  = $ex->getMessage();
             self::$headers = [];
         } catch (Throwable $ex) {

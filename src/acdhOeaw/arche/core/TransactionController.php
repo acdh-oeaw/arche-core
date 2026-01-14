@@ -31,7 +31,6 @@ use PDOException;
 use Throwable;
 use Socket;
 use zozlak\logging\Log;
-use acdhOeaw\arche\core\RepoException;
 use acdhOeaw\arche\lib\Config;
 use acdhOeaw\arche\core\Transaction as T;
 
@@ -42,8 +41,9 @@ use acdhOeaw\arche\core\Transaction as T;
  */
 class TransactionController {
 
-    const TYPE_UNIX = 'unix';
-    const TYPE_INET = 'inet';
+    const TYPE_UNIX            = 'unix';
+    const TYPE_INET            = 'inet';
+    const TOO_MANY_CONNECTIONS = -1;
 
     /**
      * 
@@ -92,7 +92,11 @@ class TransactionController {
         $txId = socket_read($socket, 100, PHP_NORMAL_READ);
 
         socket_close($socket);
-        return (int) $txId;
+        $txId = (int) $txId;
+        if ($txId === self::TOO_MANY_CONNECTIONS) {
+            throw new TooManyConnectionsException();
+        }
+        return $txId;
     }
 
     private string $configFile;
@@ -289,7 +293,12 @@ class TransactionController {
             $query->execute([$txId]);
             $pdo->commit();
         } catch (Throwable $e) {
-            $this->log->error($e);
+            if ($e instanceof PDOException && T::PG_TOO_MANY_CONNECTIONS === (string) $e->getCode()) {
+                @socket_write($connSocket, self::TOO_MANY_CONNECTIONS . "\n");
+                $this->log->info("Transaction creation failed - too many database connections");
+            } else {
+                $this->log->error($e);
+            }
         } finally {
             if (isset($pdo) && isset($txId)) {
                 if ($pdo->inTransaction()) {
@@ -409,7 +418,7 @@ class TransactionController {
             if ($ret) {
                 $this->log->debug("    binary state of $rid restored ($txId)");
             }
-            
+
             // at the end as it clears the transaction_id of a resource
             $queryResUpd->execute([$state, $rid]);
         }

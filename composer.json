@@ -13,7 +13,7 @@
     "require": {
         "php": "^8.1",
         "ext-gd": "*",
-        "zozlak/auth": "^3",
+        "zozlak/auth": "^3.1",
         "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/arche-lib": "^7.4.0",
         "sweetrdf/simple-rdf": "^2",

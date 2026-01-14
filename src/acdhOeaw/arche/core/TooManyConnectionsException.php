@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2019 Austrian Centre for Digital Humanities.
+ * Copyright 2026 zozlak.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,39 +26,17 @@
 
 namespace acdhOeaw\arche\core;
 
-use acdhOeaw\arche\lib\exception\RepoLibException;
-
 /**
- * Description of RepoException
+ * Description of TooManyConnectionsException
  *
  * @author zozlak
  */
-class RepoException extends RepoLibException {
+class TooManyConnectionsException extends RepoException {
 
-    const TOO_MANY_CONNECTIONS = 429;
-    
-    /**
-     * HTTP response headers to be set
-     * @var array<string, string|array<string>>
-     */
-    private array $headers;
-
-    /**
-     * 
-     * @param array<string, string|array<string>> $headers
-     */
-    public function __construct(string $message = "", int $code = 0,
+    public function __construct(string $message = "Too many connections",
+                                int $code = 429,
                                 \Throwable | null $previous = null,
                                 array $headers = []) {
-        parent::__construct($message, $code, $previous);
-        $this->headers = $headers;
-    }
-
-    /**
-     * 
-     * @return array<string, string|array<string>>
-     */
-    public function getHeaders(): array {
-        return $this->headers;
+        parent::__construct($message, $code, $previous, $headers);
     }
 }

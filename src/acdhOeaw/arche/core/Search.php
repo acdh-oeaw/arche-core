@@ -48,15 +48,12 @@ class Search {
     private $pdo;
 
     public function post(): void {
-        $this->pdo = new PDO(RC::$config->dbConn->guest);
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->pdo->query("SET application_name TO rest_search");
-        $this->pdo->query("BEGIN TRANSACTION READ ONLY");
+        RC::$pdo->query("BEGIN TRANSACTION READ ONLY");
 
         $schema                         = new Schema(RC::$config->schema);
         $headers                        = new Schema(RC::$config->rest->headers);
         $nonRelProp                     = RC::$config->metadataManagment->nonRelationProperties;
-        $repo                           = new RepoDb(RC::getBaseUrl(), $schema, $headers, $this->pdo, $nonRelProp, RC::$auth);
+        $repo                           = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
         $repo->setQueryLog(RC::$log);
         $config                         = SearchConfig::factory();
         $config->metadataMode           = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataSearchMode;
@@ -85,7 +82,7 @@ class Search {
             $pdoStmnt = $repo->getPdoStatementBySearchTerms($terms, $config);
         }
 
-        $meta = new MetadataReadOnly(0);
+        $meta   = new MetadataReadOnly(0);
         $meta->loadFromPdoStatement($repo, $pdoStmnt, true);
         $format = Metadata::negotiateFormat();
         RC::setOutput($meta, $format);

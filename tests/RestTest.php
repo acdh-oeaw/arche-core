@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use PDO;
+use PDOException;
 use RuntimeException;
 use GuzzleHttp\Psr7\Request;
 use quickRdf\Dataset;
@@ -1417,5 +1419,109 @@ class RestTest extends TestBase {
         $this->assertCount(2, scandir($tmpDir));
         $this->assertCount(3, scandir(dirname($binaryPath)));
         $this->assertEquals($refContent, file_get_contents($binaryPath));
+    }
+
+    public function testTooManyConnections(): void {
+        $conns = [];
+
+        // describe - 1 connection needed
+        $conns   = $this->saturateDbConnections($conns);
+        $request = new Request('get', self::$baseUrl . 'describe');
+        $resp    = self::$client->send($request);
+        $this->assertEquals(429, $resp->getStatusCode());
+        array_pop($conns);
+        $resp    = self::$client->send($request);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        // search - 1 connection needed
+        $conns   = $this->saturateDbConnections($conns);
+        $headers = ['content-type' => 'application/x-www-form-urlencoded'];
+        $body    = http_build_query(['sql' => "SELECT -1::bigint AS id"]);
+        $request = new Request('post', self::$baseUrl . 'search', $headers, $body);
+        $resp    = self::$client->send($request);
+        $this->assertEquals(429, $resp->getStatusCode());
+        array_pop($conns);
+        $resp    = self::$client->send($request);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        // transaction - 4 connections needed
+        $request = new Request('post', self::$baseUrl . 'transaction');
+        $minConn = 4;
+        for ($i = 0; $i < $minConn; $i++) {
+            $conns = $this->saturateDbConnections($conns);
+            for ($j = 0; $j < $i; $j++) {
+                array_pop($conns);
+            }
+            $resp = self::$client->send($request);
+            $this->assertEquals(429, $resp->getStatusCode());
+        }
+        $conns   = $this->saturateDbConnections($conns);
+        for ($j = 0; $j < $minConn; $j++) {
+            array_pop($conns);
+        }
+        $txId = $this->beginTransaction();
+        $this->assertGreaterThan(0, $txId);
+
+        // resource creation - 2 connections needed
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Disposition'                       => 'attachment; filename="foo.txt"',
+            'Content-Type'                              => 'text/plain',
+            'Eppn'                                      => 'admin',
+        ];
+        $request = new Request('post', self::$baseUrl, $headers, 'test resource content');
+        $minConn = 2;
+        for ($i = 0; $i < $minConn; $i++) {
+            $conns = $this->saturateDbConnections($conns);
+            for ($j = 0; $j < $i; $j++) {
+                array_pop($conns);
+            }
+            $resp = self::$client->send($request);
+            $this->assertEquals(429, $resp->getStatusCode());
+        }
+        $conns = $this->saturateDbConnections($conns);
+        for ($j = 0; $j < $minConn; $j++) {
+            array_pop($conns);
+        }
+        $resp = self::$client->send($request);
+        $this->assertEquals(201, $resp->getStatusCode());
+
+        // transaction rollback - 2 connections needed
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+        ];
+        $request = new Request('delete', self::$baseUrl . 'transaction', $headers);
+        $minConn = 2;
+        $conns   = $this->saturateDbConnections($conns);
+        for ($i = 0; $i < $minConn; $i++) {
+            for ($j = 0; $j < $i; $j++) {
+                array_pop($conns);
+            }
+            $resp = self::$client->send($request);
+            $this->assertEquals(429, $resp->getStatusCode());
+        }
+        $conns = $this->saturateDbConnections($conns);
+        for ($j = 0; $j < $minConn; $j++) {
+            array_pop($conns);
+        }
+        $resp = self::$client->send($request);
+        $this->assertEquals(204, $resp->getStatusCode());
+    }
+
+    /**
+     * 
+     * @param array<PDO> $conns
+     * @return array<PDO>
+     */
+    private function saturateDbConnections(array $conns): array {
+        try {
+            while (true) {
+                $conns[] = new PDO(self::$config->dbConn->admin);
+            }
+        } catch (PDOException $e) {
+            
+        }
+        return $conns;
     }
 }

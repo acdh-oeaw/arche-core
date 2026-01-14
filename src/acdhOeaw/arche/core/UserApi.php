@@ -48,7 +48,7 @@ class UserApi {
 
     public function __construct() {
         $cfg      = RC::$config->accessControl;
-        $this->db = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
+        $this->db = new PdoDb(RC::$pdo, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
     }
 
     public function put(string $user): void {
