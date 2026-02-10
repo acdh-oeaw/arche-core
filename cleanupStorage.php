@@ -55,7 +55,7 @@ AAA
 }
 
 $t = microtime(true);
-printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', $t));
+printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', (int) $t));
 
 // CONFIG PARSING
 if (!file_exists($params[0])) {
@@ -69,10 +69,13 @@ if ($cfg === false) {
 $cfg = json_decode(json_encode($cfg));
 
 if (substr($cfg->storage->dir, 0, 1) !== '/') {
-    throw Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
+    throw new Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
 }
 
-function iterateDir($path, $level, $levels) {
+/**
+ * @return Generator<string>
+ */
+function iterateDir(string $path, int $level, int $levels): Generator {
     $dir = @opendir($path);
     if ($dir === false) {
         return;

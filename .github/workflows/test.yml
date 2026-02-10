@@ -39,6 +39,9 @@ jobs:
     - name: composer update
       run: |
         composer update
+    - name: phpstan
+      run: |
+        vendor/bin/phpstan analyze -l 6 src/ tests/ *.php
     - name: environment
       run: |
         docker build -t arche-dev build/docker
@@ -85,7 +88,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: shivammathur/setup-php@v2
       with:
-        php-version: 8.4
+        php-version: 8.5
     - uses: actions/cache@v4
       with: 
         path: vendor
@@ -94,5 +97,5 @@ jobs:
     - name: composer
       run: composer update
     - name: phpstan
-      run: vendor/bin/phpstan analyse -l 8 src tests || true
+      run: vendor/bin/phpstan analyse -l 8 src tests *php || true
    

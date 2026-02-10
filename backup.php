@@ -274,6 +274,9 @@ try {
         $log->info("        ended");
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
     function createArchive(string $path, array $params): Tar {
         $tar         = new Tar();
         $compression = match ($params['compression']) {

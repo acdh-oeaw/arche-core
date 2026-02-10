@@ -28,7 +28,7 @@ namespace acdhOeaw\arche\core\tests;
 
 use ZipArchive;
 use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
 use quickRdf\Dataset;
 use quickRdf\DataFactory as DF;
 use quickRdfIo\NQuadsSerializer;
@@ -194,7 +194,7 @@ class DownloadTest extends TestBase {
      * 
      * @return array<string>
      */
-    private function testZipBasics(Response $resp, int $expectedCount): array {
+    private function testZipBasics(ResponseInterface $resp, int $expectedCount): array {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(["attachment; filename*=UTF-8''data.zip"], $resp->getHeader('Content-Disposition'));
         $this->assertEquals(['application/zip'], $resp->getHeader('Content-Type'));

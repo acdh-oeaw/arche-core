@@ -32,7 +32,7 @@
     },
     "require-dev": {
         "ext-zip": "*",
-        "phpunit/phpunit": "*",
+        "phpunit/phpunit": "<13",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
     }

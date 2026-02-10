@@ -92,7 +92,7 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
 
         $location = $this->createMetadataResource($this->createMetadata(), $txId);
-        $this->assertIsString($location);
+        $this->assertNotEmpty($location);
 
         $prevMeta = null;
         $formats  = ['application/n-triples', 'text/turtle', 'application/ld+json',
@@ -878,7 +878,7 @@ class RestTest extends TestBase {
             DF::quadNoSubject($prop, DF::namedNode('https://foo/bar2')),
         ]);
         $location2 = $this->createMetadataResource($meta, $txId);
-        $this->assertIsString($location2);
+        $this->assertNotEmpty($location2);
 
         $req  = new Request('get', $location2 . '/metadata');
         $resp = self::$client->send($req);
@@ -970,6 +970,7 @@ class RestTest extends TestBase {
         $meta->add(DF::quadNoSubject(DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
         try {
             $this->createMetadataResource($meta);
+            /** @phpstan-ignore method.impossibleType */
             $this->assertTrue(false);
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('Wrong property value', $e->getMessage());
@@ -1540,6 +1541,7 @@ class RestTest extends TestBase {
      */
     private function saturateDbConnections(array $conns): array {
         try {
+            /** @phpstan-ignore while.alwaysTrue */
             while (true) {
                 $conns[] = new PDO(self::$config->dbConn->admin);
             }

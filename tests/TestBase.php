@@ -337,7 +337,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             /* @var $i Request */
             $req          = curl_init();
             $reqHandles[] = $req;
-            curl_setopt($req, \CURLOPT_URL, $i->getUri());
+            curl_setopt($req, \CURLOPT_URL, (string) $i->getUri());
             curl_setopt($req, \CURLOPT_CUSTOMREQUEST, $i->getMethod());
             $headers      = [];
             foreach ($i->getHeaders() as $header => $values) {
@@ -368,9 +368,9 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             $code        = curl_getinfo($i, \CURLINFO_RESPONSE_CODE);
             fseek($outputs[$n], 0);
             $headers     = [
-                'Start-Time'   => $startTimes[$n],
-                'Time'         => curl_getinfo($i, \CURLINFO_TOTAL_TIME_T),
-                'Content-Type' => curl_getinfo($i, \CURLINFO_CONTENT_TYPE),
+                'Start-Time'   => (string) $startTimes[$n],
+                'Time'         => (string) curl_getinfo($i, \CURLINFO_TOTAL_TIME_T),
+                'Content-Type' => (string) curl_getinfo($i, \CURLINFO_CONTENT_TYPE),
             ];
             $responses[] = new Response($code, $headers, $outputs[$n]);
         }
@@ -381,6 +381,6 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     protected function getGlobPath(string $location): string {
         $cfg = self::$config->storage;
         $id  = preg_replace('`^.*/`', '', $location);
-        return BinaryPayload::getStorageDir($id, $cfg->dir, 0, $cfg->levels) . '/' . $id;
+        return BinaryPayload::getStorageDir((int) $id, $cfg->dir, 0, $cfg->levels) . '/' . $id;
     }
 }
