@@ -358,7 +358,7 @@ class ParallelTest extends TestBase {
         $this->assertContains(201, $statuses);
         $this->assertContains(409, $statuses);
         $body     = $resp1->getBody() . "\n" . $resp2->getBody();
-        $this->assertStringContainsString('duplicate key value violates unique constraint "identifiers_pkey"', $body);
+        $this->assertStringContainsString('Duplicated resource identifier', $body);
     }
 
     /**

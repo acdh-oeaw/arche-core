@@ -131,10 +131,12 @@ class Transaction {
         $query->execute([$this->id, $lockId]);
         $resId = (int) $query->fetchColumn();
 
-        $ids[] = Metadata::idAsUri($resId);
+        $ids[]    = Metadata::idAsUri($resId);
+        $trackIds = null;
         try {
             $query = $this->pdo->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
             foreach ($ids as $i) {
+                $trackIds = $i;
                 $query->execute([$i, $resId]);
             }
             $query = $this->pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
@@ -169,7 +171,9 @@ class Transaction {
         } catch (PDOException $e) {
             $this->pdo->rollBack();
             if ($e->getCode() === self::PG_DUPLICATE_KEY) {
-                throw new DuplicatedKeyException($e->getMessage());
+                $query = $this->pdo->prepare("SELECT id FROM identifiers WHERE ids = ?");
+                $query->execute([$trackIds]);
+                throw new DuplicatedKeyException("Duplicated resource identifier: $trackIds", 409, $e, $query->fetchColumn());
             }
             throw $e;
         }

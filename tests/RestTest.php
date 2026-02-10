@@ -562,18 +562,42 @@ class RestTest extends TestBase {
     }
 
     public function testDuplicatedId(): void {
+        $id = DF::namedNode('https://my.id');
+
         $res1  = $this->createMetadataResource();
         $meta1 = $this->getResourceMeta($res1);
-        $meta1->add(DF::quadNoSubject(self::$schema->id, DF::namedNode('https://my.id')));
+        $meta1->add(DF::quadNoSubject(self::$schema->id, $id));
         $resp  = $this->updateResource($meta1);
         $this->assertEquals(200, $resp->getStatusCode());
 
         $res2  = $this->createMetadataResource();
         $meta2 = $this->getResourceMeta($res2);
-        $meta2->add(DF::quadNoSubject(self::$schema->id, DF::namedNode('https://my.id')));
+        $meta2->add(DF::quadNoSubject(self::$schema->id, $id));
         $resp  = $this->updateResource($meta2);
         $this->assertEquals(409, $resp->getStatusCode());
-        $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
+        $this->assertEquals("Duplicated resource identifier: $id", (string) $resp->getBody());
+    }
+
+    public function testCreateDuplicate(): void {
+        $id   = DF::namedNode('https://my.id');
+        $meta = new DatasetNode(DF::namedNode(self::$baseUrl));
+        $meta->add(DF::quadNoSubject(self::$schema->id, $id));
+        $res  = $this->createMetadataResource($meta);
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
+        ];
+        $body    = self::$serializer->serialize($meta);
+        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
+        $resp    = self::$client->send($req);
+        $this->rollbackTransaction($txId);
+        $this->assertEquals(409, $resp->getStatusCode());
+        $this->assertEquals("Duplicated resource identifier: $id", (string) $resp->getBody());
+        $header  = self::$config->rest->headers->existingResourceLocation;
+        $this->assertEquals([$res], $resp->getHeader($header));
     }
 
     public function testUnbinaryResource(): void {
@@ -1455,7 +1479,7 @@ class RestTest extends TestBase {
             $resp = self::$client->send($request);
             $this->assertEquals(429, $resp->getStatusCode());
         }
-        $conns   = $this->saturateDbConnections($conns);
+        $conns = $this->saturateDbConnections($conns);
         for ($j = 0; $j < $minConn; $j++) {
             array_pop($conns);
         }

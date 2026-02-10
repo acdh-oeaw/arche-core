@@ -32,8 +32,16 @@ namespace acdhOeaw\arche\core;
  */
 class DuplicatedKeyException extends RepoException {
 
-    public function __construct(string $message = "Duplicate key value violates unique constraint", int $code = 409,
-                                ?\Throwable $previous = null) {
+    private int | null $existingResourceId;
+
+    public function __construct(string $message = "Duplicated resource identifier",
+                                int $code = 409, ?\Throwable $previous = null,
+                                int | null $existingResourceId = null) {
         parent::__construct($message, $code, $previous);
+        $this->existingResourceId = $existingResourceId;
+    }
+
+    public function getExistingResourceId(): int | null {
+        return $this->existingResourceId;
     }
 }

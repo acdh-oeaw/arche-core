@@ -36,6 +36,7 @@ use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\core\util\Schema;
 use acdhOeaw\arche\lib\Config;
 use acdhOeaw\arche\lib\exception\RepoLibException;
+use acdhOeaw\arche\core\DuplicatedKeyException;
 use acdhOeaw\arche\core\util\OutputFile;
 
 /**
@@ -265,6 +266,13 @@ class RestController {
             $statusCode    = $ex->getCode();
             self::$output  = $ex->getMessage();
             self::$headers = [];
+        } catch (DuplicatedKeyException $ex) {
+            $statusCode   = $ex->getCode();
+            self::$output = $ex->getMessage();
+            self::setHeader(
+                self::$config->rest->headers->existingResourceLocation,
+                self::getBaseUrl() . $ex->getExistingResourceId()
+            );
         } catch (RepoException $ex) {
             $statusCode   = $ex->getCode() >= 100 ? $ex->getCode() : 500;
             self::$output = $ex->getMessage();

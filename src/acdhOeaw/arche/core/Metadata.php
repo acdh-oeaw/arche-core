@@ -221,6 +221,7 @@ class Metadata {
         $query        = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
         $query->execute([$this->id]);
 
+        $trackIds = null;
         try {
             $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING mid");
             $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
@@ -295,12 +296,13 @@ class Metadata {
             $query->execute([$this->id]);
             foreach ($ids as $v) {
                 RC::$log->debug("\tadding id " . $v);
+                $trackIds = $v;
                 $queryI->execute([$this->id, $v]);
             }
         } catch (PDOException $e) {
             switch ($e->getCode()) {
                 case Transaction::PG_DUPLICATE_KEY:
-                    throw new DuplicatedKeyException('Duplicated resource identifier', 409, $e);
+                    throw new DuplicatedKeyException("Duplicated resource identifier: $trackIds", 409, $e);
                 case Transaction::PG_WRONG_DATE_VALUE:
                 case Transaction::PG_WRONG_TEXT_VALUE:
                 case Transaction::PG_WRONG_BINARY_VALUE:

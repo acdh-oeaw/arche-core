@@ -213,6 +213,7 @@ rest:
         withReferences: X-WITH-REFERENCES
         resourceProperties: X-RESOURCE-PROPERTIES
         relativesProperties: X-RELATIVES-PROPERTIES
+        existingResourceLocation: X-EXISTING-RESOURCE-LOCATION
 download:
     # store or deflate
     compressionMethod: store
