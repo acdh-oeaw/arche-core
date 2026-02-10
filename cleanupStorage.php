@@ -26,6 +26,7 @@
 
 $params = ['ageToDelete' => 604800];
 $n      = 0;
+$argv ??= [];
 for ($i = 1; $i < count($argv); $i++) {
     if (substr($argv[$i], 0, 2) === '--') {
         $params[substr($argv[$i], 2)] = $argv[$i + 1];

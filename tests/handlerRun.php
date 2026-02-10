@@ -32,5 +32,5 @@ use acdhOeaw\arche\core\tests\Handler;
 $composer = require_once __DIR__ . '/../vendor/autoload.php';
 $composer->addPsr4("acdhOeaw\\arche\\core\\tests\\", __DIR__);
 
-$h = new Handler($argv[1]);
+$h = new Handler($argv[1] ?? '');
 $h->loop();

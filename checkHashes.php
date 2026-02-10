@@ -36,7 +36,7 @@ for ($i = 1; $i < count($argv); $i++) {
     }
 }
 
-if ($argc < 2) {
+if (($argc ?? 0) < 2) {
     exit(<<<AAA
 checkHashes.php repoConfigFile
 
@@ -52,6 +52,7 @@ AAA
 }
 
 $t = microtime(true);
+$argv ??= [];
 printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', (int) $t));
 
 // CONFIG PARSING

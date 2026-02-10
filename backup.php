@@ -49,6 +49,7 @@ $params = [
     'help'             => false,
 ];
 $n      = 0;
+$argv ??= [];
 for ($i = 1; $i < count($argv); $i++) {
     if ($argv[$i] === '--help') {
         $params['help'] = true;
