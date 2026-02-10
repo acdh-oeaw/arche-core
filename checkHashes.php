@@ -26,6 +26,7 @@
 
 $params = [];
 $n      = 0;
+$argv ??= [];
 for ($i = 1; $i < count($argv); $i++) {
     if (substr($argv[$i], 0, 2) === '--') {
         $params[substr($argv[$i], 2)] = $argv[$i + 1];
@@ -52,7 +53,6 @@ AAA
 }
 
 $t = microtime(true);
-$argv ??= [];
 printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', (int) $t));
 
 // CONFIG PARSING
