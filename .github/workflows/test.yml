@@ -59,6 +59,7 @@ jobs:
         docker exec -w /root arche-dev supervisorctl restart apache2
         docker exec -t -e XDEBUG_MODE=coverage -u www-data arche-dev vendor/bin/phpunit --display-deprecations --display-phpunit-deprecations --display-notices --display-warnings
     - name: coveralls
+      if: ${{ matrix.php == 8.5 }}
       run: |
         export COVERALLS_RUN_LOCALLY=1
         export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}

@@ -116,8 +116,9 @@ class UserApi {
         }
         $this->checkUserExists($user);
 
-        parse_str((string) file_get_contents('php://input'), $post);
-        $json    = json_decode((string) file_get_contents('php://input'));
+        $input = (string) file_get_contents('php://input');
+        parse_str($input, $post);
+        $json    = json_decode($input);
         $newData = new stdClass();
         $fields  = $admin ? ['password', 'groups'] : ['password'];
         foreach ($fields as $i) {

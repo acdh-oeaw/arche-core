@@ -154,7 +154,7 @@ try {
             $v = substr($i, 1 + strpos($i, '='));
             if (isset($pgdumpConnParam[$k])) {
                 $pgdumpConnStr .= ' ' . $pgdumpConnParam[$k] . " '" . $v . "'";
-            } elseif ($v === 'password') {
+            } elseif ($k === 'password') {
                 $pgdumpConnStr = "PGPASSWORD='$v' " . $pgdumpConnStr;
             } else {
                 throw new Exception("Unknown database connection parameter: $k");
