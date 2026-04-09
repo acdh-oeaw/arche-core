@@ -86,6 +86,7 @@ class Auth implements AuthInterface {
             $this->userName  = $cfg->publicRole;
             $this->userRoles = [$this->userName];
         }
+        $this->userRoles= array_unique($this->userRoles)
 
         $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
         $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
