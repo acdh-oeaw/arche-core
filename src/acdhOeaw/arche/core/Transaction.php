@@ -26,9 +26,9 @@
 
 namespace acdhOeaw\arche\core;
 
-use PDO;
 use PDOException;
 use PDOStatement;
+use PDO\Pgsql;
 use RuntimeException;
 use Throwable;
 use zozlak\RdfConstants as RDF;
@@ -69,7 +69,7 @@ class Transaction {
      * Database connection.
      * A separate is required so it can commit changes independently from the main connection.
      */
-    private PDO $pdo;
+    private Pgsql $pdo;
 
     public function __construct() {
         $id       = (int) RC::getRequestParameter('transactionId');
@@ -393,13 +393,13 @@ class Transaction {
         $this->get();
     }
 
-    public function getPreTransactionDbHandle(): PDO {
-        $pdo = new PDO(RC::$config->dbConn->admin);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 1);
+    public function getPreTransactionDbHandle(): Pgsql {
+        $pdo = new Pgsql(RC::$config->dbConn->admin);
+        $pdo->setAttribute(Pgsql::ATTR_ERRMODE, Pgsql::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(Pgsql::ATTR_EMULATE_PREPARES, 1);
         $pdo->query("SET application_name TO rest_tx_pre_" . RC::$logId);
         $pdo->query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ; SET TRANSACTION SNAPSHOT '" . $this->snapshot . "'");
-        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 0);
+        $pdo->setAttribute(Pgsql::ATTR_EMULATE_PREPARES, 0);
         return $pdo;
     }
 
@@ -511,7 +511,7 @@ class Transaction {
     private function getResourceList(): array {
         $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $query->execute([$this->id]);
-        return $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        return $query->fetchAll(Pgsql::FETCH_COLUMN) ?: [];
     }
 
     /**
@@ -551,8 +551,8 @@ class Transaction {
 
     private function initPdo(): void {
         if (!isset($this->pdo)) {
-            $this->pdo   = new PDO(RC::$config->dbConn->admin);
-            $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $this->pdo   = new Pgsql(RC::$config->dbConn->admin);
+            $this->pdo->setAttribute(Pgsql::ATTR_ERRMODE, Pgsql::ERRMODE_EXCEPTION);
             $this->pdo->query("SET application_name TO rest_tx_" . RC::$logId);
             $lockTimeout = (int) (RC::$config->transactionController->lockTimeout ?? self::LOCK_TIMEOUT_DEFAULT);
             $this->pdo->query("SET lock_timeout TO $lockTimeout");

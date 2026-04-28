@@ -27,7 +27,7 @@
 namespace acdhOeaw\arche\core;
 
 use ErrorException;
-use PDO;
+use PDO\Pgsql;
 use PDOException;
 use Throwable;
 use Composer\Autoload\ClassLoader;
@@ -82,7 +82,7 @@ class RestController {
     static public Config $config;
     static public Schema $schema;
     static public Log $log;
-    static public PDO $pdo;
+    static public Pgsql $pdo;
     static public Transaction $transaction;
     static public Resource $resource;
     static public Auth $auth;
@@ -126,8 +126,8 @@ class RestController {
             self::$log->info("------------------------------");
             self::$log->info(filter_input(INPUT_SERVER, 'REQUEST_METHOD') . " " . filter_input(INPUT_SERVER, 'REQUEST_URI'));
 
-            self::$pdo   = new PDO(self::$config->dbConn->admin);
-            self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            self::$pdo   = new Pgsql(self::$config->dbConn->admin);
+            self::$pdo->setAttribute(Pgsql::ATTR_ERRMODE, Pgsql::ERRMODE_EXCEPTION);
             self::$pdo->query("SET application_name TO rest_" . self::$logId);
             $lockTimeout = (int) (self::$config->transactionController->lockTimeout ?? Transaction::LOCK_TIMEOUT_DEFAULT);
             self::$pdo->query("SET lock_timeout TO $lockTimeout");

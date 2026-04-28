@@ -26,7 +26,7 @@
 
 namespace acdhOeaw\arche\core;
 
-use PDO;
+use PDO\Pgsql;
 use PDOException;
 use Throwable;
 use Socket;
@@ -205,10 +205,10 @@ class TransactionController {
             $this->log->info("Handling a connection");
 
             $connStr    = $this->config->dbConn->admin;
-            $pdo        = new PDO($connStr);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $preTxState = new PDO($connStr);
-            $preTxState->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $pdo        = new Pgsql($connStr);
+            $pdo->setAttribute(Pgsql::ATTR_ERRMODE, Pgsql::ERRMODE_EXCEPTION);
+            $preTxState = new Pgsql($connStr);
+            $preTxState->setAttribute(Pgsql::ATTR_ERRMODE, Pgsql::ERRMODE_EXCEPTION);
 
             $pdo->query("SET application_name TO tx_controller");
             $preTxState->query("SET application_name TO txcontrollerpre");
@@ -323,12 +323,12 @@ class TransactionController {
      * - finding all resources visible for the $currState assigned to the transaction $txId
      * - bringing their state back to the one visible for the $preTxState
      * @param int $txId
-     * @param PDO $curState
-     * @param PDO $prevState
+     * @param Pgsql $curState
+     * @param Pgsql $prevState
      * @return void
      */
-    private function rollbackTransaction(int $txId, PDO $curState,
-                                         PDO $prevState): void {
+    private function rollbackTransaction(int $txId, Pgsql $curState,
+                                         Pgsql $prevState): void {
         $this->log->info("Transaction $txId - rollback");
 
         $queryResDelCheck = $curState->prepare("
@@ -393,25 +393,25 @@ class TransactionController {
 
             $queryIdDel->execute([$rid]);
             $queryIdSel->execute([$rid]);
-            while ($i = $queryIdSel->fetch(PDO::FETCH_NUM)) {
+            while ($i = $queryIdSel->fetch(Pgsql::FETCH_NUM)) {
                 $queryIdIns->execute($i);
             }
 
             $queryRelDel->execute([$rid]);
             $queryRelSel->execute([$rid]);
-            while ($i = $queryRelSel->fetch(PDO::FETCH_NUM)) {
+            while ($i = $queryRelSel->fetch(Pgsql::FETCH_NUM)) {
                 $queryRelIns->execute($i);
             }
 
             $queryMetaDel->execute([$rid]);
             $queryMetaSel->execute([$rid]);
-            while ($i = $queryMetaSel->fetch(PDO::FETCH_NUM)) {
+            while ($i = $queryMetaSel->fetch(Pgsql::FETCH_NUM)) {
                 $queryMetaIns->execute($i);
             }
 
             $queryFtsDel->execute([$rid]);
             $queryFtsSel->execute([$rid]);
-            while ($i = $queryFtsSel->fetch(PDO::FETCH_NUM)) {
+            while ($i = $queryFtsSel->fetch(Pgsql::FETCH_NUM)) {
                 $queryFtsIns->execute($i);
             }
 
@@ -430,11 +430,11 @@ class TransactionController {
     /**
      * Commits a transaction, e.g. saves metadata history changes.
      * @param int $txId
-     * @param PDO $curState
-     * @param PDO $prevState
+     * @param Pgsql $curState
+     * @param Pgsql $prevState
      * @return void
      */
-    private function commitTransaction(int $txId, PDO $curState, PDO $prevState): void {
+    private function commitTransaction(int $txId, Pgsql $curState, Pgsql $prevState): void {
         $this->log->info("Transaction $txId - commit");
 
         if ($this->config->transactionController->simplifyMetaHistory) {
