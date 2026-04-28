@@ -23,11 +23,12 @@ if [ ! -f /var/www/html/config.yaml ]; then
 fi
 
 if [ ! -d /var/www/postgresql ]; then
-    su -l www-data -c '/usr/lib/postgresql/18/bin/initdb -D /var/www/postgresql --auth=ident -U www-data --locale en_US.UTF-8'
-    su -l www-data -c '/usr/lib/postgresql/18/bin/pg_ctl start -D /var/www/postgresql' && \
-    su -l www-data -c 'createdb -O www-data www-data' && \
-    su -l www-data -c 'psql -f /var/www/html/build/db_schema.sql' && \
-    su -l www-data -c '/usr/lib/postgresql/18/bin/pg_ctl stop -D /var/www/postgresql'
+    PG_VERSION="`ls -1 /usr/lib/postgresql/ | head -n 1`"
+    su -l www-data -c "/usr/lib/postgresql/$PG_VERSION/bin/initdb -D /var/www/postgresql --auth=ident -U www-data --locale en_US.UTF-8"
+    su -l www-data -c "/usr/lib/postgresql/$PG_VERSION/bin/pg_ctl start -D /var/www/postgresql" && \
+    su -l www-data -c "createdb -O www-data www-data" && \
+    su -l www-data -c "psql -f /var/www/html/build/db_schema.sql" && \
+    su -l www-data -c "/usr/lib/postgresql/$PG_VERSION/bin/pg_ctl stop -D /var/www/postgresql"
 fi
 
 /usr/bin/supervisord -c /root/supervisord.conf
