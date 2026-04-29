@@ -1,7 +1,7 @@
 # ARCHE-core
 
 [![Latest Stable Version](https://poser.pugx.org/acdh-oeaw/arche-core/v/stable)](https://packagist.org/packages/acdh-oeaw/arche-core)
-![Build status](https://github.com/acdh-oeaw/arche-core/workflows/phpunit/badge.svg?branch=master)
+[![Build Status](https://github.com/acdh-oeaw/arche-core/actions/workflows/test.yml/badge.svg)](https://github.com/acdh-oeaw/arche-core/actions/workflows/test.yml)
 [![Coverage Status](https://coveralls.io/repos/github/acdh-oeaw/arche-core/badge.svg?branch=master)](https://coveralls.io/github/acdh-oeaw/arche-core?branch=master)
 [![License](https://poser.pugx.org/acdh-oeaw/arche-core/license)](https://packagist.org/packages/acdh-oeaw/arche-core)
 
