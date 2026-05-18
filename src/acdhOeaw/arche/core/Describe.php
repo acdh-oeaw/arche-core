@@ -59,7 +59,7 @@ class Describe {
                 'urlBase'  => RC::$config->rest->urlBase,
                 'pathBase' => RC::$config->rest->pathBase,
             ],
-            'nonRelationProperties' => RC::$config->metadataManager->nonRelationProperties,
+            'nonRelationProperties' => RC::$config->metadataManagment->nonRelationProperties,
             'schema'                => RC::$config->schema,
             'collation'             => [
                 'default'   => $collation,
