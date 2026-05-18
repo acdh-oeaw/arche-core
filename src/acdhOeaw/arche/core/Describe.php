@@ -41,7 +41,7 @@ use function \GuzzleHttp\json_encode;
 class Describe {
 
     public function head(bool $get = false): void {
-        $query = "
+        $query     = "
             SELECT coalesce(mv.collation_name, db.datcollate) 
             FROM
                 (
@@ -52,15 +52,16 @@ class Describe {
                 (SELECT datcollate FROM pg_database WHERE datname = current_database()) db
         ";
         $collation = RC::$pdo->query($query)->fetchColumn();
-        $cfg = [
-            'version'   => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
-            'rest'      => [
+        $cfg       = [
+            'version'               => InstalledVersions::getVersion('acdh-oeaw/arche-core'),
+            'rest'                  => [
                 'headers'  => RC::$config->rest->headers,
                 'urlBase'  => RC::$config->rest->urlBase,
-                'pathBase' => RC::$config->rest->pathBase
+                'pathBase' => RC::$config->rest->pathBase,
             ],
-            'schema'    => RC::$config->schema,
-            'collation' => [
+            'nonRelationProperties' => RC::$config->metadataManager->nonRelationProperties,
+            'schema'                => RC::$config->schema,
+            'collation'             => [
                 'default'   => $collation,
                 'available' => RC::$pdo->query("SELECT DISTINCT collname FROM pg_collation ORDER BY 1")->fetchAll(PDO::FETCH_COLUMN),
             ],
