@@ -569,7 +569,7 @@ class SearchTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
         $body     = (string) file_get_contents(__DIR__ . '/data/baedeker.xml');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $req      = new Request('POST', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
@@ -759,7 +759,7 @@ class SearchTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
         $body         = (string) file_get_contents(__DIR__ . '/data/baedeker.xml');
-        $req          = new Request('post', self::$baseUrl, $headers, $body);
+        $req          = new Request('POST', self::$baseUrl, $headers, $body);
         $resp         = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location     = $resp->getHeader('Location')[0];
@@ -846,7 +846,7 @@ class SearchTest extends TestBase {
     }
 
     public function testOptions(): void {
-        $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . 'search'));
         $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
     }
 
@@ -972,7 +972,7 @@ class SearchTest extends TestBase {
     }
 
     public function testWrongHttpMethod(): void {
-        $resp = self::$client->send(new Request('put', self::$baseUrl . 'search'));
+        $resp = self::$client->send(new Request('PUT', self::$baseUrl . 'search'));
         $this->assertEquals(405, $resp->getStatusCode());
     }
 
@@ -1005,16 +1005,16 @@ class SearchTest extends TestBase {
             self::$config->rest->headers->transactionId => $txId,
             'Eppn'                                      => 'admin',
         ];
-        $resp    = self::$client->send(new Request('delete', $r1, $headers));
+        $resp    = self::$client->send(new Request('DELETE', $r1, $headers));
         $this->assertEquals(200, $resp->getStatusCode());
-        $resp    = self::$client->send(new Request('get', $r1));
+        $resp    = self::$client->send(new Request('GET', $r1));
         $this->assertEquals(410, $resp->getStatusCode());
         $g       = $this->runSearch($opts);
         $matches = $g->listSubjects($matchTmpl)->getValues();
         $this->assertEquals([$r2], $matches);
         $this->commitTransaction($txId);
 
-        $resp    = self::$client->send(new Request('get', $r1));
+        $resp    = self::$client->send(new Request('GET', $r1));
         $this->assertEquals(410, $resp->getStatusCode());
         $g       = $this->runSearch($opts);
         $matches = $g->listSubjects($matchTmpl)->getValues();

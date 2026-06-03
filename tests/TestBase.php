@@ -135,25 +135,25 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     }
 
     protected function beginTransaction(): int {
-        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $req  = new Request('POST', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         return (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? throw new RuntimeException("Failed to begin a transaction"));
     }
 
     protected function commitTransaction(int $txId): int {
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('PUT', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         return $resp->getStatusCode();
     }
 
     protected function rollbackTransaction(int $txId): int {
-        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('DELETE', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         return $resp->getStatusCode();
     }
 
     protected function waitForTransactionEnd(int $txId, int $tMax = 5): void {
-        $req  = new Request('get', self::$baseUrl . 'transaction?transactionId=' . $txId);
+        $req  = new Request('GET', self::$baseUrl . 'transaction?transactionId=' . $txId);
         $resp = null;
         while ($tMax > 0 && $resp?->getStatusCode() !== 400) {
             usleep(500000);
@@ -190,7 +190,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Eppn'                                      => 'admin',
         ];
         $body    = (string) file_get_contents($path);
-        $req     = new Request('post', self::$baseUrl, $headers, $body);
+        $req     = new Request('POST', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
 
         if (!$extTx) {
@@ -221,7 +221,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Eppn'                                      => 'admin',
         ];
         $body    = self::$serializer->serialize($meta);
-        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
+        $req     = new Request('POST', self::$baseUrl . 'metadata', $headers, $body);
         $resp    = self::$client->send($req);
 
         if (!$extTx) {
@@ -247,7 +247,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Eppn'                                          => 'admin',
         ];
         $body    = self::$serializer->serialize($meta);
-        $req     = new Request('patch', $meta->getNode()->getValue() . '/metadata', $headers, $body);
+        $req     = new Request('PATCH', $meta->getNode()->getValue() . '/metadata', $headers, $body);
         $resp    = self::$client->send($req);
 
         if (!$extTx) {
@@ -263,7 +263,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             $txId = $this->beginTransaction();
         }
 
-        $req  = new Request('delete', $location, $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
 
         if (!$extTx) {
@@ -294,7 +294,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     }
 
     protected function getResourceMeta(string $location): DatasetNode {
-        $req  = new Request('get', $location . '/metadata');
+        $req  = new Request('GET', $location . '/metadata');
         $resp = self::$client->send($req);
         return $this->extractResource($resp, $location);
     }

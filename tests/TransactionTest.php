@@ -63,13 +63,13 @@ class TransactionTest extends TestBase {
     }
 
     public function testGet(): void {
-        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $req  = new Request('POST', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data = json_decode($resp->getBody());
@@ -79,7 +79,7 @@ class TransactionTest extends TestBase {
 
     public function testProlong(): void {
         $txId = $this->beginTransaction();
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
 
         sleep(self::$config->transactionController->timeout / 2);
         $resp = self::$client->send($req);
@@ -102,22 +102,22 @@ class TransactionTest extends TestBase {
         $txId = $this->beginTransaction();
         sleep(self::$config->transactionController->timeout * 2);
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
 
-        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('DELETE', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
 
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('PUT', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
@@ -125,32 +125,32 @@ class TransactionTest extends TestBase {
 
     public function testEmpty(): void {
         // commit
-        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $req  = new Request('POST', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('PUT', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
 
         // rollback
-        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $req  = new Request('POST', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $txId = (int) ($resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? -1);
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('DELETE', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
     }
@@ -163,14 +163,14 @@ class TransactionTest extends TestBase {
         $globPath = $this->getGlobPath($location);
         $this->assertCount(1, glob($globPath));
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'created file content mismatch');
 
         $this->assertEquals(204, $this->rollbackTransaction($txId));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
         $this->assertCount(0, glob($globPath . "*"));
@@ -180,7 +180,7 @@ class TransactionTest extends TestBase {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
         $globPath = $this->getGlobPath($location);
-        $req      = new Request('get', $location, $this->getHeaders());
+        $req      = new Request('GET', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertCount(1, glob($globPath));
@@ -191,7 +191,7 @@ class TransactionTest extends TestBase {
         $this->assertGreaterThan(0, $txId);
 
         // delete the resource and make sure it's not there
-        $req  = new Request('delete', $location, $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta = new Dataset();
@@ -200,20 +200,20 @@ class TransactionTest extends TestBase {
         $this->assertCount(0, glob($globPath));
         $this->assertCount(1, glob($globPath . "." . $txId));
 
-        $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $this->assertCount(0, glob($globPath));
         $this->assertCount(1, glob($globPath . "." . $txId));
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
 
         // rollback the transaction and check if the resource is back
         $this->assertEquals(204, $this->rollbackTransaction($txId));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
@@ -225,7 +225,7 @@ class TransactionTest extends TestBase {
         // set up and remember an initial state
         $location = $this->createBinaryResource();
 
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $req  = new Request('GET', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->extractResource($resp, $location);
@@ -237,7 +237,7 @@ class TransactionTest extends TestBase {
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req     = new Request('patch', $location . '/metadata', $headers, self::$serializer->serialize($meta));
+        $req     = new Request('PATCH', $location . '/metadata', $headers, self::$serializer->serialize($meta));
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
@@ -247,7 +247,7 @@ class TransactionTest extends TestBase {
         $this->rollbackTransaction($txId);
 
         // make sure nothing changed after transaction commit
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $req  = new Request('GET', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
@@ -267,10 +267,10 @@ class TransactionTest extends TestBase {
         $this->updateResource($meta2, $txId);
         $this->rollbackTransaction($txId);
 
-        $req  = new Request('get', $loc1);
+        $req  = new Request('GET', $loc1);
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
-        $req  = new Request('get', $loc2);
+        $req  = new Request('GET', $loc2);
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
     }
@@ -327,20 +327,20 @@ class TransactionTest extends TestBase {
 
         $txId     = $this->beginTransaction();
         $location = $this->createBinaryResource($txId);
-        $req      = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $req      = new Request('GET', $location . '/metadata', $this->getHeaders($txId));
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
-        $req  = new Request('get', $location . '/foo', $this->getHeaders($txId));
+        $req  = new Request('GET', $location . '/foo', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
 
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $req  = new Request('GET', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
     }
@@ -368,10 +368,10 @@ class TransactionTest extends TestBase {
         $meta3 = $this->getResourceMeta($loc3);
         $this->assertEquals($loc1, $meta3->getObjectValue(new PT(self::$schema->parent)));
 
-        $req1  = new Request('get', "$loc1/metadata");
+        $req1  = new Request('GET', "$loc1/metadata");
         $resp1 = self::$client->send($req1);
         $this->assertEquals(200, $resp1->getStatusCode());
-        $req2  = new Request('get', "$loc2/metadata");
+        $req2  = new Request('GET', "$loc2/metadata");
         $resp2 = self::$client->send($req2);
         $this->assertEquals(404, $resp2->getStatusCode());
     }
@@ -384,7 +384,7 @@ class TransactionTest extends TestBase {
         $loc        = $this->createMetadataResource();
         $rid        = (int) preg_replace('`^.*/`', '', $loc);
         $storageLoc = BinaryPayload::getStorageDir($rid, self::$config->storage->dir, 0, self::$config->storage->levels) . "/$rid";
-        $testReq    = new Request('get', $loc, ['Eppn' => 'admin']);
+        $testReq    = new Request('GET', $loc, ['Eppn' => 'admin']);
 
         $tx   = $this->beginTransaction();
         $resp = self::$client->send($testReq);
@@ -397,7 +397,7 @@ class TransactionTest extends TestBase {
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $req     = new Request('put', $loc, $headers, (string) file_get_contents(__DIR__ . '/data/test.ttl'));
+        $req     = new Request('PUT', $loc, $headers, (string) file_get_contents(__DIR__ . '/data/test.ttl'));
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $resp    = self::$client->send($testReq);
@@ -413,7 +413,7 @@ class TransactionTest extends TestBase {
 
     public function testUpdateBinaryRollback(): void {
         $loc         = $this->createBinaryResource();
-        $testReq     = new Request('get', $loc, ['Eppn' => 'admin']);
+        $testReq     = new Request('GET', $loc, ['Eppn' => 'admin']);
         $prevContent = (string) self::$client->send($testReq)->getBody();
 
         $tx      = $this->beginTransaction();
@@ -421,7 +421,7 @@ class TransactionTest extends TestBase {
             self::$config->rest->headers->transactionId => $tx,
             'Eppn'                                      => 'admin',
         ];
-        $req     = new Request('put', $loc, $headers, "adjusted content");
+        $req     = new Request('PUT', $loc, $headers, "adjusted content");
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $resp    = self::$client->send($testReq);
@@ -435,12 +435,12 @@ class TransactionTest extends TestBase {
     }
 
     public function testOptions(): void {
-        $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . 'transaction'));
         $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
     public function testWrongHttpMethod(): void {
-        $resp = self::$client->send(new Request('patch', self::$baseUrl . 'transaction'));
+        $resp = self::$client->send(new Request('PATCH', self::$baseUrl . 'transaction'));
         $this->assertEquals(405, $resp->getStatusCode());
     }
 
@@ -465,13 +465,13 @@ class TransactionTest extends TestBase {
             'Content-Type'                              => 'application/n-triples',
         ];
 
-        $req  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $req  = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp->getBody(), $location);
         $this->assertEquals('value1', $res->getObjectValue(new PT($prop)));
 
-        $req  = new Request('put', self::$baseUrl . 'transaction', $headers);
+        $req  = new Request('PUT', self::$baseUrl . 'transaction', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
     }

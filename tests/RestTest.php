@@ -59,7 +59,7 @@ class RestTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
         $body     = (string) file_get_contents(__DIR__ . '/data/test.ttl');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $req      = new Request('POST', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? '';
@@ -67,12 +67,12 @@ class RestTest extends TestBase {
         $metaN1   = new DatasetNode(DF::namedNode($location));
         $metaN1->add(RdfIoUtil::parse($resp, new DF()));
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
 
-        $req    = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $req    = new Request('GET', $location . '/metadata', $this->getHeaders($txId));
         $resp   = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $metaN2 = new DatasetNode(DF::namedNode($location));
@@ -82,7 +82,7 @@ class RestTest extends TestBase {
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
@@ -99,7 +99,7 @@ class RestTest extends TestBase {
             'application/rdf+xml'];
         foreach ($formats as $f) {
             $headers['Accept'] = $f;
-            $req               = new Request('get', $location . '/metadata', $headers);
+            $req               = new Request('GET', $location . '/metadata', $headers);
             $resp              = self::$client->send($req);
             $this->assertEquals(200, $resp->getStatusCode());
             $this->assertEquals($f, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
@@ -112,12 +112,12 @@ class RestTest extends TestBase {
             }
         }
 
-        $req  = new Request('get', $location . '/metadata?format=text/html');
+        $req  = new Request('GET', $location . '/metadata?format=text/html');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/html', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
 
-        $req  = new Request('get', $location . '/metadata?format=foo/bar');
+        $req  = new Request('GET', $location . '/metadata?format=foo/bar');
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Unsupported metadata format requested', $resp->getBody());
@@ -134,7 +134,7 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('delete', $location, $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta = new DatasetNode(DF::namedNode($location));
@@ -143,13 +143,13 @@ class RestTest extends TestBase {
         $this->assertCount(0, glob($globPath));
         $this->assertCount(1, glob($globPath . "." . $txId));
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
         $this->assertCount(0, glob($globPath . '*'));
@@ -160,7 +160,7 @@ class RestTest extends TestBase {
         $this->deleteResource($location);
 
         // make sure tombstone is there
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
@@ -168,17 +168,17 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
     }
@@ -188,7 +188,7 @@ class RestTest extends TestBase {
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
-        $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
+        $req  = new Request('DELETE', $location . '/tombstone', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(405, $resp->getStatusCode());
 
@@ -206,14 +206,14 @@ class RestTest extends TestBase {
         $headers                                                       = $this->getHeaders($txId);
         $headers[self::$config->rest->headers->metadataParentProperty] = self::$config->schema->parent;
 
-        $req     = new Request('delete', $loc1, $headers);
+        $req     = new Request('DELETE', $loc1, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta    = new Dataset();
         $meta->add(RdfIoUtil::parse($resp, new DF()));
         $deleted = $meta->listObjects(new PT(self::$schema->id))->getValues();
         foreach ($deleted as $delres) {
-            $resp = self::$client->send(new Request('get', $delres));
+            $resp = self::$client->send(new Request('GET', $delres));
             $this->assertEquals(410, $resp->getStatusCode());
         }
         $this->assertContains($loc1, $deleted);
@@ -222,7 +222,7 @@ class RestTest extends TestBase {
         $this->commitTransaction($txId);
 
         foreach ($deleted as $delres) {
-            $resp = self::$client->send(new Request('get', $delres));
+            $resp = self::$client->send(new Request('GET', $delres));
             $this->assertEquals(410, $resp->getStatusCode());
         }
     }
@@ -236,21 +236,21 @@ class RestTest extends TestBase {
         $meta->add(DF::quadNoSubject(self::$schema->parent, df::namedNode($loc1)));
         $loc2 = $this->createMetadataResource($meta, $txId);
 
-        $req  = new Request('delete', $loc1, $headers);
+        $req  = new Request('DELETE', $loc1, $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(409, $resp->getStatusCode());
 
         $headers[self::$config->rest->headers->withReferences] = 1;
-        $req                                                   = new Request('delete', $loc1, $headers);
+        $req                                                   = new Request('DELETE', $loc1, $headers);
         $resp                                                  = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
 
-        $req  = new Request('get', $loc1);
+        $req  = new Request('GET', $loc1);
         $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
-        $req  = new Request('get', $loc2 . '/metadata');
+        $req  = new Request('GET', $loc2 . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $meta = new DatasetNode(DF::namedNode($loc1));
@@ -267,7 +267,7 @@ class RestTest extends TestBase {
         $this->commitTransaction($txId);
 
         $txId = $this->beginTransaction();
-        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $req  = new Request('DELETE', $loc1, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(409, $resp->getStatusCode());
     }
@@ -280,7 +280,7 @@ class RestTest extends TestBase {
         $meta->add(DF::quadNoSubject(self::$schema->parent, DF::namedNode($loc1)));
         $this->createMetadataResource($meta, $txId);
 
-        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $req  = new Request('DELETE', $loc1, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(409, $resp->getStatusCode());
     }
@@ -288,7 +288,7 @@ class RestTest extends TestBase {
     public function testHead(): void {
         $location = $this->createBinaryResource();
 
-        $req  = new Request('head', $location, $this->getHeaders());
+        $req  = new Request('HEAD', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals("attachment; filename*=UTF-8''test.ttl", $resp->getHeader('Content-Disposition')[0] ?? '');
@@ -299,32 +299,32 @@ class RestTest extends TestBase {
         }
 
         $headers = array_merge($this->getHeaders(), ['Accept' => 'application/n-triples']);
-        $req     = new Request('head', $location . '/metadata', $headers);
+        $req     = new Request('HEAD', $location . '/metadata', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('application/n-triples', $resp->getHeader('Content-Type')[0] ?? '');
 
         $headers = array_merge($this->getHeaders(), ['Accept' => 'text/*']);
-        $req     = new Request('head', $location . '/metadata', $headers);
+        $req     = new Request('HEAD', $location . '/metadata', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
     }
 
     public function testOptions(): void {
-        $resp = self::$client->send(new Request('options', self::$baseUrl));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = self::$client->send(new Request('options', self::$baseUrl . 'metadata'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . 'metadata'));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = self::$client->send(new Request('options', self::$baseUrl . '1'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . '1'));
         $this->assertEquals('OPTIONS, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = self::$client->send(new Request('options', self::$baseUrl . '1/metadata'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . '1/metadata'));
         $this->assertEquals('OPTIONS, HEAD, GET, PATCH', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = self::$client->send(new Request('options', self::$baseUrl . '1/tombstone'));
+        $resp = self::$client->send(new Request('OPTIONS', self::$baseUrl . '1/tombstone'));
         $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
@@ -332,7 +332,7 @@ class RestTest extends TestBase {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
         $globPath = $this->getGlobPath($location);
-        $req      = new Request('get', $location, $this->getHeaders());
+        $req      = new Request('GET', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertCount(1, glob($globPath));
@@ -346,12 +346,12 @@ class RestTest extends TestBase {
             'Eppn'                                         => 'admin',
         ];
         $body    = (string) file_get_contents(__FILE__);
-        $req     = new Request('put', $location, $headers, $body);
+        $req     = new Request('PUT', $location, $headers, $body);
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $this->assertEmpty((string) $resp->getBody());
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
@@ -361,7 +361,7 @@ class RestTest extends TestBase {
 
         $this->commitTransaction($txId);
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
@@ -372,7 +372,7 @@ class RestTest extends TestBase {
     public function testPutReturnMeta(): void {
         // create a resource and make sure it's there
         $location = $this->createBinaryResource();
-        $req      = new Request('get', $location, $this->getHeaders());
+        $req      = new Request('GET', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
@@ -385,7 +385,7 @@ class RestTest extends TestBase {
             'Eppn'                                         => 'admin',
         ];
         $body    = (string) file_get_contents(__FILE__);
-        $req     = new Request('put', $location, $headers, $body);
+        $req     = new Request('PUT', $location, $headers, $body);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
@@ -406,7 +406,7 @@ class RestTest extends TestBase {
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
+        $req     = new Request('POST', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
         $resp    = self::$client->send($req);
 
         $this->assertEquals(201, $resp->getStatusCode());
@@ -415,12 +415,12 @@ class RestTest extends TestBase {
         $metaN1   = new DatasetNode(DF::namedNode($location));
         $metaN1->add(RdfIoUtil::parse($resp, new DF()));
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertEquals($location . '/metadata', $resp->getHeader('Location')[0]);
 
-        $req     = new Request('get', $location . '/metadata', $this->getHeaders());
+        $req     = new Request('GET', $location . '/metadata', $this->getHeaders());
         $resp    = self::$client->send($req);
         $body    = $resp->getBody();
         $this->assertEquals(200, $resp->getStatusCode());
@@ -448,14 +448,14 @@ class RestTest extends TestBase {
         $this->assertEquals(204, $this->commitTransaction($txId));
 
         // check if everything is still in place after the transaction end
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $req  = new Request('GET', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals((string) $body, (string) $resp->getBody());
 
         // check automatically created resource metadata
         $locationA = $metaN2->getObjectValue($relTmpl);
-        $req       = new Request('get', $locationA . '/metadata', $this->getHeaders());
+        $req       = new Request('GET', $locationA . '/metadata', $this->getHeaders());
         $resp      = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $metaA     = new DatasetNode(DF::namedNode($locationA));
@@ -555,7 +555,7 @@ class RestTest extends TestBase {
             'Content-Type'                              => 'application/n-triples',
             'Eppn'                                      => 'admin',
         ];
-        $req      = new Request('patch', $location . '/metadata', $headers);
+        $req      = new Request('PATCH', $location . '/metadata', $headers);
         $resp     = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Begin transaction first', (string) $resp->getBody());
@@ -591,7 +591,7 @@ class RestTest extends TestBase {
             'Eppn'                                      => 'admin',
         ];
         $body    = self::$serializer->serialize($meta);
-        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
+        $req     = new Request('POST', self::$baseUrl . 'metadata', $headers, $body);
         $resp    = self::$client->send($req);
         $this->rollbackTransaction($txId);
         $this->assertEquals(409, $resp->getStatusCode());
@@ -604,17 +604,17 @@ class RestTest extends TestBase {
         $location = $this->createBinaryResource();
         $txHeader = self::$config->rest->headers->transactionId;
 
-        $req  = new Request('get', $location, $this->getHeaders());
+        $req  = new Request('GET', $location, $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
         $txId = $this->beginTransaction();
 
-        $req  = new Request('put', $location, $this->getHeaders($txId), '');
+        $req  = new Request('PUT', $location, $this->getHeaders($txId), '');
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $req  = new Request('GET', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertEquals($location . '/metadata', $resp->getHeader('Location')[0]);
@@ -625,7 +625,7 @@ class RestTest extends TestBase {
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertEquals($location . '/metadata', $resp->getHeader('Location')[0]);
 
-        $req  = new Request('get', $location . '/metadata');
+        $req  = new Request('GET', $location . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
@@ -638,7 +638,7 @@ class RestTest extends TestBase {
         $location = $this->createBinaryResource();
 
         $txId = $this->beginTransaction();
-        $req  = new Request('patch', $location . '/metadata', $this->getHeaders($txId), '');
+        $req  = new Request('PATCH', $location . '/metadata', $this->getHeaders($txId), '');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->commitTransaction($txId);
@@ -648,7 +648,7 @@ class RestTest extends TestBase {
         $location                                                = $this->createBinaryResource();
         $headers                                                 = $this->getHeaders();
         $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_NONE;
-        $req                                                     = new Request('get', "$location/metadata", $headers);
+        $req                                                     = new Request('GET', "$location/metadata", $headers);
         $resp                                                    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $this->assertEmpty((string) $resp->getBody());
@@ -671,7 +671,7 @@ class RestTest extends TestBase {
             self::$config->rest->headers->metadataReadMode       => RRI::META_RELATIVES,
             self::$config->rest->headers->metadataParentProperty => self::$schema->parent->getValue(),
         ];
-        $req     = new Request('get', $m[0]->getNode()->getValue() . '/metadata', $headers);
+        $req     = new Request('GET', $m[0]->getNode()->getValue() . '/metadata', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $g       = new Dataset();
@@ -718,7 +718,7 @@ class RestTest extends TestBase {
         ]);
         $locRef  = $this->createMetadataResource($metaRef, $txId);
 
-        $req  = new Request('put', self::$baseUrl . "merge/$id2/$id1", $headers);
+        $req  = new Request('PUT', self::$baseUrl . "merge/$id2/$id1", $headers);
         $resp = self::$client->send($req);
 
         $this->assertEquals(200, $resp->getStatusCode());
@@ -735,11 +735,11 @@ class RestTest extends TestBase {
         $this->assertEquals(['2'], $meta->listObjects($barTmpl)->getValues());
         $this->assertEquals(['B'], $meta->listObjects($bazTmpl)->getValues());
 
-        $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
+        $resp    = self::$client->send(new Request('GET', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
-        $resp    = self::$client->send(new Request('get', $loc2));
+        $resp    = self::$client->send(new Request('GET', $loc2));
         $this->assertEquals(404, $resp->getStatusCode());
-        $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+        $resp    = self::$client->send(new Request('GET', "$locRef/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
         $metaRef = new DatasetNode(DF::namedNode($locRef));
         $metaRef->add(RdfIoUtil::parse($resp, new DF()));
@@ -747,11 +747,11 @@ class RestTest extends TestBase {
 
         $this->commitTransaction($txId);
 
-        $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
+        $resp    = self::$client->send(new Request('GET', "$loc1/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
-        $resp    = self::$client->send(new Request('get', $loc2));
+        $resp    = self::$client->send(new Request('GET', $loc2));
         $this->assertEquals(404, $resp->getStatusCode());
-        $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+        $resp    = self::$client->send(new Request('GET', "$locRef/metadata"));
         $this->assertEquals(200, $resp->getStatusCode());
         $metaRef = new DatasetNode(DF::namedNode($locRef));
         $metaRef->add(RdfIoUtil::parse($resp, new DF()));
@@ -799,17 +799,17 @@ class RestTest extends TestBase {
                 $headers                                                 = $this->getHeaders($txId);
                 $headers[self::$config->rest->headers->metadataReadMode] = RRI::META_RESOURCE;
 
-                $req  = new Request('put', self::$baseUrl . "merge/$mergeUrl", $headers);
+                $req  = new Request('PUT', self::$baseUrl . "merge/$mergeUrl", $headers);
                 $resp = self::$client->send($req);
                 $this->assertEquals(200, $resp->getStatusCode());
-                $resp = self::$client->send(new Request('get', "$loc1/metadata"));
+                $resp = self::$client->send(new Request('GET', "$loc1/metadata"));
                 $this->assertEquals($order ? 200 : 404, $resp->getStatusCode(), "$mergeUrl");
-                $resp = self::$client->send(new Request('get', "$loc2/metadata"));
+                $resp = self::$client->send(new Request('GET', "$loc2/metadata"));
                 $this->assertEquals($order ? 404 : 200, $resp->getStatusCode(), "$mergeUrl");
 
                 $this->assertEquals(204, $this->rollbackTransaction($txId));
 
-                $resp    = self::$client->send(new Request('get', "$loc1/metadata"));
+                $resp    = self::$client->send(new Request('GET', "$loc1/metadata"));
                 $this->assertEquals(200, $resp->getStatusCode());
                 $metaRes = new DatasetNode(DF::namedNode($loc1));
                 $metaRes->add(RdfIoUtil::parse($resp, new DF()));
@@ -817,7 +817,7 @@ class RestTest extends TestBase {
                 $this->assertContains('http://res1', $ids);
                 $this->assertEquals('1', $metaRes->getObjectValue($barTmpl));
 
-                $resp    = self::$client->send(new Request('get', "$loc2/metadata"));
+                $resp    = self::$client->send(new Request('GET', "$loc2/metadata"));
                 $this->assertEquals(200, $resp->getStatusCode());
                 $metaRes = new DatasetNode(DF::namedNode($loc2));
                 $metaRes->add(RdfIoUtil::parse($resp, new DF()));
@@ -825,7 +825,7 @@ class RestTest extends TestBase {
                 $this->assertContains('http://res2', $ids);
                 $this->assertEquals('A', $metaRes->getObjectValue($barTmpl));
 
-                $resp    = self::$client->send(new Request('get', "$locRef/metadata"));
+                $resp    = self::$client->send(new Request('GET', "$locRef/metadata"));
                 $this->assertEquals(200, $resp->getStatusCode());
                 $metaRef = new DatasetNode(DF::namedNode($locRef));
                 $metaRef->add(RdfIoUtil::parse($resp, new DF()));
@@ -839,7 +839,7 @@ class RestTest extends TestBase {
         $headers  = [
             self::$config->rest->headers->metadataReadMode => 'foo',
         ];
-        $req      = new Request('get', $location . '/metadata', $headers);
+        $req      = new Request('GET', $location . '/metadata', $headers);
         $resp     = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Bad metadata mode foo', (string) $resp->getBody());
@@ -855,7 +855,7 @@ class RestTest extends TestBase {
     }
 
     public function testMethodNotAllowed(): void {
-        $req  = new Request('put', self::$baseUrl);
+        $req  = new Request('PUT', self::$baseUrl);
         $resp = self::$client->send($req);
         $this->assertEquals(405, $resp->getStatusCode());
     }
@@ -880,7 +880,7 @@ class RestTest extends TestBase {
         $location2 = $this->createMetadataResource($meta, $txId);
         $this->assertNotEmpty($location2);
 
-        $req  = new Request('get', $location2 . '/metadata');
+        $req  = new Request('GET', $location2 . '/metadata');
         $resp = self::$client->send($req);
         $r    = new DatasetNode(DF::namedNode($location2));
         $r->add(RdfIoUtil::parse($resp, new DF()));
@@ -934,14 +934,14 @@ class RestTest extends TestBase {
 
         $res  = new DatasetNode(self::$baseNode);
         $res->add(DF::quadNoSubject(self::$schema->id, DF::namedNode(self::$baseUrl . '0')));
-        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
+        $req  = new Request('POST', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertMatchesRegularExpression('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
 
         $res  = new DatasetNode(self::$baseNode);
         $res->add(DF::quadNoSubject(self::$schema->id, DF::literal(self::$baseUrl . '0')));
-        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
+        $req  = new Request('POST', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($res));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
@@ -955,7 +955,7 @@ class RestTest extends TestBase {
             DF::quadNoSubject(DF::namedNode('https://old/date3'), DF::literal('-4714-01-01', null, RDF::XSD_DATE)),
         ]);
         $location = $this->createMetadataResource($meta);
-        $req      = new Request('get', $location . '/metadata');
+        $req      = new Request('GET', $location . '/metadata');
         $resp     = self::$client->send($req);
         $g        = new DatasetNode(DF::namedNode($location));
         $g->add(RdfIoUtil::parse($resp, new DF()));
@@ -988,7 +988,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.geojson"';
         $headers['Content-Type']        = 'application/geo+json';
         $body                           = '{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [2, 3]}}]}';
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp                           = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
@@ -1000,7 +1000,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.geojson"';
         $headers['Content-Type']        = 'application/geo+json';
         $body                           = hex2bin('EFBBBF') . '{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [2, 3]}}]}';
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp                           = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
@@ -1012,7 +1012,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.kml"';
         $headers['Content-Type']        = 'application/vnd.google-earth.kml+xml';
         $body                           = (string) file_get_contents(__DIR__ . '/data/test.kml');
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp                           = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
@@ -1024,7 +1024,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.gml"';
         $headers['Content-Type']        = 'application/gml+xml; version=3.2';
         $body                           = (string) file_get_contents(__DIR__ . '/data/test.gml');
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp                           = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
@@ -1036,7 +1036,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.tif"';
         $headers['Content-Type']        = 'image/tiff';
         $body                           = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
-        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp                           = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
@@ -1048,7 +1048,7 @@ class RestTest extends TestBase {
         $headers['Content-Disposition'] = 'attachment; filename="test.tif"';
         $headers['Content-Type']        = 'image/tiff';
         $body                           = (string) file_get_contents(__DIR__ . '/data/raster.tif');
-        $req                            = new Request('post', self::$baseUrl, $headers, $body);
+        $req                            = new Request('POST', self::$baseUrl, $headers, $body);
         $resp                           = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location                       = $resp->getHeader('Location')[0];
@@ -1067,7 +1067,7 @@ class RestTest extends TestBase {
         $headers  = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
+        $req      = new Request('POST', self::$baseUrl . 'metadata', $headers, self::$serializer->serialize($meta));
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
@@ -1096,8 +1096,8 @@ class RestTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $req1     = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
-        $req2     = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
+        $req1     = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $req2     = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
         $prom1    = self::$client->sendAsync($req1);
         $prom2    = self::$client->sendAsync($req2);
         $resp1    = $prom1->wait();
@@ -1114,18 +1114,18 @@ class RestTest extends TestBase {
             RRI::META_RELATIVES_ONLY, RRI::META_RELATIVES_REVERSE, RRI::META_RESOURCE,
             '0_0_0_0', '1', '1_2_1', '3_2_1_1', '-1_-3_0_0'];
         foreach ($readModes as $mode) {
-            $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode($mode));
+            $req  = new Request('GET', $location . '/metadata?readMode=' . rawurldecode($mode));
             $resp = self::$client->send($req);
             $this->assertEquals(200, $resp->getStatusCode());
         }
 
-        $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode(RRI::META_NONE));
+        $req  = new Request('GET', $location . '/metadata?readMode=' . rawurldecode(RRI::META_NONE));
         $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $readModes = ['0_', 'foo', '0_0_0_foo', '0_0_0_2', '0_0_2_0', '1_2_-1'];
         foreach ($readModes as $mode) {
-            $req  = new Request('get', $location . '/metadata?readMode=' . rawurldecode($mode));
+            $req  = new Request('GET', $location . '/metadata?readMode=' . rawurldecode($mode));
             $resp = self::$client->send($req);
             $this->assertEquals(400, $resp->getStatusCode());
             $this->assertStringContainsString('Bad metadata mode', (string) $resp->getBody());
@@ -1135,7 +1135,7 @@ class RestTest extends TestBase {
     public function testHttpRangeRequest(): void {
         $location = $this->createBinaryResource();
         $headers  = ['Eppn' => 'admin'];
-        $resp     = self::$client->send(new Request('get', $location, $headers));
+        $resp     = self::$client->send(new Request('GET', $location, $headers));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('bytes', $resp->getHeader('Accept-Ranges')[0] ?? '');
         $refData  = (string) $resp->getBody();
@@ -1150,7 +1150,7 @@ class RestTest extends TestBase {
         for ($i = 0; $i < $length; $i += $chunkSize) {
             $upperRange       = min($length - 1, $i + $chunkSize - 1);
             $headers['Range'] = "bytes=$i-$upperRange";
-            $resp             = self::$client->send(new Request('get', $location, $headers));
+            $resp             = self::$client->send(new Request('GET', $location, $headers));
             $this->assertEquals(206, $resp->getStatusCode());
             $chunk            = (string) $resp->getBody();
             $this->assertEquals($upperRange - $i + 1, strlen($chunk));
@@ -1165,12 +1165,12 @@ class RestTest extends TestBase {
     public function testHttpMultiRangeRequest(): void {
         $location = $this->createBinaryResource();
         $headers  = ['Eppn' => 'admin'];
-        $resp     = self::$client->send(new Request('get', $location, $headers));
+        $resp     = self::$client->send(new Request('GET', $location, $headers));
         $data     = (string) $resp->getBody();
 
         $ranges           = [[50, 99], [75, 99], [25, 83]];
         $headers['Range'] = "bytes=" . implode(',', array_map(fn($x) => "$x[0]-$x[1]", $ranges));
-        $resp             = self::$client->send(new Request('get', $location, $headers));
+        $resp             = self::$client->send(new Request('GET', $location, $headers));
         $body             = (string) $resp->getBody();
         $this->assertEquals(206, $resp->getStatusCode());
         $this->assertStringStartsWith('multipart/byteranges; boundary=', $resp->getHeader('Content-Type')[0] ?? '');
@@ -1203,13 +1203,13 @@ class RestTest extends TestBase {
         ];
         foreach ($wrongRanges as $range) {
             $headers['Range'] = 'range';
-            $resp             = self::$client->send(new Request('get', $location, $headers));
+            $resp             = self::$client->send(new Request('GET', $location, $headers));
             $this->assertEquals(416, $resp->getStatusCode(), "range: $range");
         }
     }
 
     public function testETagLastModifiedDescibe(): void {
-        $resp    = self::$client->send(new Request('get', self::$baseUrl . "describe"));
+        $resp    = self::$client->send(new Request('GET', self::$baseUrl . "describe"));
         $this->assertCount(1, $resp->getHeader('ETag'));
         $lastMod = date("D, d M Y H:i:s", filectime(__DIR__ . '/../config.yaml')) . " GMT";
         $this->assertEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
@@ -1225,7 +1225,7 @@ class RestTest extends TestBase {
 
         // create a resource and check if headers are there
         $location = $this->createBinaryResource();
-        $resp     = self::$client->send(new Request('head', $location, $headers));
+        $resp     = self::$client->send(new Request('HEAD', $location, $headers));
         $etag     = $resp->getHeader('Etag')[0] ?? '';
         $lastMod  = $resp->getHeader('Last-Modified')[0] ?? '';
         $this->assertNotEmpty($etag);
@@ -1236,11 +1236,11 @@ class RestTest extends TestBase {
         sleep(1);
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, 'test ETag nad Last-Modified headers');
+        $req                = new Request('PUT', $location, $headers, 'test ETag nad Last-Modified headers');
         $resp               = self::$client->send($req);
         $this->commitTransaction($txId);
         unset($headers[$txHeader]);
-        $resp               = self::$client->send(new Request('head', $location, $headers));
+        $resp               = self::$client->send(new Request('HEAD', $location, $headers));
         $this->assertNotEquals($etag, $resp->getHeader('Etag')[0] ?? '');
         $this->assertNotEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
         $etag               = $resp->getHeader('Etag')[0] ?? '';
@@ -1250,11 +1250,11 @@ class RestTest extends TestBase {
         sleep(1);
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, 'test ETag nad Last-Modified headers');
+        $req                = new Request('PUT', $location, $headers, 'test ETag nad Last-Modified headers');
         $resp               = self::$client->send($req);
         $this->commitTransaction($txId);
         unset($headers[$txHeader]);
-        $resp               = self::$client->send(new Request('head', $location, $headers));
+        $resp               = self::$client->send(new Request('HEAD', $location, $headers));
         $this->assertEquals($etag, $resp->getHeader('ETag')[0] ?? '');
         $this->assertNotEquals($lastMod, $resp->getHeader('Last-Modified')[0] ?? '');
     }
@@ -1292,14 +1292,14 @@ class RestTest extends TestBase {
     public function testSkipContentDisposition(): void {
         $location = $this->createBinaryResource();
 
-        $req       = new Request('get', $location, $this->getHeaders());
+        $req       = new Request('GET', $location, $this->getHeaders());
         $resp      = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(self::BINARY_RES_PATH), (string) $resp->getBody());
         $refHeader = ["attachment; filename*=UTF-8''" . basename(self::BINARY_RES_PATH)];
         $this->assertEquals($refHeader, $resp->getHeader('Content-Disposition'));
 
-        $req  = new Request('get', $location . '?skipContentDisposition=', $this->getHeaders());
+        $req  = new Request('GET', $location . '?skipContentDisposition=', $this->getHeaders());
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(self::BINARY_RES_PATH), (string) $resp->getBody());
@@ -1316,7 +1316,7 @@ class RestTest extends TestBase {
 
         // ordinary tif - shouldn't rise an error
         $body     = (string) file_get_contents(__DIR__ . '/data/raster.tif');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $req      = new Request('POST', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
@@ -1327,7 +1327,7 @@ class RestTest extends TestBase {
 
         // geoTIFF
         $body     = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
-        $resp     = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $resp     = self::$client->send(new Request('POST', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0];
         $g        = new DatasetNode(DF::namedNode($location));
@@ -1348,7 +1348,7 @@ class RestTest extends TestBase {
         $location   = $this->createMetadataResource();
         $id         = (int) preg_replace('`^.*/`', '', $location);
         $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
-        $req        = new Request('get', $location, $this->getHeaders());
+        $req        = new Request('GET', $location, $this->getHeaders());
         $resp       = self::$client->send($req);
         $this->assertEquals(302, $resp->getStatusCode());
         $this->assertFileDoesNotExist($binaryPath);
@@ -1368,7 +1368,7 @@ class RestTest extends TestBase {
         self::$pdo->query("LOCK TABLE full_text_search IN EXCLUSIVE MODE");
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, $body);
+        $req                = new Request('PUT', $location, $headers, $body);
         $resp               = self::$client->send($req);
         self::$pdo->rollBack();
         $this->assertEquals(409, $resp->getStatusCode());
@@ -1382,7 +1382,7 @@ class RestTest extends TestBase {
         self::$pdo->query("LOCK TABLE metadata IN EXCLUSIVE MODE");
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, $body);
+        $req                = new Request('PUT', $location, $headers, $body);
         $resp               = self::$client->send($req);
         self::$pdo->rollBack();
         $this->assertEquals(409, $resp->getStatusCode());
@@ -1400,7 +1400,7 @@ class RestTest extends TestBase {
         $location   = $this->createBinaryResource();
         $id         = (int) preg_replace('`^.*/`', '', $location);
         $binaryPath = BinaryPayload::getStorageDir($id, self::$config->storage->dir, 0, self::$config->storage->levels) . '/' . $id;
-        $req        = new Request('get', $location, $this->getHeaders());
+        $req        = new Request('GET', $location, $this->getHeaders());
         $resp       = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertFileExists($binaryPath);
@@ -1421,7 +1421,7 @@ class RestTest extends TestBase {
         self::$pdo->query("LOCK TABLE full_text_search IN EXCLUSIVE MODE");
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, $body);
+        $req                = new Request('PUT', $location, $headers, $body);
         $resp               = self::$client->send($req);
         self::$pdo->rollBack();
         $this->assertEquals(409, $resp->getStatusCode());
@@ -1436,7 +1436,7 @@ class RestTest extends TestBase {
         self::$pdo->query("LOCK TABLE metadata IN EXCLUSIVE MODE");
         $txId               = $this->beginTransaction();
         $headers[$txHeader] = $txId;
-        $req                = new Request('put', $location, $headers, $body);
+        $req                = new Request('PUT', $location, $headers, $body);
         $resp               = self::$client->send($req);
         self::$pdo->rollBack();
         $this->assertEquals(409, $resp->getStatusCode());
@@ -1451,7 +1451,7 @@ class RestTest extends TestBase {
 
         // describe - 1 connection needed
         $conns   = $this->saturateDbConnections($conns);
-        $request = new Request('get', self::$baseUrl . 'describe');
+        $request = new Request('GET', self::$baseUrl . 'describe');
         $resp    = self::$client->send($request);
         $this->assertEquals(429, $resp->getStatusCode());
         array_pop($conns);
@@ -1462,7 +1462,7 @@ class RestTest extends TestBase {
         $conns   = $this->saturateDbConnections($conns);
         $headers = ['content-type' => 'application/x-www-form-urlencoded'];
         $body    = http_build_query(['sql' => "SELECT -1::bigint AS id"]);
-        $request = new Request('post', self::$baseUrl . 'search', $headers, $body);
+        $request = new Request('POST', self::$baseUrl . 'search', $headers, $body);
         $resp    = self::$client->send($request);
         $this->assertEquals(429, $resp->getStatusCode());
         array_pop($conns);
@@ -1470,7 +1470,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
 
         // transaction - 4 connections needed
-        $request = new Request('post', self::$baseUrl . 'transaction');
+        $request = new Request('POST', self::$baseUrl . 'transaction');
         $minConn = 4;
         for ($i = 0; $i < $minConn; $i++) {
             $conns = $this->saturateDbConnections($conns);
@@ -1494,7 +1494,7 @@ class RestTest extends TestBase {
             'Content-Type'                              => 'text/plain',
             'Eppn'                                      => 'admin',
         ];
-        $request = new Request('post', self::$baseUrl, $headers, 'test resource content');
+        $request = new Request('POST', self::$baseUrl, $headers, 'test resource content');
         $minConn = 2;
         for ($i = 0; $i < $minConn; $i++) {
             $conns = $this->saturateDbConnections($conns);
@@ -1516,7 +1516,7 @@ class RestTest extends TestBase {
             self::$config->rest->headers->transactionId => $txId,
             'Eppn'                                      => 'admin',
         ];
-        $request = new Request('delete', self::$baseUrl . 'transaction', $headers);
+        $request = new Request('DELETE', self::$baseUrl . 'transaction', $headers);
         $minConn = 2;
         $conns   = $this->saturateDbConnections($conns);
         for ($i = 0; $i < $minConn; $i++) {

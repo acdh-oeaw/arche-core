@@ -98,7 +98,7 @@ class ParallelTest extends TestBase {
             DF::quad($r, DF::namedNode('http://foo/j'), DF::literal(str_repeat("j", 1000))),
         ]);
         $body    = self::$serializer->serialize($meta);
-        $req     = new Request('patch', "$loc/metadata", $headers, $body);
+        $req     = new Request('PATCH', "$loc/metadata", $headers, $body);
 
         // run a query locking the transaction during handler execution
         pg_send_query($conn, "SELECT pg_sleep(0.1); UPDATE transactions SET last_request = now() WHERE transaction_id = $tx;");
@@ -125,8 +125,8 @@ class ParallelTest extends TestBase {
         $headers = [
             self::$config->rest->headers->transactionId => (string) $txId,
         ];
-        $req1    = new Request('put', self::$baseUrl . 'transaction', $headers);
-        $req2    = new Request('delete', self::$baseUrl . 'transaction', $headers);
+        $req1    = new Request('PUT', self::$baseUrl . 'transaction', $headers);
+        $req2    = new Request('DELETE', self::$baseUrl . 'transaction', $headers);
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 50000);
         $this->assertEquals(204, $resp1->getStatusCode());
         $this->assertEquals(409, $resp2->getStatusCode());
@@ -142,9 +142,9 @@ class ParallelTest extends TestBase {
         $headers  = [
             self::$config->rest->headers->transactionId => (string) $txId,
         ];
-        $requests = [new Request('put', self::$baseUrl . 'transaction', $headers)];
+        $requests = [new Request('PUT', self::$baseUrl . 'transaction', $headers)];
         while (count($requests) < 15) {
-            $requests[] = new Request('get', self::$baseUrl . 'transaction', $headers);
+            $requests[] = new Request('GET', self::$baseUrl . 'transaction', $headers);
         }
         $resp = $this->runConcurrently($requests, 75000);
         $this->assertEquals(204, $resp[0]->getStatusCode());
@@ -179,8 +179,8 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $resReq  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
-        $txReq   = new Request('put', self::$baseUrl . 'transaction', $headers);
+        $resReq  = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $txReq   = new Request('PUT', self::$baseUrl . 'transaction', $headers);
         list($resResp, $txResp) = $this->runConcurrently([$resReq, $txReq], 50000);
         $this->assertEquals(200, $resResp->getStatusCode());
         $this->assertEquals(409, $txResp->getStatusCode());
@@ -201,8 +201,8 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $txReq   = new Request('put', self::$baseUrl . 'transaction', $headers);
-        $resReq  = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $txReq   = new Request('PUT', self::$baseUrl . 'transaction', $headers);
+        $resReq  = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
         list($txResp, $resResp) = $this->runConcurrently([$txReq, $resReq], 50000);
         $this->assertEquals(204, $txResp->getStatusCode());
         $this->assertEquals(409, $resResp->getStatusCode());
@@ -224,8 +224,8 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $req1    = new Request('patch', $loc1 . '/metadata', $headers, "<$loc1> <$prop> \"value1\" .");
-        $req2    = new Request('patch', $loc2 . '/metadata', $headers, "<$loc2> <$prop> \"value2\" .");
+        $req1    = new Request('PATCH', $loc1 . '/metadata', $headers, "<$loc1> <$prop> \"value1\" .");
+        $req2    = new Request('PATCH', $loc2 . '/metadata', $headers, "<$loc2> <$prop> \"value2\" .");
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $h1      = $resp1->getHeaders();
         $h2      = $resp2->getHeaders();
@@ -252,8 +252,8 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $req1    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
-        $req2    = new Request('patch', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
+        $req1    = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value1\" .");
+        $req2    = new Request('PATCH', $location . '/metadata', $headers, "<$location> <$prop> \"value2\" .");
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 50000);
         $codes   = [$resp1->getStatusCode(), $resp2->getStatusCode()];
         $this->assertContains(200, $codes);
@@ -278,8 +278,8 @@ class ParallelTest extends TestBase {
             'Eppn'                                      => 'admin',
             'Content-Type'                              => 'application/n-triples',
         ];
-        $req1    = new Request('patch', $loc1 . '/metadata', $headers, "<$loc1> <$prop> <$value> .");
-        $req2    = new Request('patch', $loc2 . '/metadata', $headers, "<$loc2> <$prop> <$value> .");
+        $req1    = new Request('PATCH', $loc1 . '/metadata', $headers, "<$loc1> <$prop> <$value> .");
+        $req2    = new Request('PATCH', $loc2 . '/metadata', $headers, "<$loc2> <$prop> <$value> .");
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $h1      = $resp1->getHeaders();
         $h2      = $resp2->getHeaders();
@@ -319,8 +319,8 @@ class ParallelTest extends TestBase {
             DF::quad(self::$baseNode, self::$schema->parent, DF::namedNode('http://res1')),
         ]);
 
-        $req1  = new Request('post', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta1));
-        $req2  = new Request('post', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta2));
+        $req1  = new Request('POST', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta1));
+        $req2  = new Request('POST', self::$baseUrl . "metadata", $headers, self::$serializer->serialize($meta2));
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $h1    = $resp1->getHeaders();
         $h2    = $resp2->getHeaders();
@@ -351,8 +351,8 @@ class ParallelTest extends TestBase {
         ]);
         $body    = self::$serializer->serialize($meta);
 
-        $req1     = new Request('post', self::$baseUrl . "metadata", $headers, $body);
-        $req2     = new Request('post', self::$baseUrl . "metadata", $headers, $body);
+        $req1     = new Request('POST', self::$baseUrl . "metadata", $headers, $body);
+        $req2     = new Request('POST', self::$baseUrl . "metadata", $headers, $body);
         list($resp1, $resp2) = $this->runConcurrently([$req1, $req2], 0);
         $statuses = [$resp1->getStatusCode(), $resp2->getStatusCode()];
         $this->assertContains(201, $statuses);
@@ -376,7 +376,7 @@ class ParallelTest extends TestBase {
 
         $tx      = $this->beginTransaction();
         $loc1    = $this->createMetadataResource(null, $tx);
-        $req1    = new Request('get', "$loc1/metadata");
+        $req1    = new Request('GET', "$loc1/metadata");
         $headers = [
             self::$config->rest->headers->transactionId => $tx,
             'Content-Type'                              => 'application/n-triples',
@@ -388,9 +388,9 @@ class ParallelTest extends TestBase {
         $meta2 = new DatasetNode(self::$baseNode);
         $meta2->add(DF::quad(self::$baseNode, self::$schema->id, DF::namedNode($loc1)));
         $body2 = self::$serializer->serialize($meta2);
-        $req2  = new Request('post', self::$baseUrl . 'metadata', $headers, $body2);
+        $req2  = new Request('POST', self::$baseUrl . 'metadata', $headers, $body2);
 
-        $req3 = new Request('post', self::$baseUrl . 'metadata', $headers, '');
+        $req3 = new Request('POST', self::$baseUrl . 'metadata', $headers, '');
 
         $requests  = [$req2, $req3, $req3, $req3, $req3, $req3, $req3, $req3, $req3,
             $req3];

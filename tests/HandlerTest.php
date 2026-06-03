@@ -83,12 +83,12 @@ class HandlerTest extends TestBase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('post', self::$baseUrl, $this->getHeaders($txId), 'foo bar');
+        $req  = new Request('POST', self::$baseUrl, $this->getHeaders($txId), 'foo bar');
         $resp = self::$client->send($req);
         $this->assertEquals(500, $resp->getStatusCode());
         $this->assertEquals('Unknown handler type: foo', (string) $resp->getBody());
 
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('PUT', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(500, $resp->getStatusCode());
         $this->assertEquals('Unknown handler type: bar', (string) $resp->getBody());
@@ -312,7 +312,7 @@ class HandlerTest extends TestBase {
         ]);
         $this->createMetadataResource($meta, $txId);
 
-        $req  = new Request('delete', $loc1, $headers);
+        $req  = new Request('DELETE', $loc1, $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals(204, $this->commitTransaction($txId));
@@ -393,7 +393,7 @@ class HandlerTest extends TestBase {
             $this->assertEmpty($ex->getMessage());
         }
 
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('GET', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals("Transaction $txId doesn't exist", (string) $resp->getBody());
@@ -410,7 +410,7 @@ class HandlerTest extends TestBase {
         $cfg['rest']['handlers']['rabbitMq']['host'] = 'foo';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
-        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $req  = new Request('POST', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(500, $resp->getStatusCode());
         $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());

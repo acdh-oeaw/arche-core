@@ -66,15 +66,15 @@ class AuthTest extends TestBase {
         $txId    = $this->beginTransaction();
         $headers = [self::$config->rest->headers->transactionId => (string) $txId];
 
-        $req  = new Request('delete', $location, $headers);
+        $req  = new Request('DELETE', $location, $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
-        $req  = new Request('delete', $location, array_merge($headers, ['foo' => 'badUser']));
+        $req  = new Request('DELETE', $location, array_merge($headers, ['foo' => 'badUser']));
         $resp = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
-        $req  = new Request('delete', $location, array_merge($headers, ['foo' => 'admin']));
+        $req  = new Request('DELETE', $location, array_merge($headers, ['foo' => 'admin']));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
@@ -89,10 +89,10 @@ class AuthTest extends TestBase {
         $query->execute([$id, $prop]);
         $query        = self::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value) VALUES (?, ?, '', '', ?)");
         $query->execute([$id, $prop, $cfg['accessControl']['adminRoles'][0]]);
-        $req          = new Request('get', $location, []);
+        $req          = new Request('GET', $location, []);
         $resp         = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $req          = new Request('get', $location, ['foo' => 'ssouser']);
+        $req          = new Request('GET', $location, ['foo' => 'ssouser']);
         $resp         = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         
@@ -100,10 +100,10 @@ class AuthTest extends TestBase {
         $query->execute([$id, $prop]);
         $query        = self::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value) VALUES (?, ?, '', '', ?)");
         $query->execute([$id, $prop, $loggedInRole]);
-        $req          = new Request('get', $location, []);
+        $req          = new Request('GET', $location, []);
         $resp         = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $req          = new Request('get', $location, ['foo' => 'ssouser']);
+        $req          = new Request('GET', $location, ['foo' => 'ssouser']);
         $resp         = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
     }
@@ -132,25 +132,25 @@ class AuthTest extends TestBase {
         ];
         $body    = (string) file_get_contents(__DIR__ . '/data/test.ttl');
 
-        $req  = new Request('post', self::$baseUrl, $headers, $body);
+        $req  = new Request('POST', self::$baseUrl, $headers, $body);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
         $this->assertEquals(['Basic realm="repo"'], $resp->getHeader('WWW-Authenticate'));
 
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:_wrong_password_");
-        $req                      = new Request('post', self::$baseUrl, $headers, $body);
+        $req                      = new Request('POST', self::$baseUrl, $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:$pswd");
-        $req                      = new Request('post', self::$baseUrl, $headers, $body);
+        $req                      = new Request('POST', self::$baseUrl, $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
     }
 
     public function testEnforceOnMeta(): void {
         $location = $this->createBinaryResource();
-        $req      = new Request('get', $location . '/metadata');
+        $req      = new Request('GET', $location . '/metadata');
 
         $cfg                                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['accessControl']['create']['assignRoles']['read'] = [];
@@ -177,7 +177,7 @@ class AuthTest extends TestBase {
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
         $location = $this->createBinaryResource();
-        $req      = new Request('get', $location . '/metadata');
+        $req      = new Request('GET', $location . '/metadata');
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
     }
@@ -201,7 +201,7 @@ class AuthTest extends TestBase {
             self::$config->rest->headers->transactionId          => (string) $txId,
             self::$config->rest->headers->metadataParentProperty => $relProp,
         ];
-        $req     = new Request('delete', $loc1, $headers);
+        $req     = new Request('DELETE', $loc1, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
@@ -209,7 +209,7 @@ class AuthTest extends TestBase {
             self::$config->rest->headers->transactionId  => (string) $txId,
             self::$config->rest->headers->withReferences => 1,
         ];
-        $req     = new Request('delete', $loc1, $headers);
+        $req     = new Request('DELETE', $loc1, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
     }

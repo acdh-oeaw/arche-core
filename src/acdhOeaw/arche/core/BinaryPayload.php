@@ -392,7 +392,7 @@ class BinaryPayload {
         if (substr($tika, 0, 4) === 'http') {
             $client = new Client(['http_errors' => false]);
             $input  = fopen($this->tmpPath, 'r') ?: throw new RepoException("Failed to open binary for indexing");
-            $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
+            $req    = new Request('PUT', $tika . 'tika', ['Accept' => 'text/plain'], $input);
             $resp   = $client->send($req);
             if ($resp->getStatusCode() === 200) {
                 $body   = (string) $resp->getBody();
