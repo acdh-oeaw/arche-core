@@ -53,7 +53,7 @@ class DownloadTest extends TestBase {
     public function testSingleBinary(): void {
         $uri        = $this->createBinaryResource();
         $dwnldUri   = self::$baseUrl . 'download?ids=' . preg_replace('`^.*/`', '', $uri);
-        $req        = new Request('get', $dwnldUri, ['eppn' => 'admin']);
+        $req        = new Request('GET', $dwnldUri, ['eppn' => 'admin']);
         $resp       = self::$client->send($req);
         $content    = $this->testZipBasics($resp, 1);
         $refContent = [basename(self::BINARY_RES_PATH) => file_get_contents(self::BINARY_RES_PATH)];
@@ -85,7 +85,7 @@ class DownloadTest extends TestBase {
                 $sbj            = DF::namedNode($uri);
                 $meta           = new Dataset();
                 $meta->add(DF::quad($sbj, self::$schema->parent, $collections[$i]));
-                $req            = new Request('patch', "$uri/metadata", $headers, $serializer->serialize($meta));
+                $req            = new Request('PATCH', "$uri/metadata", $headers, $serializer->serialize($meta));
                 $resp           = self::$client->send($req);
                 $this->assertEquals(200, $resp->getStatusCode());
             }
@@ -96,7 +96,7 @@ class DownloadTest extends TestBase {
         $ids        = [self::$baseUrl . $binaries[2][1], $binaries[0][0]];
         $ids        = array_map(fn($x) => preg_replace('`^.*/`', '', $x), $ids);
         $uri        = self::$baseUrl . 'download?' . http_build_query(['ids' => $ids]);
-        $req        = new Request('get', $uri, ['eppn' => 'admin']);
+        $req        = new Request('GET', $uri, ['eppn' => 'admin']);
         $resp       = self::$client->send($req);
         $content    = $this->testZipBasics($resp, 2);
         $refContent = [
@@ -109,7 +109,7 @@ class DownloadTest extends TestBase {
         $ids        = [(string) $collections[2]];
         $ids        = array_map(fn($x) => preg_replace('`^.*/`', '', $x), $ids);
         $uri        = self::$baseUrl . 'download?' . http_build_query(['ids' => $ids]);
-        $req        = new Request('get', $uri, ['eppn' => 'admin']);
+        $req        = new Request('GET', $uri, ['eppn' => 'admin']);
         $resp       = self::$client->send($req);
         $content    = $this->testZipBasics($resp, 2);
         $refContent = [
@@ -122,7 +122,7 @@ class DownloadTest extends TestBase {
         $ids        = array_map(fn($x) => preg_replace('`^.*/`', '', $x), $ids);
         $uri        = self::$baseUrl . 'download';
         $headers    = ['eppn' => 'admin', 'content-type' => 'application/x-www-form-urlencoded'];
-        $req        = new Request('post', $uri, $headers, http_build_query(['ids' => $ids]));
+        $req        = new Request('POST', $uri, $headers, http_build_query(['ids' => $ids]));
         $resp       = self::$client->send($req);
         $content    = $this->testZipBasics($resp, 5);
         $refContent = [
@@ -158,7 +158,7 @@ class DownloadTest extends TestBase {
             if ($j === 0) {
                 $meta->add(DF::quad($sbj, DF::namedNode(self::$config->accessControl->schema->read), DF::literal($username)));
             }
-            $req  = new Request('patch', "$uri/metadata", $headers, $serializer->serialize($meta));
+            $req  = new Request('PATCH', "$uri/metadata", $headers, $serializer->serialize($meta));
             $resp = self::$client->send($req);
             $this->assertEquals(200, $resp->getStatusCode());
         }
@@ -169,21 +169,21 @@ class DownloadTest extends TestBase {
 
         // without skipping unauthorized
         $uri  = self::$baseUrl . 'download?' . http_build_query(['ids' => $ids]);
-        $req  = new Request('get', $uri);
+        $req  = new Request('GET', $uri);
         $resp = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
-        $req  = new Request('get', $uri, ['eppn' => $username]);
+        $req  = new Request('GET', $uri, ['eppn' => $username]);
         $resp = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 
         // with skipping unauthorized
         $param      = ['ids' => $ids, 'skipUnauthorized' => true];
         $uri        = self::$baseUrl . 'download?' . http_build_query($param);
-        $req        = new Request('get', $uri);
+        $req        = new Request('GET', $uri);
         $resp       = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $this->assertEquals("Unauthorized to download all requested resources", (string) $resp->getBody());
-        $req        = new Request('get', $uri, ['eppn' => $username]);
+        $req        = new Request('GET', $uri, ['eppn' => $username]);
         $resp       = self::$client->send($req);
         $content    = $this->testZipBasics($resp, 1);
         $refContent = ['collection_1-__ ąę/test.ttl' => file_get_contents(self::BINARY_RES_PATH)];

@@ -87,7 +87,7 @@ class UserApiTest extends TestBase {
         // QUERY
         $headers = ['Authorization' => self::$adminAuth];
         $query   = '?groups[]=' . urlencode(self::$createGroup) . '&password=' . self::PSWD;
-        $req     = new Request('put', self::$baseUrl . 'user/foo' . $query, $headers);
+        $req     = new Request('PUT', self::$baseUrl . 'user/foo' . $query, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
@@ -100,7 +100,7 @@ class UserApiTest extends TestBase {
         // X-WWW-URLENCODED and non-array groups
         $headers['Content-Type'] = 'application/x-www-form-urlencoded';
         $body                    = 'password=' . self::PSWD;
-        $req                     = new Request('put', self::$baseUrl . 'user/bar', $headers, $body);
+        $req                     = new Request('PUT', self::$baseUrl . 'user/bar', $headers, $body);
         $resp                    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
@@ -114,7 +114,7 @@ class UserApiTest extends TestBase {
             'groups'   => [],
             'password' => self::PSWD
         ]);
-        $req                     = new Request('put', self::$baseUrl . 'user/baz', $headers, $body);
+        $req                     = new Request('PUT', self::$baseUrl . 'user/baz', $headers, $body);
         $resp                    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
@@ -123,14 +123,14 @@ class UserApiTest extends TestBase {
         $this->assertContains(self::$publicGroup, $data->groups);
 
         // no authorization
-        $req  = new Request('put', self::$baseUrl . 'user/foobar', [], $body);
+        $req  = new Request('PUT', self::$baseUrl . 'user/foobar', [], $body);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // lack of priviledges
         $headers['Authorization'] = 'Basic ' . base64_encode('foo:' . self::PSWD);
-        $req                      = new Request('put', self::$baseUrl . 'user/foobar', $headers, $body);
+        $req                      = new Request('PUT', self::$baseUrl . 'user/foobar', $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
@@ -139,14 +139,14 @@ class UserApiTest extends TestBase {
     #[Depends('testUserCreate')]
     public function testUserGet(): void {
         // no authorization
-        $req  = new Request('get', self::$baseUrl . 'user');
+        $req  = new Request('GET', self::$baseUrl . 'user');
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // as root
         $headers = ['Authorization' => self::$adminAuth];
-        $req     = new Request('get', self::$baseUrl . 'user', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
@@ -157,7 +157,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(['archeLogin=admin%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         $data = json_decode($resp->getBody());
-        $req  = new Request('get', self::$baseUrl . 'user/foo', $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user/foo', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data = json_decode($resp->getBody());
@@ -171,7 +171,7 @@ class UserApiTest extends TestBase {
 
         // as user
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:' . self::PSWD)];
-        $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
@@ -183,7 +183,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(['archeLogin=bar%2CpublicRole%2Cacademic; path=/'], $resp->getHeader('Set-Cookie'));
 
         // /user by a non-admin user
-        $req  = new Request('get', self::$baseUrl . 'user', $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data = json_decode($resp->getBody());
@@ -199,31 +199,31 @@ class UserApiTest extends TestBase {
 
         // lack of priviledges
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
-        $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // wrong password
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:xxx')];
-        $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
 
         // non-existing user
-        $req     = new Request('get', self::$baseUrl . 'user/joe', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user/joe', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $this->assertEquals(['archeLogin=; max-Age=0; path=/'], $resp->getHeader('Set-Cookie'));
         $headers = ['Authorization' => self::$adminAuth];
-        $req     = new Request('get', self::$baseUrl . 'user/joe', $headers);
+        $req     = new Request('GET', self::$baseUrl . 'user/joe', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Set-Cookie'));
 
         // sso user out of local database
-        $req  = new Request('get', self::$baseUrl . 'user/ssouser', ['EPPN' => 'ssouser']);
+        $req  = new Request('GET', self::$baseUrl . 'user/ssouser', ['EPPN' => 'ssouser']);
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data = json_decode($resp->getBody());
@@ -239,13 +239,13 @@ class UserApiTest extends TestBase {
     public function testRedirect(): void {
         $headers = ['Authorization' => 'Basic ' . base64_encode('bar:' . self::PSWD)];
 
-        $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=/describe', $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user/bar?redirect=/describe', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(303, $resp->getStatusCode());
         $this->assertEquals(['/describe'], $resp->getHeader('Location'));
         $this->assertEquals('archeLogin=bar%2CpublicRole%2Cacademic; path=/', $resp->getHeader('Set-Cookie')[0] ?? '');
 
-        $req  = new Request('get', self::$baseUrl . 'user/bar?redirect=http%3A%2F%2Fexternal%2Flocation', $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user/bar?redirect=http%3A%2F%2Fexternal%2Flocation', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Location'));
@@ -258,25 +258,25 @@ class UserApiTest extends TestBase {
 
         // logout without credentials
         // 201 as the auth library is unable to determine the logout method
-        $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo');
+        $req  = new Request('GET', self::$baseUrl . 'user/logout?redirect=/foo');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Refresh'));
 
         // logout with valid credentials
-        $req  = new Request('get', self::$baseUrl . 'user/logout', $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user/logout', $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
         $this->assertEquals([], $resp->getHeader('Refresh'));
 
         // logout with redirect
-        $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=' . rawurldecode('/foo/bar'), $headers);
+        $req  = new Request('GET', self::$baseUrl . 'user/logout?redirect=' . rawurldecode('/foo/bar'), $headers);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
         $this->assertEquals(['0; url=/foo/bar'], $resp->getHeader('Refresh'));
         
         // logout with invalid credentials and redirect
-        $req  = new Request('get', self::$baseUrl . 'user/logout?redirect=/foo', [
+        $req  = new Request('GET', self::$baseUrl . 'user/logout?redirect=/foo', [
             'Authorization' => 'Basic ' . base64_encode('x:y')]);
         $resp = self::$client->send($req);
         $this->assertEquals(401, $resp->getStatusCode());
@@ -293,7 +293,7 @@ class UserApiTest extends TestBase {
             'other'    => 'value',
             'password' => 'newPass',
         ]);
-        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $req            = new Request('PATCH', self::$baseUrl . 'user/foo', $headers, $body);
         $resp           = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data           = json_decode($resp->getBody());
@@ -312,11 +312,11 @@ class UserApiTest extends TestBase {
             'other'    => 'value',
             'password' => self::PSWD,
         ]);
-        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $req            = new Request('PATCH', self::$baseUrl . 'user/foo', $headers, $body);
         $resp           = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
         $headers        = ['Authorization' => 'Basic ' . base64_encode('foo:newPass')];
-        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $req            = new Request('PATCH', self::$baseUrl . 'user/foo', $headers, $body);
         $resp           = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data           = json_decode($resp->getBody());
@@ -334,7 +334,7 @@ class UserApiTest extends TestBase {
     public function testUserDelete(): void {
         // as user
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
-        $req     = new Request('delete', self::$baseUrl . 'user/foo', $headers);
+        $req     = new Request('DELETE', self::$baseUrl . 'user/foo', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $resp    = self::$client->send($req->withMethod('get'));
@@ -344,7 +344,7 @@ class UserApiTest extends TestBase {
 
         // as admin
         $headers = ['Authorization' => self::$adminAuth];
-        $req     = new Request('delete', self::$baseUrl . 'user/bar', $headers);
+        $req     = new Request('DELETE', self::$baseUrl . 'user/bar', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
         $resp    = self::$client->send($req->withMethod('get'));
@@ -352,7 +352,7 @@ class UserApiTest extends TestBase {
     }
 
     public function testWrongHttpMethod(): void {
-        $resp = self::$client->send(new Request('post', self::$baseUrl . 'user'));
+        $resp = self::$client->send(new Request('POST', self::$baseUrl . 'user'));
         $this->assertEquals(405, $resp->getStatusCode());
     }
 }

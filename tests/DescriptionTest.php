@@ -48,21 +48,21 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testYaml(): void {
-        $resp = self::$client->send(new Request('get', self::$baseUrl . 'describe'));
+        $resp = self::$client->send(new Request('GET', self::$baseUrl . 'describe'));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/vnd.yaml', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0] ?? ''));
         $cfg  = yaml_parse((string) $resp->getBody());
         $this->assertArrayHasKey('schema', $cfg);
 
         $headers = ['Accept' => 'text/vnd.yaml'];
-        $resp    = self::$client->send(new Request('get', self::$baseUrl . 'describe', $headers));
+        $resp    = self::$client->send(new Request('GET', self::$baseUrl . 'describe', $headers));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/vnd.yaml', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0] ?? ''));
         $cfg     = yaml_parse((string) $resp->getBody());
         $this->assertArrayHasKey('schema', $cfg);
         
         $headers = ['Accept' => 'image/png'];
-        $resp    = self::$client->send(new Request('get', self::$baseUrl . 'describe', $headers));
+        $resp    = self::$client->send(new Request('GET', self::$baseUrl . 'describe', $headers));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/vnd.yaml', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0] ?? ''));
         $cfg     = yaml_parse((string) $resp->getBody());
@@ -71,13 +71,13 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
 
     public function testJson(): void {
         $headers = ['Accept' => 'application/json'];
-        $resp    = self::$client->send(new Request('get', self::$baseUrl . 'describe', $headers));
+        $resp    = self::$client->send(new Request('GET', self::$baseUrl . 'describe', $headers));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('application/json', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0] ?? ''));
         $cfg     = json_decode((string) $resp->getBody(), true);
         $this->assertArrayHasKey('schema', $cfg);
 
-        $resp = self::$client->send(new Request('get', self::$baseUrl . 'describe?format=application/json'));
+        $resp = self::$client->send(new Request('GET', self::$baseUrl . 'describe?format=application/json'));
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('application/json', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0] ?? ''));
         $cfg  = json_decode((string) $resp->getBody(), true);
@@ -85,7 +85,7 @@ class DescriptionTest extends \PHPUnit\Framework\TestCase {
     }
 
     public function testWrongHttpMethod(): void {
-        $resp = self::$client->send(new Request('put', self::$baseUrl . 'describe'));
+        $resp = self::$client->send(new Request('PUT', self::$baseUrl . 'describe'));
         $this->assertEquals(405, $resp->getStatusCode());
     }
 }
