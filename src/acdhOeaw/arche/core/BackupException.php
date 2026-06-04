@@ -1,10 +1,9 @@
-#!/usr/bin/php
 <?php
 
 /*
  * The MIT License
  *
- * Copyright 2020 Austrian Centre for Digital Humanities.
+ * Copyright 2026 zozlak.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,23 +24,13 @@
  * THE SOFTWARE.
  */
 
-$composerDir = realpath(__DIR__);
-while ($composerDir !== false && !file_exists("$composerDir/vendor")) {
-    $composerDir = realpath("$composerDir/..");
+namespace acdhOeaw\arche\core;
+
+/**
+ * Description of BackupException
+ *
+ * @author zozlak
+ */
+class BackupException extends \Exception {
+    
 }
-require_once "$composerDir/vendor/autoload.php";
-
-use zozlak\logging\Log;
-use Psr\Log\LogLevel;
-use acdhOeaw\arche\core\Backup;
-use acdhOeaw\arche\core\util\BackupParameters;
-
-$params = BackupParameters::fromArgv($argv ?? []);
-if ($params === false) {
-    exit(BackupParameters::HELP_STRING);
-}
-
-$log = new Log('php://stdout', LogLevel::DEBUG);
-$backup = new Backup($params, $log);
-$exit = $backup->run();
-exit($exit);
