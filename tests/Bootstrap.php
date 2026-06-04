@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use DirectoryIterator;
+use ZipArchive;
 use PHPUnit\Runner\Extension\Extension;
 use PHPUnit\Runner\Extension\Facade;
 use PHPUnit\Runner\Extension\ParameterCollection;
