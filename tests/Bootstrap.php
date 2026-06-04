@@ -75,7 +75,9 @@ class Init implements ExecutionStartedSubscriber {
         system('rm -fR ' . escapeshellarg($this->config->storage->tmpDir) . ' && mkdir -p ' . escapeshellarg($this->config->storage->tmpDir));
 
         if (!file_exists(__DIR__ . '/data/baedeker.xml')) {
-            file_put_contents(__DIR__ . '/data/baedeker.xml', file_get_contents('https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'));
+            $zip = new ZipArchive();
+            $zip->open(__DIR__ . '/data/baedeker.zip');
+            $zip->extractTo(__DIR__ . '/data/');
         }
 
         if (file_exists($this->config->transactionController->logging->file)) {
