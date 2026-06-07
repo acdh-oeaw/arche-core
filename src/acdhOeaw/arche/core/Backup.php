@@ -101,7 +101,6 @@ class Backup {
                 }
                 $this->pdo->commit();
                 $this->processChunks();
-                $this->updateDateFile($this->dateTo);
                 $this->log?->info("Dump completed " . ($this->exitCode === self::ERROR_NO_ERROR ? 'successfully' : 'with errors'));
             }
         } catch (BackupException $e) {
