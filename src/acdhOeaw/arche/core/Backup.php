@@ -99,7 +99,9 @@ class Backup {
                 if ($this->params->include !== BackupParameters::INCLUDE_NONE) {
                     $this->backupDb();
                 }
-                $this->pdo->commit();
+                if ($this->pdo->inTransaction()) {
+                    $this->pdo->commit();
+                }
                 $this->processChunks();
                 $this->log?->info("Dump completed " . ($this->exitCode === self::ERROR_NO_ERROR ? 'successfully' : 'with errors'));
             }
@@ -323,7 +325,6 @@ class Backup {
             throw new BackupException("Dumping database failed:\n\n" . implode("\n", $out));
         }
         $this->log?->info("    dump size: " . self::formatMb(filesize($this->sqlFile)) . "\n");
-        $this->pdo->commit(); // must be here so the snapshot passed to pg_dump exists
     }
 
     private function cleanup(): void {
