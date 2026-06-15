@@ -339,6 +339,9 @@ class Backup {
             }
         }
         if (isset($this->pdo) && !empty($this->txId)) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollback();
+            }
             $this->log?->info("Releasing database locks");
             $query = $this->pdo->prepare("UPDATE resources SET transaction_id = NULL WHERE transaction_id = ?");
             $query->execute([$this->txId]);
