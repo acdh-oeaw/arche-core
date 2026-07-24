@@ -38,7 +38,6 @@ use quickRdfIo\NQuadsParser;
 use quickRdfIo\NQuadsSerializer;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Config;
-use function \GuzzleHttp\json_encode;
 
 /**
  * Description of CallbackController
