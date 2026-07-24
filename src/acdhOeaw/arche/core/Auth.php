@@ -33,7 +33,6 @@ use acdhOeaw\arche\lib\AuthInterface;
 use zozlak\queryPart\QueryPart;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
-use function \GuzzleHttp\json_encode;
 
 /**
  * Description of Auth

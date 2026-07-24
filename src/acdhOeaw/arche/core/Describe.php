@@ -31,7 +31,6 @@ use RuntimeException;
 use zozlak\HttpAccept;
 use Composer\InstalledVersions;
 use acdhOeaw\arche\core\RestController as RC;
-use function \GuzzleHttp\json_encode;
 
 /**
  * Handles the /desribe endpoint
