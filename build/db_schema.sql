@@ -430,7 +430,7 @@ BEGIN
     END IF;
     IF TG_OP IN ('UPDATE', 'INSERT') THEN
         INSERT INTO spatial_search (mid, geom)
-            SELECT mid, st_geomfromtext(value, 4326)::geography
+            SELECT mid, st_geomfromtext(replace(value, '+', ''), 4326)::geography
             FROM allnew
             WHERE type = 'GEOM';
     END IF;
