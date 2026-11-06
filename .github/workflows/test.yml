@@ -39,15 +39,12 @@ jobs:
         if [ ! -d build/docker/root/var/www/tika ] ; then
             mkdir -p build/docker/root/var/www/tika
         fi
-        if [ ! -f build/docker/root/var/www/tika/tika-server.jar ] ; then
-            curl https://dlcdn.apache.org/tika/4.2.0/tika-server-standard-4.2.0.zip > build/docker/root/var/www/tika/tika.zip && \
-            cd build/docker/root/var/www/tika && unzip tika.zip && \
-            ln -s tika-server-* tika-server.jar
+        cd build/docker/root/var/www/tika
+        if [ ! -f tika-server.jar ] ; then
+            curl https://dlcdn.apache.org/tika/4.2.0/tika-server-standard-4.2.0.zip > tika.zip && unzip -o tika.zip && mv tika-server-* tika-server.jar && rm tika.zip
         fi
-        if [ ! -f build/docker/root/var/www/tika/tika-app.jar ] ; then
-            curl https://dlcdn.apache.org/tika/4.2.0/tika-app-4.2.0.zip > build/docker/root/var/www/tika/tika.zip && \
-            cd build/docker/root/var/www/tika && unzip tika.zip && \
-            ln -s tika-app* tika-app.jar
+        if [ ! -f tika-app.jar ] ; then
+            curl https://dlcdn.apache.org/tika/4.2.0/tika-app-4.2.0.zip > tika.zip && unzip -o tika.zip && mv tika-app* tika-app.jar && rm tika.zip
         fi
     - uses: shivammathur/setup-php@v2
       with:
