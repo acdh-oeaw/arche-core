@@ -45,6 +45,8 @@ CREATE TABLE resources (
     transaction_id bigint REFERENCES transactions(transaction_id) ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED,
     state text DEFAULT 'active' NOT NULL,
     lock int,
+    hash_check_date timestamp,
+    hash_check_result text,
     CONSTRAINT resources_state_check CHECK ((state = ANY (ARRAY['active', 'tombstone', 'deleted'])))
 );
 CREATE INDEX resources_transaction_id_index ON resources(transaction_id) WHERE transaction_id IS NOT NULL;

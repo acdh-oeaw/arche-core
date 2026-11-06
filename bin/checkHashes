@@ -1,0 +1,155 @@
+#!/usr/bin/php
+<?php
+/*
+ * The MIT License
+ *
+ * Copyright 2020 Austrian Centre for Digital Humanities.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+$targetTime = 0.25;
+$params = [
+    'targetReadSpeed' => 10,
+    'maxExecutionTime' => 0,
+    'batchSize' => 1000,
+];
+$n      = 0;
+$argv ??= [];
+for ($i = 1; $i < count($argv); $i++) {
+    if (substr($argv[$i], 0, 2) === '--') {
+        $params[substr($argv[$i], 2)] = $argv[$i + 1];
+        $i++;
+    } else {
+        $params[$n] = $argv[$i];
+        $n++;
+    }
+}
+
+if (($argc ?? 0) < 2) {
+    exit(<<<AAA
+checkHashes.php repoConfigFile --targetReadSpeed --maxExecutionTime --batchSize
+
+Checks repository storage consistency by comparing hashes stored in the metadata
+with actual file hashes.
+
+Parameters:
+    repoConfigFile path to the repository config yaml file
+    --targetReadSpeed target I/O speed in MB/s (default 10 MB/s)
+    --maxExecutionTime maximum execution time in seconds (0 means infinite, default is 0)
+    --batchSize size of the resources batch size retrieved from the database (default 1000)
+
+AAA
+    );
+}
+
+$targetRate = ((float) $params['targetReadSpeed']) * 1048576;
+$chunkSize = (int) ($targetRate * $targetTime);
+
+$t = microtime(true);
+printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', (int) $t));
+print_r($params);
+
+// CONFIG PARSING
+if (!file_exists($params[0])) {
+    print_r($params);
+    throw new Exception('Repository config yaml file does not exist');
+}
+$cfg = yaml_parse_file($params[0]);
+if ($cfg === false) {
+    throw new Exception('Repository config yaml file can not be parsed as YAML');
+}
+$cfg = json_decode(json_encode($cfg));
+
+if (substr($cfg->storage->dir, 0, 1) !== '/') {
+    throw new Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
+}
+
+$pdo   = new PDO($cfg->dbConnStr->admin);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+function computeHash(string $path, string $algo, float $targetTime, int $chunkSize): string {
+    $hash = hash_init($algo);
+    $handle = fopen($path, 'rb');
+    $t0 = microtime(true);
+    while (!feof($handle)) {
+        hash_update($hash, fread($handle, $chunkSize));
+        $t1 = microtime(true);
+        $actualTime = $t1 - $t0;
+        $diff = $targetTime - $actualTime;
+        if ($diff > 0) {
+            usleep((int) ($diff * 1000000));
+        }
+        $t0 = $t1;
+    }
+    fclose($handle);
+    return hash_final($hash);
+}
+
+function getStorageDir(int $id, string $path, int $level, int $levelMax): string {
+    if ($level < $levelMax) {
+        $path = sprintf('%s/%02d', $path, $id % 100);
+        $path = getStorageDir((int) $id / 100, $path, $level + 1, $levelMax);
+    }
+    return $path;
+}
+
+$count = ['n' => 0, 'missing' => 0, 'mismatch' => 0];
+
+while (true) {
+    $query = $pdo->prepare("SELECT id, value AS hash FROM metadata JOIN resources USING (id) WHERE property = ? ORDER BY last_hash_check NULLS FIRST, id LIMIT ?");
+    $query->execute([$cfg->schema->hash, $params['batchSize']]);
+    $resources = $query->fetchAll(PDO::FETCH_OBJ);
+    foreach ($resources as $res) {
+        $count['n']++;
+        $path = getStorageDir($res->id, $cfg->storage->dir, 0, $cfg->storage->levels) . '/' . $res->id;
+        if (!file_exists($path)) {
+            printf("error: resource %d doesn't exist [%d]\n", $res->id, $count['n']);
+            $count['missing']++;
+        } else {
+            $p     = strpos($res->hash, ':');
+            $algo  = substr($res->hash, 0, $p);
+            $hash1 = substr($res->hash, $p + 1);
+            $hash2 = computeHash($path, $algo, $targetTime, $chunkSize);
+            if ($hash1 === $hash2) {
+                printf("ok: resource %d [%d]\n", $res->id, $count['n']);
+                $updateParam = ['ok', $res->id];
+            } else {
+                printf("error: resource %d hash doesn't match %s != %s (%s) [%d]\n", $res->id, $hash1, $hash2, $algo, $count['n']);
+                $count['mismatch']++;
+                $updateParam = [$hash1 . ' != '. $hash2, $res->id];
+            }
+            try {
+                $update = $pdo->prepare("UPDATE resources SET last_hash_check = now(), hash_check = ? WHERE id = ?");
+                $update->execute($updateParam);
+            } catch (PDOException $e) {
+                printf("db update error: %s\n", $e->getMessage());
+            }
+        }
+        if ($params['maxExecutionTime'] > 0 && (microtime(true) - $t) > $params['maxExecutionTime']) {
+            printf("Stopping checking because of the execution timeout\n");
+            break 2;
+        }
+    }
+}
+
+$t = microtime(true) - $t;
+printf("%d files checked in %.1f s\t%d missing\t%d mismatches\n", $count['n'], $t, $count['missing'], $count['mismatch']);
+exit($count['missing'] + $count['mismatch'] != 0);
+
