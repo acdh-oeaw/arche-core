@@ -550,7 +550,7 @@ class SearchTest extends TestBase {
     public function testFullTextSearch1(?array $expected = null): void {
         $expected ??= [
             (string) self::$config->schema->id => '<b>verbunden</b>',
-            SearchConfig::FTS_BINARY           => "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht",
+            SearchConfig::FTS_BINARY           => "aufs     engste     <b>verbunden</b>  .     Auf      kleinasiatischem@Kettenbrücken  )     miteinander     <b>verbunden</b>  .     Zoll   für@Donautal     <b>verbunden</b>  .     Das     Klima   entspricht",
             'http://another/match'             => '<b>verbunden</b>',
         ];
 
