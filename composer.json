@@ -35,5 +35,10 @@
         "phpunit/phpunit": "<13",
         "zozlak/yaml-merge": "^1",
         "phpstan/phpstan": "*"
-    }
+    },
+    "bin": [
+        "bin/backup",
+        "bin/checkHashes",
+        "bin/cleanupStorage"
+    ]
 }
