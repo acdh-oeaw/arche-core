@@ -113,7 +113,7 @@ function getStorageDir(int $id, string $path, int $level, int $levelMax): string
 $count = ['n' => 0, 'missing' => 0, 'mismatch' => 0];
 
 while (true) {
-    $query = $pdo->prepare("SELECT id, value AS hash FROM metadata JOIN resources USING (id) WHERE property = ? ORDER BY last_hash_check NULLS FIRST, id LIMIT ?");
+    $query = $pdo->prepare("SELECT id, value AS hash FROM metadata JOIN resources USING (id) WHERE property = ? ORDER BY hash_check_date NULLS FIRST, id LIMIT ?");
     $query->execute([$cfg->schema->hash, $params['batchSize']]);
     $resources = $query->fetchAll(PDO::FETCH_OBJ);
     foreach ($resources as $res) {
@@ -136,7 +136,7 @@ while (true) {
                 $updateParam = [$hash1 . ' != '. $hash2, $res->id];
             }
             try {
-                $update = $pdo->prepare("UPDATE resources SET last_hash_check = now(), hash_check = ? WHERE id = ?");
+                $update = $pdo->prepare("UPDATE resources SET hash_check_date = now(), hash_check_result = ? WHERE id = ?");
                 $update->execute($updateParam);
             } catch (PDOException $e) {
                 printf("db update error: %s\n", $e->getMessage());
