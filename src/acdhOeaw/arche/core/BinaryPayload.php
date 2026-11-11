@@ -131,7 +131,7 @@ class BinaryPayload {
     private int $imagePxHeight;
     private int $imagePxWidth;
     private string $tmpPath;
-    private CData $gdalRaster;
+    private CData | null $gdalRaster;
 
     public function __construct(int $id) {
         $this->id = $id;
@@ -471,6 +471,10 @@ class BinaryPayload {
             /** @phpstan-ignore method.notFound */
             $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
         }
+        if ($this->gdalRaster === null) {
+            RC::$log->warning("\t\taborting spatial search update - GDAL failed to open the file");
+            return;
+        }
 
         /** @phpstan-ignore method.notFound */
         $projection = self::$gdal->GDALGetSpatialRef($this->gdalRaster);
@@ -513,10 +517,14 @@ class BinaryPayload {
                     /** @phpstan-ignore method.notFound */
                     $this->gdalRaster = self::$gdal->GDALOpen($this->tmpPath, self::GDAL_READONLY);
                 }
-                /** @phpstan-ignore method.notFound */
-                $this->imagePxHeight = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
-                /** @phpstan-ignore method.notFound */
-                $this->imagePxWidth  = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
+                if ($this->gdalRaster !== null) {
+                    /** @phpstan-ignore method.notFound */
+                    $this->imagePxHeight = self::$gdal->GDALGetRasterYSize($this->gdalRaster);
+                    /** @phpstan-ignore method.notFound */
+                    $this->imagePxWidth  = self::$gdal->GDALGetRasterXSize($this->gdalRaster);
+                } else {
+                    RC::$log->warning("\tfailed to read image dimensions - GDAL failed to open the file");
+                }
             } else {
                 $ret = getimagesize($this->tmpPath);
                 if (is_array($ret)) {
