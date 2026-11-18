@@ -1,5 +1,6 @@
 #!/usr/bin/php
 <?php
+
 /*
  * The MIT License
  *
@@ -25,13 +26,14 @@
  */
 
 $targetTime = 0.25;
-$params = [
-    'targetReadSpeed' => 10,
+$params     = [
+    'targetReadSpeed'  => 10,
     'maxExecutionTime' => 0,
-    'batchSize' => 1000,
+    'batchSize'        => 1000,
+    'reportFile'       => '',
 ];
-$n      = 0;
-$argv ??= [];
+$n          = 0;
+$argv       ??= [];
 for ($i = 1; $i < count($argv); $i++) {
     if (substr($argv[$i], 0, 2) === '--') {
         $params[substr($argv[$i], 2)] = $argv[$i + 1];
@@ -54,13 +56,14 @@ Parameters:
     --targetReadSpeed target I/O speed in MB/s (default 10 MB/s)
     --maxExecutionTime maximum execution time in seconds (0 means infinite, default is 0)
     --batchSize size of the resources batch size retrieved from the database (default 1000)
+    --reportPath path of the to-a report file updated each batchSize
 
 AAA
     );
 }
 
 $targetRate = ((float) $params['targetReadSpeed']) * 1048576;
-$chunkSize = (int) ($targetRate * $targetTime);
+$chunkSize  = (int) ($targetRate * $targetTime);
 
 $t = microtime(true);
 printf("-----\nRunning %s on %s\n", implode(" ", $argv), date('Y-m-d H:i:s', (int) $t));
@@ -81,18 +84,19 @@ if (substr($cfg->storage->dir, 0, 1) !== '/') {
     throw new Exception('Storage dir set up as a relative path in the repository config file - can not determine paths');
 }
 
-$pdo   = new PDO($cfg->dbConnStr->admin);
+$pdo = new PDO($cfg->dbConnStr->admin);
 $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-function computeHash(string $path, string $algo, float $targetTime, int $chunkSize): string {
-    $hash = hash_init($algo);
+function computeHash(string $path, string $algo, float $targetTime,
+                     int $chunkSize): string {
+    $hash   = hash_init($algo);
     $handle = fopen($path, 'rb');
-    $t0 = microtime(true);
+    $t0     = microtime(true);
     while (!feof($handle)) {
         hash_update($hash, fread($handle, $chunkSize));
-        $t1 = microtime(true);
+        $t1         = microtime(true);
         $actualTime = $t1 - $t0;
-        $diff = $targetTime - $actualTime;
+        $diff       = $targetTime - $actualTime;
         if ($diff > 0) {
             usleep((int) ($diff * 1000000));
         }
@@ -110,10 +114,28 @@ function getStorageDir(int $id, string $path, int $level, int $levelMax): string
     return $path;
 }
 
+function generateReport(string $path, PDO $pdo): void {
+    $results = $pdo->query("
+        SELECT
+            coalesce(hash_check_result, 'never checked') AS state, 
+            count(*) as count, 
+            min(hash_check_date)::date as oldest, 
+            max(hash_check_date)::date as latest
+            FROM resources 
+        GROUP BY 1 
+        ORDER BY 1
+    ")->fetchAll(PDO::FETCH_OBJ);
+    $report  = '### Hash checks report from ' . date("Y-m-d H:i:s") . "\n\n";
+    $report  .= "[state: count (oldest check date, lates check date)]\n\n";
+    foreach ($results as $i) {
+        $report .= "$i->state: $i->count ($i->oldest, $i->latest)\n";
+    }
+    file_put_contents($path, $report);
+}
 $count = ['n' => 0, 'missing' => 0, 'mismatch' => 0];
 
 while (true) {
-    $query = $pdo->prepare("SELECT id, value AS hash FROM metadata JOIN resources USING (id) WHERE property = ? ORDER BY hash_check_date NULLS FIRST, id LIMIT ?");
+    $query     = $pdo->prepare("SELECT id, value AS hash FROM metadata JOIN resources USING (id) WHERE property = ? ORDER BY hash_check_date NULLS FIRST, id LIMIT ?");
     $query->execute([$cfg->schema->hash, $params['batchSize']]);
     $resources = $query->fetchAll(PDO::FETCH_OBJ);
     foreach ($resources as $res) {
@@ -133,7 +155,7 @@ while (true) {
             } else {
                 printf("error: resource %d hash doesn't match %s != %s (%s) [%d]\n", $res->id, $hash1, $hash2, $algo, $count['n']);
                 $count['mismatch']++;
-                $updateParam = [$hash1 . ' != '. $hash2, $res->id];
+                $updateParam = [$hash1 . ' != ' . $hash2, $res->id];
             }
             try {
                 $update = $pdo->prepare("UPDATE resources SET hash_check_date = now(), hash_check_result = ? WHERE id = ?");
@@ -147,9 +169,14 @@ while (true) {
             break 2;
         }
     }
+    if (!empty($params['reportPath'])) {
+        generateReport($params['reportPath'], $pdo);
+    }
 }
 
 $t = microtime(true) - $t;
 printf("%d files checked in %.1f s\t%d missing\t%d mismatches\n", $count['n'], $t, $count['missing'], $count['mismatch']);
+if (!empty($params['reportPath'])) {
+    generateReport($params['reportPath'], $pdo);
+}
 exit($count['missing'] + $count['mismatch'] != 0);
-
