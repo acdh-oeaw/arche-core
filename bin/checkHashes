@@ -127,9 +127,12 @@ function generateReport(string $path, PDO $pdo): void {
     ")->fetchAll(PDO::FETCH_OBJ);
     $report  = '### Hash checks report from ' . date("Y-m-d H:i:s") . "\n\n";
     $report  .= "[state: count (oldest check date, lates check date)]\n\n";
+    $allFine = true;
     foreach ($results as $i) {
         $report .= "$i->state: $i->count ($i->oldest, $i->latest)\n";
+        $allFine &= $i->state === 'ok' || $i->state === '';
     }
+    $report .= "\n".($allFine? "All checked hashes match" : "Error - some hashes differ")."\n";
     file_put_contents($path, $report);
 }
 $count = ['n' => 0, 'missing' => 0, 'mismatch' => 0];
