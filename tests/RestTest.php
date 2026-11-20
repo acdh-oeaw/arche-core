@@ -970,8 +970,7 @@ class RestTest extends TestBase {
         $meta->add(DF::quadNoSubject(DF::namedNode('https://wrong/date'), DF::literal('foo', null, RDF::XSD_DATE)));
         try {
             $this->createMetadataResource($meta);
-            /** @phpstan-ignore method.impossibleType */
-            $this->assertTrue(false);
+            $this->fail();
         } catch (RuntimeException $e) {
             $this->assertStringContainsString('Wrong property value', $e->getMessage());
         }
