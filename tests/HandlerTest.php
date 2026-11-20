@@ -336,16 +336,14 @@ class HandlerTest extends TestBase {
         $txId = $this->beginTransaction();
         try {
             $this->createBinaryResource($txId);
-            /** @phpstan-ignore method.impossibleType */
-            $this->assertTrue(false);
+            $this->fail();
         } catch (RuntimeException $ex) {
             $this->assertEquals(400, $ex->getCode());
             $this->assertEquals("Just throw an exception", $ex->getMessage());
         }
         try {
             $this->createMetadataResource(null, $txId);
-            /** @phpstan-ignore method.impossibleType */
-            $this->assertTrue(false);
+            $this->fail();
         } catch (RuntimeException $ex) {
             $this->assertEquals(400, $ex->getCode());
             $this->assertEquals("Just throw an exception", $ex->getMessage());
@@ -386,8 +384,7 @@ class HandlerTest extends TestBase {
         $txId = $this->beginTransaction();
         try {
             $this->createBinaryResource($txId);
-            /** @phpstan-ignore method.impossibleType */
-            $this->assertTrue(false);
+            $this->fail();
         } catch (RuntimeException $ex) {
             $this->assertEquals(500, $ex->getCode());
             $this->assertEmpty($ex->getMessage());
